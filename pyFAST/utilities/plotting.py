@@ -89,7 +89,7 @@ def _replace_id_script_string(script: str, attribute: str) -> str:
 
 
 def _tidy_script_string(script):
-    return script.replace("\n", "".join(("\n", INDENT)))
+    return script.replace("\n", f"\n"{INDENT})
 
 
 def create_header(title: str) -> str:
@@ -112,33 +112,18 @@ def create_header(title: str) -> str:
             "<!DOCTYPE html>",
             "<html>",
             "<head>",
-            "".join((INDENT, f"<title>{title}</title>'.format()")),
-            "".join(
-                (
-                    INDENT,
-                    '<link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">',
-                )
-            ),
-            "".join(
-                (
-                    INDENT,
-                    '<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>',
-                )
-            ),
-            "".join(
-                (
-                    INDENT,
-                    '<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>',
-                )
-            ),
-            "".join((INDENT, '<style media="screen" type="text/css">')),
-            "".join((INDENT * 2, ".cell-warning {")),
-            "".join((INDENT * 3, "background-color: #FF6666;")),
-            "".join((INDENT * 2, "}")),
-            "".join((INDENT * 2, ".cell-highlight {")),
-            "".join((INDENT * 3, "background-color: #E5E589;")),
-            "".join((INDENT * 2, "}")),
-            "".join((INDENT, "</style>")),
+            f"{INDENT}<title>{title}</title>'.format()",
+            f'{INDENT}<link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">',
+            f'{INDENT}<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>',
+            f'{INDENT}<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>',
+            f'{INDENT}<style media="screen" type="text/css">',
+            f"{INDENT * 2}.cell-warning {{",
+            f"{INDENT * 3}background-color: #FF6666;",
+            f"{INDENT * 2}}}",
+            f"{INDENT * 2}.cell-highlight {{",
+            f"{INDENT * 3}background-color: #E5E589;",
+            f"{INDENT * 2}}}",
+            f"{INDENT}</style>",
             "</head>",
         )
     )
@@ -164,26 +149,17 @@ def create_table_head(columns: List[str]) -> str:
         Stringified table head that can be inserted into an HTML document.
     """
 
-    header = "\n".join(
-        ("".join((INDENT * 5, f"<th>{column}</th>")) for column in columns)
-    )
+    header = "\n".join((f"{INDENT * 5}<th>{col}</th>" for col in columns))
 
-    head = "\n".join(
-        (
-            "".join(
-                (
-                    INDENT * 2,
-                    '<table class="table table-bordered table-hover table-sm" style="margin: auto; width: 100%; font-size:80%">',
-                )
-            ),
-            "".join((INDENT * 3, "<thead>")),
-            "".join((INDENT * 4, "<tr>")),
-            "".join((INDENT * 5, "<th>#</th>")),
-            header,
-            "".join((INDENT * 4, "</tr>")),
-            "".join((INDENT * 3, "</thead>")),
-        )
-    )
+    head = "\n".join((
+        f'{INDENT * 2}<table class="table table-bordered table-hover table-sm" style="margin: auto; width: 100%; font-size:80%">',
+        f"{INDENT * 3}<thead>",
+        f"{INDENT * 4}<tr>",
+        f"{INDENT * 5}<th>#</th>",
+        header,
+        f"{INDENT * 4}</tr>",
+        f"{INDENT * 3}</thead>",
+    ))
     return head
 
 
@@ -308,17 +284,16 @@ def create_plot_body(html_head: str, plots: List[tuple]):
     return html_head, div_body
 
 
-def create_case_summary(path, case, results, results_max, tolerance, plots):
+def create_case_summary(
+    path, case, results, results_max, tolerance, plots, results_columns=["max_norm","max_norm_over_range","l2_norm","relative_l2_norm",]
+):
 
     title = " ".join((case, "Summary"))
     html_head = create_header(title)
     html_head, div_body = create_plot_body(html_head, plots)
     columns = [
         "Channel",
-        "Max Norm",
-        "Relative Max Norm",
-        "L2 Norm",
-        "Relative L2 Norm",
+        *[r.replace("_", " ").title() for r in results_columns],
     ]
     table_head = create_table_head(columns)
 
@@ -329,14 +304,12 @@ def create_case_summary(path, case, results, results_max, tolerance, plots):
 
     table_body = "".join((INDENT * 3, "<tbody>"))
     for i, d in enumerate(data):
-        table_body = "\n".join(
-            (
-                table_body,
-                "".join((INDENT * 4, "<tr>")),
-                "".join((INDENT * 5, f'<th scope="row">{i + 1}</th>')),
-                "".join((INDENT * 5, f"<td>{d[0]}</td>")),
-            )
-        )
+        table_body = "\n".join((
+            table_body,
+            f"{INDENT * 4}<tr>",
+            f'{INDENT * 5}<th scope="row">{i + 1}</th>',
+            f"{INDENT * 5}<td>{d[0]}</td>",
+        ))
         for j, val in enumerate(d[1]):
             if val == results_max[j]:
                 _class = ' class="cell-warning"'
@@ -345,13 +318,11 @@ def create_case_summary(path, case, results, results_max, tolerance, plots):
             else:
                 _class = ""
 
-            cell = "".join((INDENT * 5, f"<td{_class}>{val:0.4e}</td>"))
+            cell = f"{INDENT * 5}<td{_class}>{val:0.4e}</td>"
 
             table_body = "\n".join((table_body, cell))
-        table_body = "\n".join(("".join(INDENT * 4, "</tr>")))
-    table_body = "\n".join(
-        ("".join((INDENT * 3, "</tbody>")), "".join((INDENT * 2, "</table>")))
-    )
+        table_body = "\n".join((table_body, f"{INDENT * 4}</tr>"))
+    table_body = "\n".join((f"{INDENT * 3}</tbody>", f"{INDENT * 2}</table>"))
 
     if len(plots) == 0:
         plot_body = ""
@@ -363,20 +334,15 @@ def create_case_summary(path, case, results, results_max, tolerance, plots):
             html_head,
             "",
             "<body>",
-            "".join((INDENT, f'<h2 class="text-center">{title}</h2>')),
-            "".join(
-                (
-                    INDENT,
-                    f'<h4 class="text-center">Maximum values for each norm are <span class="cell-warning">highlighted</span> and failing norms (norm >= {tolerance}) are <span class="cell-highlight">highlighted</span></h2>',
-                )
-            ),
-            "".join((INDENT, '<div class="container"')),
+            f'{INDENT}<h2 class="text-center">{title}</h2>',
+            f'{INDENT}<h4 class="text-center">Maximum values for each norm are <span class="cell-warning">highlighted</span> and failing norms (norm >= {tolerance}) are <span class="cell-highlight">highlighted</span></h2>',
+            f'{INDENT}<div class="container"',
             table_body,
-            "".join((INDENT * 2, "<br>")),
-            "".join((INDENT, "</div>")),
+            f"{INDENT * 2}<br>",
+            f"{INDENT}</div>",
             plot_body,
-            "".join((INDENT * 2, "</div>")),
-            "".join((INDENT, "</div>")),
+            f"{INDENT * 2}</div>",
+            f"{INDENT}</div>",
             "</body>",
             create_tail(),
         )
