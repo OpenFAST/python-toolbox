@@ -1,7 +1,7 @@
 """Initialize everything"""
 
 
-from pyFAST import utilities
+from pyfast import utilities
 
 from .executor import Executor
 
