@@ -11,55 +11,54 @@ from multiprocessing import Process, cpu_count
 
 import bokeh
 import numpy as np
-
-from pyfast.utilities import (
-    ignore_baseline,
+from pyfast.pyfast.utilities import (
     load_output,
+    validate_file,
+    calculate_norms,
+    ignore_baseline,
     run_openfast_case,
     validate_directory,
     validate_executable,
-    validate_file,
-    calculate_norms
 )
 
 CASE_MAP = {
-    '5MW_ITIBarge_DLL_WTurb_WavesIrr': 'regression',
-    '5MW_Land_BD_DLL_WTurb': 'regression',
-    '5MW_Land_BD_Linear': 'linear',
-    '5MW_Land_DLL_WTurb': 'regression',
-    '5MW_OC3Mnpl_DLL_WTurb_WavesIrr': 'regression',
-    '5MW_OC3Spar_DLL_WTurb_WavesIrr': 'regression',
-    '5MW_OC3Trpd_DLL_WSt_WavesReg': 'regression',
-    '5MW_OC4Jckt_DLL_WTurb_WavesIrr_MGrowth': 'regression',
-    '5MW_OC4Semi_WSt_WavesWN': 'regression',
-    '5MW_TLP_DLL_WTurb_WavesIrr_WavesMulti': 'regression',
-    'AOC_WSt': 'regression',
-    'AOC_YFix_WSt': 'regression',
-    'AOC_YFree_WTurb': 'regression',
-    'AWT_WSt_StartUpShutDown': 'regression',
-    'AWT_WSt_StartUp_HighSpShutDown': 'regression',
-    'AWT_YFix_WSt': 'regression',
-    'AWT_YFree_WSt': 'regression',
-    'AWT_YFree_WTurb': 'regression',
-    'Ideal_Beam_Fixed_Free_Linear': 'linear',
-    'Ideal_Beam_Free_Free_Linear': 'linear',
-    'SWRT_YFree_VS_EDC01': 'regression',
-    'SWRT_YFree_VS_EDG01': 'regression',
-    'SWRT_YFree_VS_WTurb': 'regression',
-    'UAE_Dnwind_YRamp_WSt': 'regression',
-    'UAE_Upwind_Rigid_WRamp_PwrCurve': 'regression',
-    'WP_Stationary_Linear': 'linear',
-    'WP_VSP_ECD': 'regression',
-    'WP_VSP_WTurb': 'regression',
-    'WP_VSP_WTurb_PitchFail': 'regression',
-    'bd_5MW_dynamic': 'beam_dyn',
-    'bd_5MW_dynamic_gravity_Az00': 'beam_dyn',
-    'bd_5MW_dynamic_gravity_Az90': 'beam_dyn',
-    'bd_curved_beam': 'beam_dyn',
-    'bd_isotropic_rollup': 'beam_dyn',
-    'bd_static_cantilever_beam': 'beam_dyn',
-    'bd_static_twisted_with_k1': 'beam_dyn'
- }
+    "5MW_ITIBarge_DLL_WTurb_WavesIrr": "regression",
+    "5MW_Land_BD_DLL_WTurb": "regression",
+    "5MW_Land_BD_Linear": "linear",
+    "5MW_Land_DLL_WTurb": "regression",
+    "5MW_OC3Mnpl_DLL_WTurb_WavesIrr": "regression",
+    "5MW_OC3Spar_DLL_WTurb_WavesIrr": "regression",
+    "5MW_OC3Trpd_DLL_WSt_WavesReg": "regression",
+    "5MW_OC4Jckt_DLL_WTurb_WavesIrr_MGrowth": "regression",
+    "5MW_OC4Semi_WSt_WavesWN": "regression",
+    "5MW_TLP_DLL_WTurb_WavesIrr_WavesMulti": "regression",
+    "AOC_WSt": "regression",
+    "AOC_YFix_WSt": "regression",
+    "AOC_YFree_WTurb": "regression",
+    "AWT_WSt_StartUpShutDown": "regression",
+    "AWT_WSt_StartUp_HighSpShutDown": "regression",
+    "AWT_YFix_WSt": "regression",
+    "AWT_YFree_WSt": "regression",
+    "AWT_YFree_WTurb": "regression",
+    "Ideal_Beam_Fixed_Free_Linear": "linear",
+    "Ideal_Beam_Free_Free_Linear": "linear",
+    "SWRT_YFree_VS_EDC01": "regression",
+    "SWRT_YFree_VS_EDG01": "regression",
+    "SWRT_YFree_VS_WTurb": "regression",
+    "UAE_Dnwind_YRamp_WSt": "regression",
+    "UAE_Upwind_Rigid_WRamp_PwrCurve": "regression",
+    "WP_Stationary_Linear": "linear",
+    "WP_VSP_ECD": "regression",
+    "WP_VSP_WTurb": "regression",
+    "WP_VSP_WTurb_PitchFail": "regression",
+    "bd_5MW_dynamic": "beam_dyn",
+    "bd_5MW_dynamic_gravity_Az00": "beam_dyn",
+    "bd_5MW_dynamic_gravity_Az90": "beam_dyn",
+    "bd_curved_beam": "beam_dyn",
+    "bd_isotropic_rollup": "beam_dyn",
+    "bd_static_cantilever_beam": "beam_dyn",
+    "bd_static_twisted_with_k1": "beam_dyn",
+}
 
 
 class Executor:
@@ -78,10 +77,10 @@ class Executor:
         system: str = None,
         tolerance: float = 1e-5,
         plot: int = 0,
-        plot_path : str = None,
+        plot_path: str = None,
         execution: bool = False,
         verbose: bool = False,
-        jobs: bool = -1
+        jobs: bool = -1,
     ):
         """
         Initialize the required inputs
@@ -217,7 +216,7 @@ class Executor:
 
         if "linear" in case_type:
             directories.extend(_linear)
-        
+
         if "regression" in case_type:
             directories.extend(_regression)
 
@@ -267,7 +266,9 @@ class Executor:
         else:
             case_input = os.path.join(test_build, "".join((case, ".fst")))
 
-        code = run_openfast_case(self.executable, case_input, verbose=self.verbose, beamdyn=beamdyn)
+        code = run_openfast_case(
+            self.executable, case_input, verbose=self.verbose, beamdyn=beamdyn
+        )
         if code != 0:
             sys.exit("")
 
@@ -319,7 +320,7 @@ class Executor:
 
         for f in (local, baseline):
             validate_file(f)
-        
+
         return local, baseline
 
     @staticmethod
@@ -349,7 +350,7 @@ class Executor:
         """
         Reads in the output files corresponding to `case` and returns the
         cases, baseline outputs, and locally produced outputs.
-        
+
         Returns
         -------
         case_list : list
@@ -362,7 +363,7 @@ class Executor:
         FUNC_MAP = {
             "linear": self._get_linear_out_files,
             "regression": self._get_regression_out_files,
-            "beamdyn": self._get_beamdyn_out_files
+            "beamdyn": self._get_beamdyn_out_files,
         }
 
         case_list = []
@@ -392,8 +393,8 @@ class Executor:
         Wraps utilities.calculate_norms
         """
 
-# save to test case directory by default and custom path otherwise
 
+# save to test case directory by default and custom path otherwise
 
 
 # regression_tests = {

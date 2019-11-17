@@ -1,3 +1,3 @@
 """Initializes the package"""
 
-from pyFAST import Executor, utilities
+from pyfast import Executor, utilities
