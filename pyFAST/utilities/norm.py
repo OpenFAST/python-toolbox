@@ -209,12 +209,10 @@ def calculate_norms(
         Maximum norm of the differene betwen baseline and test data.
     """
 
-    norm_results = np.hstack(
-        (
-            NORM_MAP[norm_type](baseline, test, abs_val, axis).reshape(-1, 1)
-            for norm_type in norms
-        )
-    )
+    norm_results = np.hstack((
+        NORM_MAP[norm_type](baseline, test, abs_val, axis).reshape(-1, 1)
+        for norm_type in norms
+    ))
     return norm_results
 
 

@@ -1,20 +1,26 @@
 """Provides the Executor case"""
 
 
-import argparse
 import os
+import sys
+import shutil
 import platform
-from concurrent.futures import ProcessPoolExecutor
-from multiprocessing import cpu_count
-from pathlib import Path
 from typing import List
+from pathlib import Path
+from multiprocessing import Process, cpu_count
 
 import bokeh
-import numpy
+import numpy as np
 
-from pyFAST.utilities import (ignore_baseline, load_output, run_openfast_case,
-                              validate_directory, validate_executable,
-                              validate_file)
+from pyfast.utilities import (
+    ignore_baseline,
+    load_output,
+    run_openfast_case,
+    validate_directory,
+    validate_executable,
+    validate_file,
+    calculate_norms
+)
 
 CASE_MAP = {
     '5MW_ITIBarge_DLL_WTurb_WavesIrr': 'regression',
@@ -65,15 +71,17 @@ class Executor:
 
     def __init__(
         self,
-        case,
-        exec,
-        source,
-        compiler,
-        tolerance=1e-5,
-        plot=0,
-        execution=False,
-        verbose=False,
-        jobs=1
+        case: str,
+        executable: str,
+        source: str,
+        compiler: str,
+        system: str = None,
+        tolerance: float = 1e-5,
+        plot: int = 0,
+        plot_path : str = None,
+        execution: bool = False,
+        verbose: bool = False,
+        jobs: bool = -1
     ):
         """
         Initialize the required inputs
@@ -90,6 +98,10 @@ class Executor:
             Path to OpenFAST repository.
         compiler : str
             System compiler id. Should be one of "intel" or "gnu".
+        system : str
+            Operating system version of results used for comparison, default
+            None (machine's OS). Should be one of "Windows", "Linux", or
+            "Darwin".
         tolerance: float, default: 1e-5
             Error tolerance for pass/fail condition.
         plot : int, default: 0
@@ -98,22 +110,26 @@ class Executor:
              - 1: All plots will be produced.
              - 2: Only the plots for failing cases will be produced.
             All plots will be output to <path_to_case_name>/results.html.
+        plot_path : str, default None
+            Path to save all case result summaries and their plots. If `None`,
+            the local output directory is used.
         execution : bool, default: True
             Flag to run the test case(s). If `False`, ....
         verbose : bool, default: False
             Flag to include system ouptut.
-        jobs : int, default: 1
+        jobs : int, default: -1
             Maximum number of parallel jobs to run:
              - -1: 80% of maximum number of nodes available
              - >0: Minimum of the number passed and the number of nodes available
         """
 
         system_map = {"Darwin": "macos", "Linux": "linux", "Windows": "windows"}
+        os = system_map[platform.system() if system is None else system]
 
         self.case = case
+        self.compiler = compiler
         self.source = Path(source)
         self.executable = Path(executable)
-        self.output_type = "-".join((system_map[platform.system()], compiler.lower()))
         self.build = os.path.join(source, "build")
         self.verbose = verbose
         self.execution = execution
@@ -121,10 +137,12 @@ class Executor:
         self.plot = plot
         self.jobs = jobs if jobs != 0 else -1
 
-        self.rtest = os.path.join(sourceDirectory, "reg_tests", "r-test")
+        self.rtest = os.path.join(self.source, "reg_tests", "r-test")
         self.module = os.path.join(self.rtest, "glue-codes", "openfast")
 
         self._validate_inputs()
+
+        self.output_type = "-".join((os, self.compiler.lower()))
 
     def _validate_inputs(self):
         """Method to ensure inputs are valid."""
@@ -175,7 +193,7 @@ class Executor:
             for name in os.listdir(source):
                 if name == "ServoData":
                     continue
-                _source = os.path.join(souce, name)
+                _source = os.path.join(source, name)
                 _target = os.path.join(target, name)
                 if os.path.isdir(_source):
                     if not os.path.isdir(_target):
@@ -190,7 +208,7 @@ class Executor:
             if not os.path.isdir(test_dir):
                 shutil.copytree(input_dir, test_dir, ignore=ignore_baseline)
 
-    def build_output_directories(self, case_type: List[str]):
+    def _build_output_directories(self, case_type: List[str]):
         """Creates the local output directories"""
 
         _linear = ("Ideal_Beam", "WP_Baseline")
@@ -199,6 +217,7 @@ class Executor:
 
         if "linear" in case_type:
             directories.extend(_linear)
+        
         if "regression" in case_type:
             directories.extend(_regression)
 
@@ -215,7 +234,7 @@ class Executor:
         self._build_5MW_directories()
         self._build_test_directory()
 
-    def build_directories(self):
+    def _build_directories(self):
         """Builds the necessary directories"""
 
         self.inputs = []
@@ -228,10 +247,7 @@ class Executor:
             self.test_build.append(os.path.join(self.build, case))
             case_types.add(CASE_MAP["case"])
 
-        self._build_output_directories()
-
-
-    def _run_single_case(self, case: str, input_file: str, test_build: str):
+    def _run_single_case(self, case: str, test_build: str):
         """
         Runs a single OpenFAST test case
 
@@ -255,22 +271,28 @@ class Executor:
         if code != 0:
             sys.exit("")
 
-    def run_openfast_cases(self):
+    def _run_openfast_cases(self):
         """
         Runs all of the openfast cases in parallel (if defined).
         """
 
-        arguments = list(zip(self.case, self.inputs, self.test_build))
-        with ProcessPoolExecutor(max_workers=self.jobs) as pool:
-            pool.map(self._run_single_case, arguments)
+        arguments = list(zip(self.case, self.test_build))
+        with Process(self.jobs) as p:
+            p.map(self._run_single_case, arguments)
 
     def run(self):
-        self.build_directories()
+        """
+        Function to build the references to ouput directories. If executing
+        OpenFAST, then the directories are created if they don't already exist.
+        """
+
+        self._build_directories()
         if self.execution:
-            self.run_openfast_cases()
+            self._build_output_directories()
+            self._run_openfast_cases()
 
     @staticmethod
-    def _get_linear_out_files(self):
+    def _get_linear_out_files():
         """
         .. note:: Not yet implemented but don't want it to fail.
         """
@@ -297,6 +319,8 @@ class Executor:
 
         for f in (local, baseline):
             validate_file(f)
+        
+        return local, baseline
 
     @staticmethod
     def _get_beamdyn_out_files(case: str, out_dir: str, baseline_dir: str):
@@ -306,7 +330,7 @@ class Executor:
         Parameters
         ----------
         case : str
-            Case name.
+            Case name. Not used.
         out_dir : str
             Test build direcory.
         baseline_dir : str
@@ -319,14 +343,28 @@ class Executor:
         for f in (local, baseline):
             validate_file(f)
 
-    def read_out_files(self):
+        return local, baseline
 
+    def read_out_files(self):
+        """
+        Reads in the output files corresponding to `case` and returns the
+        cases, baseline outputs, and locally produced outputs.
+        
+        Returns
+        -------
+        case_list : list
+            List of valid non-linear regression test cases.
+        baseline_list : List[tuple]
+            List of valid non-linear regression test cases (attribute, data).
+        test_list : List[tuple]
+            List of valid non-linear regression test cases (attribute, data).
+        """
         FUNC_MAP = {
             "linear": self._get_linear_out_files,
             "regression": self._get_regression_out_files,
             "beamdyn": self._get_beamdyn_out_files
         }
-        linear = (None, None)
+
         case_list = []
         test_list = []
         baseline_list = []
@@ -348,8 +386,13 @@ class Executor:
 
         return case_list, baseline_list, test_list
 
-    def
+    @staticmethod
+    def calculate_norms():
+        """
+        Wraps utilities.calculate_norms
+        """
 
+# save to test case directory by default and custom path otherwise
 
 
 
