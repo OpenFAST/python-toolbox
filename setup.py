@@ -1,17 +1,26 @@
 """"Distribution setup"""
 
+
+import os
+
 from setuptools import setup
 
-# import pyfast
+ROOT = os.path.abspath(os.path.dirname(__file__))
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
+with open(os.path.join(ROOT, "VERSION")) as version_file:
+    __version__ = version_file.read().strip()
+
 
 setup(
     name="pyfast",
-    version="0.1.0",
     description="pyfast",
+    version=__version__,
+    url="https://github.com/RHammond2/pyfast/",
+    author="Rob Hammond",
+    author_email="robert.hammond@nrel.gov",
     classifiers=[
         "Development Status :: 4 - Beta",
         "Programming Language :: Python :: 3.7",
