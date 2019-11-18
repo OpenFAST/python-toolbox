@@ -2,15 +2,13 @@
 
 
 import os
-import sys
+from typing import List, Tuple
 
-import bokeh
 import numpy as np
 from bokeh.embed import components
 from bokeh.layouts import gridplot
-from bokeh.models.tools import HoverTool
-from bokeh.models.widgets import RangeSlider
 from bokeh.plotting import figure
+from bokeh.models.tools import HoverTool
 
 INDENT = "  "
 
@@ -88,8 +86,21 @@ def _replace_id_script_string(script: str, attribute: str) -> str:
     return script
 
 
-def _tidy_script_string(script):
-    return script.replace("\n", f"\n"{INDENT})
+def _tidy_script_string(script: str) -> str:
+    """
+    Replaces "\n" with a "\n  ".
+
+    Parameters
+    ----------
+    script : str
+        Text of html script.
+
+    Returns
+    -------
+    str
+        Updated text of html script.
+    """
+    return script.replace("\n", f"\n{INDENT}")
 
 
 def create_header(title: str) -> str:
@@ -130,7 +141,8 @@ def create_header(title: str) -> str:
     return html
 
 
-def create_tail():
+def create_tail() -> str:
+    """Creates the end of the html file."""
     return "</html>\n"
 
 
@@ -228,7 +240,30 @@ def plot_error(
     test_data: list,
     test_info: list,
     attributes: list,
-) -> list:
+) -> List[Tuple[str, str, str]]:
+    """
+    Plots the raw baseline vs test results for each attribute in one column and
+    the normalized differences between the two in a second column.
+
+    Parameters
+    ----------
+    baseline_data : list
+        Baseline output included in distribution.
+    baseline_info : list
+        Attribute information for `baseline_data`.
+    test_data : list
+        User-produced output from OpenFAST.
+    test_info : list
+        Attribute information for `test_data`.
+    attributes : list
+        list of attribute names.
+
+    Returns
+    -------
+    List[Tuple[str, str, str]]
+        List of tuples of script, div, and attrbiute name for each attribute in
+        `attributes`.
+    """
 
     x = test_data[:, 0]
     plots = []
@@ -272,8 +307,8 @@ def create_plot_body(html_head: str, plots: List[tuple]):
 
     div_body = "\n"
     script_body = "\n"
-    for i, (script, div, attribute) in enumerate(plots):
-        div = _tidy_div_string(_replace_id_div(div, attribute))
+    for script, div, attribute in plots:
+        div = _tidy_div_string(_replace_id_div_string(div, attribute))
         div_body = "\n".join((div_body, div))
 
         script = _tidy_script_string(_replace_id_script_string(script, attribute))
@@ -285,16 +320,38 @@ def create_plot_body(html_head: str, plots: List[tuple]):
 
 
 def create_case_summary(
-    path, case, results, results_max, tolerance, plots, results_columns=["max_norm","max_norm_over_range","l2_norm","relative_l2_norm",]
+    path: str,
+    case: str,
+    results: np.ndarray,
+    results_max: np.ndarray,
+    tolerance: float,
+    plots: List[str],
+    results_columns: List[str] = ["max_norm", "max_norm_over_range", "l2_norm", "relative_l2_norm"],
 ):
+    """
+    Creates the case summary and exports it to `path`/`case`_summary.html.
+
+    Parameters
+    ----------
+    path : str
+        Path for where to save the html file.
+    case : str
+        Name of the case.
+    results : np.ndarray, shape: [n_attributes, n_norms]
+        Norm results by attribute.
+    results_max : array-like
+        Max of each norm.
+    tolerance : float
+        Value at which all normed values must be below.
+    plots : List[str]
+        List of attributes to create plots for.
+    results_columns : List[str], optional
+        List of norms that are being provided, by default ["max_norm", "max_norm_over_range", "l2_norm", "relative_l2_norm"]
+    """
 
     title = " ".join((case, "Summary"))
     html_head = create_header(title)
-    html_head, div_body = create_plot_body(html_head, plots)
-    columns = [
-        "Channel",
-        *[r.replace("_", " ").title() for r in results_columns],
-    ]
+    columns = ["Channel", *[r.replace("_", " ").title() for r in results_columns]]
     table_head = create_table_head(columns)
 
     data = [
@@ -324,29 +381,27 @@ def create_case_summary(
         table_body = "\n".join((table_body, f"{INDENT * 4}</tr>"))
     table_body = "\n".join((f"{INDENT * 3}</tbody>", f"{INDENT * 2}</table>"))
 
-    if len(plots) == 0:
+    html_head, plot_body = create_plot_body(html_head, plots)
+    if not plots:
         plot_body = ""
-    else:
-        html_head, plot_body = create_plot_body(html_head, plots)
 
-    html = "\n".join(
-        (
-            html_head,
-            "",
-            "<body>",
-            f'{INDENT}<h2 class="text-center">{title}</h2>',
-            f'{INDENT}<h4 class="text-center">Maximum values for each norm are <span class="cell-warning">highlighted</span> and failing norms (norm >= {tolerance}) are <span class="cell-highlight">highlighted</span></h2>',
-            f'{INDENT}<div class="container"',
-            table_body,
-            f"{INDENT * 2}<br>",
-            f"{INDENT}</div>",
-            plot_body,
-            f"{INDENT * 2}</div>",
-            f"{INDENT}</div>",
-            "</body>",
-            create_tail(),
-        )
-    )
+    html = "\n".join((
+        html_head,
+        "",
+        "<body>",
+        f'{INDENT}<h2 class="text-center">{title}</h2>',
+        f'{INDENT}<h4 class="text-center">Maximum values for each norm are <span class="cell-warning">highlighted</span> and failing norms (norm >= {tolerance}) are <span class="cell-highlight">highlighted</span></h2>',
+        f'{INDENT}<div class="container"',
+        table_head,
+        table_body,
+        f"{INDENT * 2}<br>",
+        f"{INDENT}</div>",
+        plot_body,
+        f"{INDENT * 2}</div>",
+        f"{INDENT}</div>",
+        "</body>",
+        create_tail(),
+    ))
     with open(os.path.join(path, ".".join((case, "html"))), "w") as f:
         f.write(html)
 
@@ -354,45 +409,45 @@ def create_case_summary(
 # Left off here
 
 
-def exportResultsSummary(path, results):
-    with open(os.path.join(path, "regression_test_summary.html"), "w") as html:
+# def exportResultsSummary(path, results):
+#     with open(os.path.join(path, "regression_test_summary.html"), "w") as html:
 
-        html.write(_htmlHead("Regression Test Summary"))
+#         html.write(_htmlHead("Regression Test Summary"))
 
-        html.write("<body>" + "\n")
-        html.write(
-            '  <h2 class="text-center">{}</h2>'.format("Regression Test Summary") + "\n"
-        )
-        html.write('  <div class="container">' + "\n")
+#         html.write("<body>" + "\n")
+#         html.write(
+#             '  <h2 class="text-center">{}</h2>'.format("Regression Test Summary") + "\n"
+#         )
+#         html.write('  <div class="container">' + "\n")
 
-        # Test Case - Pass/Fail - Max Relative Norm
-        data = [
-            ('<a href="{0}/{0}.html">{0}</a>'.format(r[0]), r[1])
-            for i, r in enumerate(results)
-        ]
-        table = _tableHead(["Test Case", "Pass/Fail"])
-        body = "      <tbody>" + "\n"
-        for i, d in enumerate(data):
-            body += "        <tr>" + "\n"
-            body += '          <th scope="row">{}</th>'.format(i + 1) + "\n"
-            body += "          <td>{0:s}</td>".format(d[0]) + "\n"
+#         # Test Case - Pass/Fail - Max Relative Norm
+#         data = [
+#             ('<a href="{0}/{0}.html">{0}</a>'.format(r[0]), r[1])
+#             for i, r in enumerate(results)
+#         ]
+#         table = _tableHead(["Test Case", "Pass/Fail"])
+#         body = "      <tbody>" + "\n"
+#         for i, d in enumerate(data):
+#             body += "        <tr>" + "\n"
+#             body += '          <th scope="row">{}</th>'.format(i + 1) + "\n"
+#             body += "          <td>{0:s}</td>".format(d[0]) + "\n"
 
-            fmt = "{0:s}"
-            if d[1] == "FAIL":
-                body += ('          <td class="cell-warning">' + fmt + "</td>").format(
-                    d[1]
-                ) + "\n"
-            else:
-                body += ("          <td>" + fmt + "</td>").format(d[1]) + "\n"
+#             fmt = "{0:s}"
+#             if d[1] == "FAIL":
+#                 body += ('          <td class="cell-warning">' + fmt + "</td>").format(
+#                     d[1]
+#                 ) + "\n"
+#             else:
+#                 body += ("          <td>" + fmt + "</td>").format(d[1]) + "\n"
 
-            body += "        </tr>" + "\n"
-        body += "      </tbody>" + "\n"
-        table += body
-        table += "    </table>" + "\n"
-        html.write(table)
+#             body += "        </tr>" + "\n"
+#         body += "      </tbody>" + "\n"
+#         table += body
+#         table += "    </table>" + "\n"
+#         html.write(table)
 
-        html.write("    <br>" + "\n")
-        html.write("  </div>" + "\n")
-        html.write("</body>" + "\n")
-        html.write(_htmlTail())
-    html.close()
+#         html.write("    <br>" + "\n")
+#         html.write("  </div>" + "\n")
+#         html.write("</body>" + "\n")
+#         html.write(_htmlTail())
+#     html.close()

@@ -1,16 +1,13 @@
 """Provides the norm functions for the regression testing."""
 
 
-import argparse
-import os
 import sys
-from typing import Callable, List
+import argparse
+from typing import List
 
 import numpy as np
 import numpy.linalg as LA
-
-from fast_io import load_output
-from utilities import validate_file
+from pyfast.utilities import load_output, validate_file
 
 NORM_MAP = {
     "max_norm": max_norm,
@@ -47,10 +44,25 @@ def diff(baseline: np.ndarray, test: np.ndarray, abs_val: bool = True) -> np.nda
 
 
 def pass_regression_test(norm: np.ndarray, tolerance: float) -> bool:
+    """
+    Indicator for if a norm passes the regression test tolerance condition.
+
+    Parameters
+    ----------
+    norm : np.ndarray
+        Output from one of the norms.
+    tolerance : float
+        Value that all values in `norm` must be less than.
+
+    Returns
+    -------
+    bool
+        Indicator for if the regression test norm passed.
+    """
     return True if max(norm) < tolerance else False
 
 
-## The Norms
+# The Norms
 
 
 def max_norm(
@@ -76,7 +88,7 @@ def max_norm(
         Max norm of the differene betwen baseline and test data.
     """
 
-    return LA.norm(diff(baseline, test, abs_val), np.inf, axis=0)
+    return LA.norm(diff(baseline, test, abs_val), np.inf, axis=axis)
 
 
 def l2_norm(
@@ -106,7 +118,7 @@ def l2_norm(
 
 
 def relative_l2_norm(
-    baseline: np.ndarray, test: np.ndarray, abs_val: bool = True, axis: int = 0
+    baseline: np.ndarray, test: np.ndarray, abs_val: bool = False, axis: int = 0
 ) -> np.ndarray:
     """
     Compute the relative L2 norm of the difference between baseline and test
@@ -129,7 +141,7 @@ def relative_l2_norm(
         Relative L2 norm of the differene betwen baseline and test data.
     """
 
-    norm_diff = l2_norm(baseline, test, abs_val=False, axis=axis)
+    norm_diff = l2_norm(baseline, test, abs_val=abs_val, axis=axis)
     norm_baseline = LA.norm(baseline, 2, axis=axis)
 
     # Replace zeros with a small value before division
@@ -209,10 +221,12 @@ def calculate_norms(
         Maximum norm of the differene betwen baseline and test data.
     """
 
-    norm_results = np.hstack((
-        NORM_MAP[norm_type](baseline, test, abs_val, axis).reshape(-1, 1)
-        for norm_type in norms
-    ))
+    norm_results = np.hstack(
+        (
+            NORM_MAP[norm_type](baseline, test, abs_val, axis).reshape(-1, 1)
+            for norm_type in norms
+        )
+    )
     return norm_results
 
 
@@ -285,5 +299,5 @@ if __name__ == "__main__":
         sys.exit(0)
     else:
         fail_norms = args.norms[~norms_pass]
-        print(f"{*fail_norms} did not pass all cases within {args.tolerance}")
+        print(f"{fail_norms} did not pass all cases within {args.tolerance}")
         sys.exit(1)
