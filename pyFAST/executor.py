@@ -11,7 +11,7 @@ from multiprocessing import Process, cpu_count
 
 import bokeh
 import numpy as np
-from pyfast.pyfast.utilities import (
+from pyfast.utilities import (
     load_output,
     validate_file,
     calculate_norms,
