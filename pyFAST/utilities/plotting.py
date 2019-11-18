@@ -163,15 +163,17 @@ def create_table_head(columns: List[str]) -> str:
 
     header = "\n".join((f"{INDENT * 5}<th>{col}</th>" for col in columns))
 
-    head = "\n".join((
-        f'{INDENT * 2}<table class="table table-bordered table-hover table-sm" style="margin: auto; width: 100%; font-size:80%">',
-        f"{INDENT * 3}<thead>",
-        f"{INDENT * 4}<tr>",
-        f"{INDENT * 5}<th>#</th>",
-        header,
-        f"{INDENT * 4}</tr>",
-        f"{INDENT * 3}</thead>",
-    ))
+    head = "\n".join(
+        (
+            f'{INDENT * 2}<table class="table table-bordered table-hover table-sm" style="margin: auto; width: 100%; font-size:80%">',
+            f"{INDENT * 3}<thead>",
+            f"{INDENT * 4}<tr>",
+            f"{INDENT * 5}<th>#</th>",
+            header,
+            f"{INDENT * 4}</tr>",
+            f"{INDENT * 3}</thead>",
+        )
+    )
     return head
 
 
@@ -319,14 +321,19 @@ def create_plot_body(html_head: str, plots: List[tuple]):
     return html_head, div_body
 
 
-def create_case_summary(
+def create_case_summary(  ###### NEED TO ACTUALLY CREATE THE PLOTS
     path: str,
     case: str,
     results: np.ndarray,
     results_max: np.ndarray,
     tolerance: float,
     plots: List[str],
-    results_columns: List[str] = ["max_norm", "max_norm_over_range", "l2_norm", "relative_l2_norm"],
+    results_columns: List[str] = [
+        "max_norm",
+        "max_norm_over_range",
+        "l2_norm",
+        "relative_l2_norm",
+    ],
 ):
     """
     Creates the case summary and exports it to `path`/`case`_summary.html.
@@ -361,12 +368,14 @@ def create_case_summary(
 
     table_body = "".join((INDENT * 3, "<tbody>"))
     for i, d in enumerate(data):
-        table_body = "\n".join((
-            table_body,
-            f"{INDENT * 4}<tr>",
-            f'{INDENT * 5}<th scope="row">{i + 1}</th>',
-            f"{INDENT * 5}<td>{d[0]}</td>",
-        ))
+        table_body = "\n".join(
+            (
+                table_body,
+                f"{INDENT * 4}<tr>",
+                f'{INDENT * 5}<th scope="row">{i + 1}</th>',
+                f"{INDENT * 5}<td>{d[0]}</td>",
+            )
+        )
         for j, val in enumerate(d[1]):
             if val == results_max[j]:
                 _class = ' class="cell-warning"'
@@ -385,23 +394,25 @@ def create_case_summary(
     if not plots:
         plot_body = ""
 
-    html = "\n".join((
-        html_head,
-        "",
-        "<body>",
-        f'{INDENT}<h2 class="text-center">{title}</h2>',
-        f'{INDENT}<h4 class="text-center">Maximum values for each norm are <span class="cell-warning">highlighted</span> and failing norms (norm >= {tolerance}) are <span class="cell-highlight">highlighted</span></h2>',
-        f'{INDENT}<div class="container"',
-        table_head,
-        table_body,
-        f"{INDENT * 2}<br>",
-        f"{INDENT}</div>",
-        plot_body,
-        f"{INDENT * 2}</div>",
-        f"{INDENT}</div>",
-        "</body>",
-        create_tail(),
-    ))
+    html = "\n".join(
+        (
+            html_head,
+            "",
+            "<body>",
+            f'{INDENT}<h2 class="text-center">{title}</h2>',
+            f'{INDENT}<h4 class="text-center">Maximum values for each norm are <span class="cell-warning">highlighted</span> and failing norms (norm >= {tolerance}) are <span class="cell-highlight">highlighted</span></h2>',
+            f'{INDENT}<div class="container"',
+            table_head,
+            table_body,
+            f"{INDENT * 2}<br>",
+            f"{INDENT}</div>",
+            plot_body,
+            f"{INDENT * 2}</div>",
+            f"{INDENT}</div>",
+            "</body>",
+            create_tail(),
+        )
+    )
     with open(os.path.join(path, ".".join((case, "html"))), "w") as f:
         f.write(html)
 

@@ -2,8 +2,8 @@
 
 
 import os
-import subprocess
 import sys
+import subprocess
 from stat import ST_MODE
 
 
@@ -71,7 +71,7 @@ def validate_executable(file_path: str):
         Error is raised if the file has incorrect permissions.
     """
     permissions = oct(os.stat(file_path)[ST_MODE])[-1:]
-    if permissions % 2 != 1:
+    if int(permissions) % 2 != 1:
         raise PermissionError(f"{file_path} does not have proper permissions")
 
 
