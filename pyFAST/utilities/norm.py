@@ -7,14 +7,8 @@ from typing import List
 
 import numpy as np
 import numpy.linalg as LA
-from pyfast.utilities import load_output, validate_file
-
-NORM_MAP = {
-    "max_norm": max_norm,
-    "max_norm_over_range": max_norm_over_range,
-    "l2_norm": l2_norm,
-    "relative_l2_norm": relative_l2_norm,
-}
+from pyfast.utilities.fast_io import load_output
+from pyfast.utilities.utilities import validate_file
 
 
 def diff(baseline: np.ndarray, test: np.ndarray, abs_val: bool = True) -> np.ndarray:
@@ -228,6 +222,14 @@ def calculate_norms(
         )
     )
     return norm_results
+
+
+NORM_MAP = {
+    "max_norm": max_norm,
+    "max_norm_over_range": max_norm_over_range,
+    "l2_norm": l2_norm,
+    "relative_l2_norm": relative_l2_norm,
+}
 
 
 if __name__ == "__main__":
