@@ -53,15 +53,13 @@ def pass_regression_test(norm: np.ndarray, tolerance: float) -> bool:
     bool
         Indicator for if the regression test norm passed.
     """
-    return True if max(norm) < tolerance else False
+    return max(norm) < tolerance
 
 
 # The Norms
 
 
-def max_norm(
-    baseline: np.ndarray, test: np.ndarray, abs_val: bool, axis: int = 0
-) -> np.ndarray:
+def max_norm(baseline: np.ndarray, test: np.ndarray) -> np.ndarray:
     """
     Compute the max norm of the difference between baseline and test results.
 
@@ -82,12 +80,10 @@ def max_norm(
         Max norm of the differene betwen baseline and test data.
     """
 
-    return LA.norm(diff(baseline, test, abs_val), np.inf, axis=axis)
+    return LA.norm(diff(baseline, test, True), np.inf, axis=0)
 
 
-def l2_norm(
-    baseline: np.ndarray, test: np.ndarray, abs_val: bool = True, axis: int = 0
-) -> np.ndarray:
+def l2_norm(baseline: np.ndarray, test: np.ndarray) -> np.ndarray:
     """
     Compute the L2 norm of the difference between baseline and test results.
 
@@ -108,12 +104,10 @@ def l2_norm(
         L2 norm of the differene betwen baseline and test data.
     """
 
-    return LA.norm(diff(baseline, test, abs_val), 2, axis=axis)
+    return LA.norm(diff(baseline, test, True), 2, axis=0)
 
 
-def relative_l2_norm(
-    baseline: np.ndarray, test: np.ndarray, abs_val: bool = False, axis: int = 0
-) -> np.ndarray:
+def relative_l2_norm(baseline: np.ndarray, test: np.ndarray) -> np.ndarray:
     """
     Compute the relative L2 norm of the difference between baseline and test
     results.
@@ -135,8 +129,8 @@ def relative_l2_norm(
         Relative L2 norm of the differene betwen baseline and test data.
     """
 
-    norm_diff = l2_norm(baseline, test, abs_val=abs_val, axis=axis)
-    norm_baseline = LA.norm(baseline, 2, axis=axis)
+    norm_diff = l2_norm(baseline, test, abs_val=False, axis=0)
+    norm_baseline = LA.norm(baseline, 2, axis=0)
 
     # Replace zeros with a small value before division
     norm_baseline[norm_baseline == 0] = 1e-16
@@ -147,9 +141,7 @@ def relative_l2_norm(
     return norm
 
 
-def max_norm_over_range(
-    baseline: np.ndarray, test: np.ndarray, abs_val: bool = True, axis: int = 0
-) -> np.ndarray:
+def max_norm_over_range(baseline: np.ndarray, test: np.ndarray) -> np.ndarray:
     """
     Compute the maximum norm of the difference between baseline and test
     results over the range of the baseline data.
@@ -172,7 +164,7 @@ def max_norm_over_range(
     """
 
     ranges = diff(baseline.max(axis=0), baseline.min(axis=0), True)
-    norm = max_norm(baseline, test, abs_val, axis=axis)
+    norm = max_norm(baseline, test, abs_val, axis=0)
 
     ix_no_diff = ranges >= 1
     norm[ix_no_diff] = norm[ix_no_diff] / ranges[ix_no_diff]
@@ -188,8 +180,6 @@ def calculate_norms(
         "l2_norm",
         "relative_l2_norm",
     ],
-    abs_val: bool = True,
-    axis: int = 0,
 ) -> np.ndarray:
     """
     Compute all the listed norm of the difference between baseline and test
@@ -204,10 +194,6 @@ def calculate_norms(
     norms : List[str]
         List of norms to compute.
         Default: ["max_norm", "max_norm_over_range", "l2_norm", "relative_l2_norm"]
-    abs_val : bool, optional
-        Indicator to use absolute value, by default True.
-    axis : int, optional
-        Axis for computing the norm, by default 0.
 
     Returns
     -------
@@ -216,10 +202,7 @@ def calculate_norms(
     """
 
     norm_results = np.hstack(
-        (
-            NORM_MAP[norm_type](baseline, test, abs_val, axis).reshape(-1, 1)
-            for norm_type in norms
-        )
+        (NORM_MAP[norm_type](baseline, test).reshape(-1, 1) for norm_type in norms)
     )
     return norm_results
 
