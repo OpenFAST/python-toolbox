@@ -54,13 +54,13 @@ CASE_MAP = {
     "WP_VSP_ECD": "regression",
     "WP_VSP_WTurb": "regression",
     "WP_VSP_WTurb_PitchFail": "regression",
-    "bd_5MW_dynamic": "beam_dyn",
-    "bd_5MW_dynamic_gravity_Az00": "beam_dyn",
-    "bd_5MW_dynamic_gravity_Az90": "beam_dyn",
-    "bd_curved_beam": "beam_dyn",
-    "bd_isotropic_rollup": "beam_dyn",
-    "bd_static_cantilever_beam": "beam_dyn",
-    "bd_static_twisted_with_k1": "beam_dyn",
+    "bd_5MW_dynamic": "beamdyn",
+    "bd_5MW_dynamic_gravity_Az00": "beamdyn",
+    "bd_5MW_dynamic_gravity_Az90": "beamdyn",
+    "bd_curved_beam": "beamdyn",
+    "bd_isotropic_rollup": "beamdyn",
+    "bd_static_cantilever_beam": "beamdyn",
+    "bd_static_twisted_with_k1": "beamdyn",
 }
 
 
@@ -227,22 +227,21 @@ class Executor:
 
         if self.jobs < -1:
             raise ValueError("Input 'jobs' cannot be negative!")
-        elif self.jobs == -1:
+        if self.jobs == -1:
             self.jobs = int(np.ceil(cpu_count() * 0.8))
-        elif self.jobs > 0:
+        if self.jobs > 0:
             self.jobs = min(self.jobs, cpu_count())
         if self.jobs > len(self.case):
             self.jobs = len(self.case)
 
-    def _build_beamdyn_output_directories(self):
+    def _build_beamdyn_output_directories(self, _to_build):
         """
         Creates the local output directories for BeamDyn cases and intializes
         it with the input files.
         """
-
-        for case, in_dir, test in zip(self.case, self.inputs, self.test_build):
-            if CASE_MAP[case] != "beamdyn":
-                continue
+        for case in _to_build:
+            ix = self.case.index(case)
+            in_dir, test = self.inputs[ix], self.test_build[ix]
             for bd_file in ("bd_driver.inp", "bd_primary.inp", "beam_props.inp"):
                 shutil.copy(os.path.join(in_dir, bd_file), test)
 
@@ -272,44 +271,46 @@ class Executor:
             if not os.path.isdir(test_dir):
                 shutil.copytree(input_dir, test_dir, ignore=ignore_baseline)
 
-    def _build_output_directories(self, case_type: List[str]):
+    def _build_test_output_directories(self):
         """Creates the local output directories"""
 
         _linear = ("Ideal_Beam", "WP_Baseline")
         _regression = ("AOC", "AWT27", "SWRT", "UAE_VI", "WP_Baseline")
         directories = []
+        _to_build = []
 
-        if "linear" in case_type:
+        case_types = set(CASE_MAP[c] for c in self.case)
+        if "linear" in case_types:
             directories.extend(_linear)
 
-        if "regression" in case_type:
+        if "regression" in case_types:
             directories.extend(_regression)
 
-        if "beamdyn" in case_type:
-            self._build_beamdyn_output_directories()
-            if directories == []:
-                return
+        if "beamdyn" in case_types:
+            _to_build = [c for c in self.case if CASE_MAP[c] == "beamdyn"]
 
         for data in directories:
-            _dir = os.path.join(self.build, data)
+            _dir = os.path.join(self.build, "local_results", data)
             if not os.path.isdir(_dir):
                 shutil.copytree(os.path.join(self.module, data), _dir)
 
+        self._build_beamdyn_output_directories(_to_build)
         self._build_5MW_directories()
         self._build_test_directory()
 
-    def _build_directories(self):
+    def _build_directory_references(self):
         """Builds the necessary directories"""
 
         self.inputs = []
         self.outputs = []
         self.test_build = []
-        case_types = set()
         for i, case in enumerate(self.case):
-            self.inputs.append(os.path.join(self.module, case))
+            if CASE_MAP[case] == "beamdyn":
+                self.inputs.append(os.path.join(self.rtest, "modules", "beamdyn", case))
+            else:
+                self.inputs.append(os.path.join(self.module, case))
             self.outputs.append(os.path.join(self.inputs[i], self.output_type))
-            self.test_build.append(os.path.join(self.build, case))
-            case_types.add(CASE_MAP[case])
+            self.test_build.append(os.path.join(self.build, "local_results", case))
 
     def _run_single_case(self, args: List[Tuple[str, str]]):
         """
@@ -329,40 +330,15 @@ class Executor:
         ix, case, test_build = args
         beamdyn = CASE_MAP[case] == "beamdyn"
 
-        if self.verbose:
-            print(f"{ix.rjust(4)}: {case} running")
-
         if beamdyn:
             case_input = os.path.join(test_build, "bd_driver.inp")
         else:
             case_input = os.path.join(test_build, "".join((case, ".fst")))
 
         code = run_openfast_case(
-            self.executable, case_input, verbose=self.verbose, beamdyn=beamdyn
+            self.executable, case_input, ix, case, verbose=self.verbose, beamdyn=beamdyn
         )
-        if code != 0:
-            sys.exit("")
-
-        if self.verbose:
-            print(f"{ix.rjust(4)}: {case} complete")
-
-    @staticmethod
-    def _run_case_logging(ix: List[str], case: List[str]):
-        """
-        Prints the cases to be run.
-
-        Parameters
-        ----------
-        ix : List[str]
-            Index with format i/n.
-        case : List[str]
-            List of cases.
-        """
-
-        print("    Cases to be run:\n")
-        for i, c in zip(ix, case):
-            print(f"{i.rjust(6)}: {c}")
-        print()
+        return code, ix, case
 
     def _run_openfast_cases(self):
         """
@@ -371,12 +347,21 @@ class Executor:
 
         n_cases = len(self.case)
         ix = [f"{i}/{n_cases}" for i in range(1, n_cases + 1)]
-        if self.verbose:
-            self._run_case_logging(ix, self.case)
 
         arguments = list(zip(ix, self.case, self.test_build))
         with Pool(self.jobs) as pool:
-            pool.map(self._run_single_case, arguments)
+            results = list(pool.map(self._run_single_case, arguments))
+
+        fail = f"    Failed cases:"
+        success = 0
+        for code, ix, case in results:
+            if code != 0:
+                fail = "\n  ".join((fail, f"{ix.split('/')[0].rjust(6)}: {case}"))
+            else:
+                success += 1
+        print(f"\n\n    {success}/{n_cases} test cases passed")
+        if success != n_cases:
+            print(f"\n\n{fail}")
 
     def run(self):
         """
@@ -384,10 +369,9 @@ class Executor:
         OpenFAST, then the directories are created if they don't already exist.
         """
 
-        self._build_directories()
+        self._build_directory_references()
         if self.execution:
-            case_types = list(set(CASE_MAP[c] for c in self.case))
-            self._build_output_directories(case_types)
+            self._build_test_output_directories()
             self._run_openfast_cases()
 
     def read_out_files(self):

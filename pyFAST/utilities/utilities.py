@@ -5,6 +5,7 @@ import os
 import sys
 import subprocess
 from stat import ST_MODE
+from time import perf_counter
 
 
 def ignore_baseline(directory, contents):
@@ -76,19 +77,30 @@ def validate_executable(file_path: str):
 
 
 def run_openfast_case(
-    executable: str, in_file: str, verbose: bool = False, beamdyn: str = False
+    executable: str,
+    in_file: str,
+    ix: str,
+    case: str,
+    verbose: bool = False,
+    beamdyn: str = False,
 ):
     """
     Runs an OpenFAST regression test case.
 
     Parameters
     ----------
-    in_file : str
-        Input file for the OpenFAST test case.
     executable : str
         File path to the OpenFAST executable.
+    in_file : str
+        Input file for the OpenFAST test case.
+    ix : str
+        String index/total of case being run.
+    case : str
+        Name of the case being run
     verbose : bool, optional
         Flag to include verbose output, by default False.
+    beamdyn : str, optional
+        Flag to indicate a beamdyn case is being run, by default False.
     """
 
     if beamdyn:
@@ -105,7 +117,20 @@ def run_openfast_case(
     log = os.path.join(parent, "".join((base, ".log")))
 
     command = f"{executable} {in_file} > {log}"
-    print(command)
+    print(f"{ix.rjust(6)} Start: {case}")
+    if verbose:
+        print(f"command: {command}")
+
+    start = perf_counter()
     code = subprocess.call(command, stdout=stdout, shell=True)
-    print(f"COMPLTE with code: {code}", flush=True)
+    end = perf_counter()
+    elapsed = f"{end - start:.2f}"
+    status = "FAILED".rjust(8) if code != 0 else "complete"
+    ix = ix.split("/")[0]
+    message = (
+        f"{ix.rjust(6)}   End: {case.ljust(40, '.')} {status} with code "
+        f"{code}{elapsed.rjust(8)} seconds"
+    )
+    print(message, flush=True)
+
     return code

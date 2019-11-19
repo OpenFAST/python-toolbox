@@ -10,6 +10,8 @@ from _case_list import case_list
 
 def match_cases(case_regex):
     case_regex = case_regex.lower()
+    if case_regex == "all":
+        return case_regex
     return [c for c in case_list if case_regex in c.lower()]
 
 
@@ -84,42 +86,22 @@ parser.add_argument(
     help="Use flag to use verbose output.",
 )
 parser.add_argument(
-    "-l",
-    "--list",
+    "-n",
+    "--no-execution",
     dest="no_execution",
     action="store_false",
-    help="Doesn't run the actual test cases. Only ensures the arguments passed are valid and prints the cases to be run.",
+    help="Doesn't run the actual test case(s). The data should already exist.",
 )
 # Doesn't run openfast, uses pre-compiled results
 
 parser.add_argument(
-    "-n",
-    "--norms",
-    dest="norms",
+    "--norm",
+    dest="norm_list",
     type=str,
     nargs="+",
     choices=["max_norm", "max_norm_over_range", "l2_norm", "relative_l2_norm"],
     help="The norm(s) to be computed.",
 )
-parser.add_argument(
-    "-a",
-    "--abs",
-    dest="abs_val",
-    action="store_false",
-    metavar="Absolute-value-flag",
-    help="Indicate absolute value of differences.",
-)
-parser.add_argument(
-    "-x",
-    "--axis",
-    dest="axis",
-    default=0,
-    metavar="Axis",
-    type=int,
-    nargs=1,
-    help="Axis to compute the norm over.",
-)
-
 
 # Parse the arguments, find the cases to be run, and initialize the openFAST
 # execution class
