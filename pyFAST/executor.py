@@ -134,7 +134,7 @@ class Executor:
     def __init__(
         self,
         case: str,
-        executable: str,
+        executable: List[str],
         source: str,
         compiler: str,
         system: str = None,
@@ -154,8 +154,9 @@ class Executor:
         ----------
         case : list(str, ...)
             Test case name(s) as a list of strings.
-        exececutable : str
-            Path to the OpenFAST executable.
+        executable : List[str]
+            Path(s) to the OpenFAST executable(s). Should be no more than
+            length 2 with one exe being for OpenFAST and the other for beamdyn.
         source : str
             Path to OpenFAST repository.
         compiler : str
@@ -195,7 +196,6 @@ class Executor:
         self.output_type = "-".join((system, self.compiler.lower()))
 
         self.source = Path(source)
-        self.executable = Path(executable)
         self.build = os.path.join(self.source, "build")
 
         self.verbose = verbose
@@ -208,6 +208,14 @@ class Executor:
         self.rtest = os.path.join(self.source, "reg_tests", "r-test")
         self.module = os.path.join(self.rtest, "glue-codes", "openfast")
 
+        self.of_executable = source
+        self.bd_executable = source
+        for exe in executable:
+            if exe.endswith("openfast"):
+                self.of_executable = Path(exe)
+            elif exe.endswith("beamdyn_driver"):
+                self.bd_executable = Path(exe)
+
         self._validate_inputs()
 
     def _validate_inputs(self):
@@ -218,7 +226,11 @@ class Executor:
             self.output_type = "macos-gnu"
             print(f"Defaulting to {self.output_type} for output type")
 
-        validate_executable(self.executable)
+        if self.bd_executable != self.source:
+            validate_executable(self.bd_executable)
+        if self.of_executable != self.source:
+            validate_executable(self.of_executable)
+
         validate_directory(self.build)
 
         _opts = (0, 1, 2)
@@ -245,11 +257,31 @@ class Executor:
             for bd_file in ("bd_driver.inp", "bd_primary.inp", "beam_props.inp"):
                 shutil.copy(os.path.join(in_dir, bd_file), test)
 
+    def _check_5MW_dll_files(self):
+        """
+        Checks for the .dll libraries in the 5MW Baseline folder and creates
+        them if they don't exist.
+        """
+
+        source = os.path.join(self.module, "5MW_Baseline", "ServoData")
+        target = os.path.join(self.build, "local_results", "5MW_Baseline", "ServoData")
+        if not os.path.isdir(target):
+            os.makedirs(target)
+
+        discon = "DISCON/build/DISCON.dll"
+        discon_itibarge = "DISCON_ITI/build/DISCON_ITIBarge.dll"
+        discon_oc3hywind = "DISCON_OC3/build/DISCON_OC3Hywind.dll"
+        for f in (discon, discon_itibarge, discon_oc3hywind):
+            to_copy = os.path.join(source, f)
+            _check = os.path.join(target, f.split("/")[-1])
+            if not os.path.isfile(_check):
+                shutil.copy2(to_copy, target)
+
     def _build_5MW_directories(self):
         """Copies the 5MW Baseline folder"""
 
-        target = os.path.join(self.build, "5MW_Baseline")
         source = os.path.join(self.module, "5MW_Baseline")
+        target = os.path.join(self.build, "local_results", "5MW_Baseline")
         if not os.path.isdir(target):
             shutil.copytree(source, target)
         else:
@@ -270,6 +302,10 @@ class Executor:
         for input_dir, test_dir in zip(self.inputs, self.test_build):
             if not os.path.isdir(test_dir):
                 shutil.copytree(input_dir, test_dir, ignore=ignore_baseline)
+            else:
+                for f in os.listdir(input_dir):
+                    if os.path.isfile(f):
+                        shutil.copy2(os.path.join(input_dir, f), test_dir)
 
     def _build_test_output_directories(self):
         """Creates the local output directories"""
@@ -277,7 +313,8 @@ class Executor:
         _linear = ("Ideal_Beam", "WP_Baseline")
         _regression = ("AOC", "AWT27", "SWRT", "UAE_VI", "WP_Baseline")
         directories = []
-        _to_build = []
+        _to_build_beamdyn = []
+        _to_build_5mw = [c for c in self.case if "5MW" in c]
 
         case_types = set(CASE_MAP[c] for c in self.case)
         if "linear" in case_types:
@@ -287,16 +324,17 @@ class Executor:
             directories.extend(_regression)
 
         if "beamdyn" in case_types:
-            _to_build = [c for c in self.case if CASE_MAP[c] == "beamdyn"]
+            _to_build_beamdyn = [c for c in self.case if CASE_MAP[c] == "beamdyn"]
 
         for data in directories:
             _dir = os.path.join(self.build, "local_results", data)
             if not os.path.isdir(_dir):
                 shutil.copytree(os.path.join(self.module, data), _dir)
 
-        self._build_beamdyn_output_directories(_to_build)
-        self._build_5MW_directories()
         self._build_test_directory()
+        self._build_beamdyn_output_directories(_to_build_beamdyn)
+        self._check_5MW_dll_files()
+        self._build_5MW_directories()
 
     def _build_directory_references(self):
         """Builds the necessary directories"""
@@ -331,12 +369,14 @@ class Executor:
         beamdyn = CASE_MAP[case] == "beamdyn"
 
         if beamdyn:
+            exe = self.bd_executable
             case_input = os.path.join(test_build, "bd_driver.inp")
         else:
+            exe = self.of_executable
             case_input = os.path.join(test_build, "".join((case, ".fst")))
 
         code = run_openfast_case(
-            self.executable, case_input, ix, case, verbose=self.verbose, beamdyn=beamdyn
+            exe, case_input, ix, case, verbose=self.verbose, beamdyn=beamdyn
         )
         return code, ix, case
 
@@ -361,7 +401,7 @@ class Executor:
                 success += 1
         print(f"\n\n    {success}/{n_cases} test cases passed")
         if success != n_cases:
-            print(f"\n\n{fail}")
+            print(f"\n{fail}")
 
     def run(self):
         """
