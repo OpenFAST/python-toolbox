@@ -44,4 +44,5 @@ setup(
     ],
     test_suite="pytest",
     tests_require=["pytest", "pytest-xdist", "pytest-cov"],
+    entry_points={"console_scripts": ["pyfast = pyfast.__main__:main"]},
 )
