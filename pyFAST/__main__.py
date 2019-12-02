@@ -1,14 +1,26 @@
 """CLI functionality for pyfast"""
 
-import os
-import sys
 import argparse
+from typing import List
 
-from pyfast import Executor, utilities
+from pyfast import Executor
 from case_list import CASE_LIST
 
 
-def match_cases(case_regex):
+def match_cases(case_regex: str) -> List[str]:
+    """Match provided case with available test cases.
+
+    Parameters
+    ----------
+    case_regex : str
+        Case to match against available test cases.
+
+    Returns
+    -------
+    List[str]
+        List of cases that have `case_regex` as a non-case-sensitive substring.
+    """
+
     case_regex = case_regex.lower()
     if case_regex == "all":
         return case_regex
@@ -26,7 +38,11 @@ parser.add_argument(
     type=str,
     nargs="+",
     required=True,
-    help='"Regex" case names where the text. Looks to see if the provided string is contained in any of the valid cases. Note: not case sensitive',
+    help=(
+        '"Regex" case names where the text. Looks to see if the provided'
+        "string is contained in any of the valid cases."
+        "Note: not case sensitive"
+    ),
 )
 parser.add_argument(
     "-e",
@@ -70,7 +86,7 @@ parser.add_argument(
     dest="jobs",
     type=int,
     default=-1,
-    help="Number of cases to run in parallel. Use -1 for 80% of available cores",
+    help="Number of cases to run in parallel. Use -1 for 80 pct of available cores",
 )
 parser.add_argument(
     "-v",
