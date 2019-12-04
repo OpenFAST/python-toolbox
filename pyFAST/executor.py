@@ -7,19 +7,23 @@ import shutil
 import platform
 from typing import List, Tuple
 from pathlib import Path
+from functools import partial
 from multiprocessing import cpu_count
 from multiprocessing.pool import Pool
 
-import bokeh
 import numpy as np
+
 from pyfast.utilities import (
+    plot_error,
     load_output,
     validate_file,
     calculate_norms,
     ignore_baseline,
     run_openfast_case,
     validate_directory,
+    create_case_summary,
     validate_executable,
+    pass_regression_test,
 )
 
 SYSTEM_MAP = {"Darwin": "macos", "Linux": "linux", "Windows": "windows"}
@@ -64,7 +68,7 @@ CASE_MAP = {
 }
 
 
-def _get_linear_out_files():
+def _get_linear_out_files(case, out_dir, target):
     """
     .. note:: Not yet implemented but don't want it to fail.
     """
@@ -109,6 +113,7 @@ def _get_beamdyn_out_files(case: str, out_dir: str, baseline_dir: str):
         Target output directory.
     """
 
+    baseline_dir = os.path.dirname(baseline_dir)
     local = os.path.join(out_dir, "bd_driver.out")
     baseline = os.path.join(baseline_dir, "bd_driver.out")
 
@@ -350,22 +355,20 @@ class Executor:
             self.outputs.append(os.path.join(self.inputs[i], self.output_type))
             self.test_build.append(os.path.join(self.build, "local_results", case))
 
-    def _run_single_case(self, args: List[Tuple[str, str]]):
+    def _run_single_case(self, ix: str, case: str, test_build: str):
         """
         Runs a single OpenFAST test case
 
         Parameters
         ----------
-        args : List[Tuple[str, str]]
-            ix : str
-                String index as "i/n" for which case is being run.
-            case : str
-                Case name.
-            test_build : str
+        ix : str
+            String index as "i/n" for which case is being run.
+        case : str
+            Case name.
+        test_build : str
                 Testing build directory.
         """
 
-        ix, case, test_build = args
         beamdyn = CASE_MAP[case] == "beamdyn"
 
         if beamdyn:
@@ -375,33 +378,18 @@ class Executor:
             exe = self.of_executable
             case_input = os.path.join(test_build, "".join((case, ".fst")))
 
-        code = run_openfast_case(
+        run_openfast_case(
             exe, case_input, ix, case, verbose=self.verbose, beamdyn=beamdyn
         )
-        return code, ix, case
 
     def _run_openfast_cases(self):
         """
         Runs all of the openfast cases in parallel (if defined).
         """
 
-        n_cases = len(self.case)
-        ix = [f"{i}/{n_cases}" for i in range(1, n_cases + 1)]
-
-        arguments = list(zip(ix, self.case, self.test_build))
+        arguments = list(zip(self.ix, self.case, self.test_build))
         with Pool(self.jobs) as pool:
-            results = list(pool.map(self._run_single_case, arguments))
-
-        fail = f"    Failed cases:"
-        success = 0
-        for code, ix, case in results:
-            if code != 0:
-                fail = "\n  ".join((fail, f"{ix.split('/')[0].rjust(6)}: {case}"))
-            else:
-                success += 1
-        print(f"\n\n    {success}/{n_cases} test cases passed")
-        if success != n_cases:
-            print(f"\n{fail}")
+            pool.starmap(self._run_single_case, arguments)
 
     def run(self):
         """
@@ -410,11 +398,13 @@ class Executor:
         """
 
         self._build_directory_references()
+        self.n_cases = len(self.case)
+        self.ix = [f"{i}/{self.n_cases}" for i in range(1, self.n_cases + 1)]
         if self.execution:
             self._build_test_output_directories()
             self._run_openfast_cases()
 
-    def read_out_files(self):
+    def read_out_files(self) -> Tuple[list]:
         """
         Reads in the output files corresponding to `case` and returns the
         cases, baseline outputs, and locally produced outputs.
@@ -429,10 +419,13 @@ class Executor:
             List of valid non-linear regression test cases (attribute, data).
         """
 
+        ix_list = []
         case_list = []
         test_list = []
         baseline_list = []
-        for case, out_dir, target in zip(self.case, self.test_build, self.outputs):
+        for ix, case, out_dir, target in zip(
+            self.ix, self.case, self.test_build, self.outputs
+        ):
             # Process the files
             _func = self.FUNC_MAP[CASE_MAP[case]]
             local, baseline = _func(case, out_dir, target)
@@ -441,17 +434,21 @@ class Executor:
             if local is None and baseline is None:
                 continue
 
+            ix_list.append(ix)
+            case_list.append(case)
+
             # Extract the data
             test_data, test_info, _ = load_output(local)
-            baseline_data, baseline_info, _ = load_output(baseline)
-            case_list.append(case)
             test_list.append((test_data, test_info))
+
+            baseline_data, baseline_info, _ = load_output(baseline)
             baseline_list.append((baseline_data, baseline_info))
 
-        return case_list, baseline_list, test_list
+        return ix_list, case_list, baseline_list, test_list
 
-    @staticmethod
     def test_norm(
+        self,
+        ix_list: List[str],
         case_list: List[str],
         baseline_list: List[Tuple[np.ndarray, list]],
         test_list: List[Tuple[np.ndarray, list]],
@@ -461,12 +458,15 @@ class Executor:
             "l2_norm",
             "relative_l2_norm",
         ],
-    ) -> List[np.ndarray]:
+        test_norm_condition: List[str] = ["relative_l2_norm"],
+    ) -> Tuple[List[np.ndarray], List[bool], List[str]]:
         """
         Computes the norms for each of the valid test cases.
 
         Parameters
         ----------
+        ix_list : List[str]
+            List of indices for cases to be run in the form of "i/N".
         case_list : List[str]
             List of valid cases where a norm can be computed.
         baseline_list : List[Tuple[np.ndarray, list]]
@@ -474,23 +474,102 @@ class Executor:
         test_list : List[Tuple[np.ndarray, list]]
             Tuples of test data and info correpsonding to `case_list`.
         norm_list : List[str], optional
-            List of norms to be computed, by default ["max_norm","max_norm_over_range","l2_norm","relative_l2_norm",]
+            List of norms to be computed, by default:
+            ["max_norm","max_norm_over_range","l2_norm","relative_l2_norm"]
+        test_norm_condition : List[str]
+            Defines which norm(s) to use for the pass/fail condition, by
+            default ["relative_l2_norm"].
+        jobs : int
+            Number of parallel jobs to compute the norms and test them.
 
         Returns
         -------
         norm_results : List[np.ndarray]
             List of norm results corresponding to `case_list`. Each array will
             have shape [len(attributes), len(norm_list)]
+        pass_fail_list : List[bool]
+            A list of indicators for if the case passed the regression test.
+        norm_list : List[str]
+            `norm_list`.
         """
 
         norm_results = []
-        for case in case_list:
-            norm_results.append(calculate_norms(baseline, test, norm_list))
+        arguments = [[b[0], t[0]] for b, t in zip(baseline_list, test_list)]
+        partial_norms = partial(calculate_norms, norms=norm_list)
+        with Pool(self.jobs) as pool:
+            norm_results = list(pool.starmap(partial_norms, arguments))
 
-        return norm_results
+        norm_ix = [norm_list.index(norm) for norm in test_norm_condition]
+        arguments = [(norm[:, norm_ix], self.tolerance) for norm in norm_results]
+        with Pool(self.jobs) as pool:
+            pass_fail_list = list(pool.starmap(pass_regression_test, arguments))
+
+        n_fail = len(pass_fail_list) - sum(pass_fail_list)
+        fail = []
+        for ix, case, _pass in zip(ix_list, case_list, pass_fail_list):
+            ix = ix.split("/")[0]
+            if not _pass:
+                fail.append((ix, case))
+            pf = "pass" if _pass else "\x1b[1;31mFAIL\x1b[0m"
+            print(f"{ix.rjust(6)}  TEST: {case.ljust(40, '.')} {pf}")
+
+        print(f"\n{str(n_fail).rjust(6)} cases \x1b[1;31mFAILED\x1b[0m")
+        for ix, case in fail:
+            ix = ix.split("/")[0]
+            message = f"\x1b[1;31m{ix.rjust(8)} {case}\x1b[0m"
+            print(message)
+
+        return norm_results, pass_fail_list, norm_list
+
+    def retrieve_plot_html(
+        self,
+        cases: List[str],
+        baseline: List[np.ndarray],
+        test: List[np.ndarray],
+        attributes: List[List[Tuple[str, str]]],
+        pass_fail: List[bool],
+    ) -> Tuple[int, List[Tuple[str, str, str]]]:
+        """Creates the plots for each case and attribute.
+
+        Parameters
+        ----------
+        cases : List[str]
+            List of case names.
+        baseline_data : List[np.ndarray]
+            Baseline data for each case.
+        test_data : List[np.ndarray]
+            Test data for each case.
+        attributes : List[List[Tuple[str, str]]]
+            List of tuples of attribute name and units for each case.
+        pass_fail : List[bool]
+            List of whether or not each case passed the regression test.
+
+        Returns
+        -------
+        Tuple[int, List[Tuple[str, str, str]]]
+            Tuples of html script and html div to be embedded in an html file.
+            This should be the `plots` parameter for `create_results_summary`.
+            (case_index, List[Tuple[script, div, attribute_name]])
+        """
+
+        if self.plot == 0:
+            return [[] for _ in pass_fail]
+
+        plots = []
+        for _pass, b, t, a in zip(pass_fail, baseline, test, attributes):
+            if self.plot == 2 or (self.plot == 1 and not _pass):
+                plots.append(plot_error(b, t, a))
+            else:
+                plots.append([])
+        return plots
 
     def create_results_summary(
-        self, case_list: List[str], norm_results: List[np.ndarray]
+        self,
+        case_list: List[str],
+        attributes_list: List[List[Tuple[str, str]]],
+        norm_results: List[np.ndarray],
+        norm_list: List[str],
+        plot_list: List[List[Tuple[str, str, str]]],
     ):
         """
         Creates the results summary html file for each case in `case_list`.
@@ -501,12 +580,26 @@ class Executor:
             List of cases to produce html summaries.
         norm_results : List[np.ndarray]
             Computed norms for each of the cases in `case_list`.
+        plot_list : List[Tuple[int, List[Tuple[str, str, str]]]]
+            Output of `retrieve_plot_info`
         """
 
         if self.plot_path is None:
             self.plot_path = [self.test_build[self.case.index(c)] for c in case_list]
+        else:
+            self.plot_path = [self.plot_path] * len(case_list)
 
-        #### LEFT OFF HERE ####
-        create_case_summary(
-            path, case, results, results_max, tolerance, plots, results_columns
-        )
+        for plots, case, path, norms, attributes in zip(
+            plot_list, case_list, self.plot_path, norm_results, attributes_list
+        ):
+            norm_max = norms.argmax(axis=0)
+            create_case_summary(
+                path,
+                case,
+                norms,
+                norm_max,
+                attributes,
+                norm_list,
+                plots,
+                self.tolerance,
+            )

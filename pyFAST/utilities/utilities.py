@@ -132,5 +132,3 @@ def run_openfast_case(
         f"{code}{elapsed.rjust(8)} seconds"
     )
     print(message, flush=True)
-
-    return code

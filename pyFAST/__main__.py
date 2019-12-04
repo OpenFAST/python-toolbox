@@ -3,8 +3,7 @@
 import argparse
 from typing import List
 
-from pyfast import Executor
-from case_list import CASE_LIST
+from pyfast import CASE_LIST, Executor
 
 
 def match_cases(case_regex: str) -> List[str]:
@@ -22,9 +21,51 @@ def match_cases(case_regex: str) -> List[str]:
     """
 
     case_regex = case_regex.lower()
-    if case_regex == "all":
-        return case_regex
     return [c for c in CASE_LIST if case_regex in c.lower()]
+
+
+def main():
+    cases = (
+        "all"
+        if "all" in args.case
+        else [c for el in args.case for c in match_cases(el)]
+    )
+
+    execution = not args.no_execution
+    reg_test = Executor(
+        cases,
+        args.executable,
+        args.source,
+        args.compiler,
+        tolerance=args.tolerance,
+        plot=args.plot,
+        execution=execution,
+        verbose=args.verbose,
+        jobs=args.jobs,
+    )
+
+    # Run openFAST cases
+    reg_test.run()
+
+    # Gather the outputs
+    ix, cases, baseline, test = reg_test.read_out_files()
+
+    # Run the regression test
+    norm_res, pass_fail_list, norm_list = reg_test.test_norm(ix, cases, baseline, test)
+
+    # Extract the attributes metadata and the data
+    attributes = [
+        list(zip(info["attribute_names"], info["attribute_units"]))
+        for _, info in baseline
+    ]
+    baseline_data = [data for data, _ in baseline]
+    test_data = [data for data, _ in test]
+
+    # Create the case summary for each case
+    plots = reg_test.retrieve_plot_html(
+        cases, baseline_data, test_data, attributes, pass_fail_list
+    )
+    reg_test.create_results_summary(cases, attributes, norm_res, norm_list, plots)
 
 
 parser = argparse.ArgumentParser(
@@ -37,10 +78,11 @@ parser.add_argument(
     dest="case",
     type=str,
     nargs="+",
-    required=True,
+    default=["all"],
+    required=False,
     help=(
         '"Regex" case names where the text. Looks to see if the provided'
-        "string is contained in any of the valid cases."
+        "string is contained in any of the valid cases. "
         "Note: not case sensitive"
     ),
 )
@@ -77,6 +119,7 @@ parser.add_argument(
     "--plot",
     dest="plot",
     choices=[0, 1, 2],
+    type=int,
     default=0,
     help="0: no plots; 1: all plots; 2: plot failure cases only",
 )
@@ -116,26 +159,5 @@ parser.add_argument(
 # Parse the arguments, find the cases to be run, and initialize the openFAST
 # execution class
 args = parser.parse_args()
-cases = [c for el in args.case for c in match_cases(el)]
 
-reg_test = Executor(
-    cases,
-    args.executable,
-    args.source,
-    args.compiler,
-    tolerance=args.tolerance,
-    plot=args.plot,
-    execution=~args.no_execution,
-    verbose=args.verbose,
-    jobs=args.jobs,
-)
-
-# Run openFAST cases
-reg_test.run()
-
-# Gather the outputs
-cases, baseline, test = reg_test.read_out_files()
-
-# Check for pass/fail
-
-# Plot the results
+main()

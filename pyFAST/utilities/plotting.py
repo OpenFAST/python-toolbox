@@ -7,7 +7,7 @@ from typing import List, Tuple
 import numpy as np
 from bokeh.embed import components
 from bokeh.layouts import gridplot
-from bokeh.plotting import figure
+from bokeh.plotting import ColumnDataSource, figure
 from bokeh.models.tools import HoverTool
 
 INDENT = "  "
@@ -34,31 +34,8 @@ def _replace_id_div_string(div: str, attribute: str) -> str:
     id_start = div.find("id=") + 4
     id_end = div[id_start:].find('"') + id_start
     div = attribute.join((div[:id_start], div[id_end:]))
-    return div
-
-
-def _tidy_div_string(div: str) -> str:
-    """
-    Tidies the stringified div object to have the same class and style.
-
-    Parameters
-    ----------
-    div : str
-        Div object as a string.
-
-    Returns
-    -------
-    str
-        Div object as a string that has been tidied up.
-    """
-
-    div_class = ' class="col-sm-12 col-md-6 col-lg-6"'
-    style = 'style="margin:10 auto"'
-
-    ix_insert = div.find("></div>")
-    div = div_class.join((div[:ix_insert], div[ix_insert:]))
-    div = div.replace("<div", " ".join(("<div", style)))
-    div = div.join((INDENT * 3, "\n"))
+    # div = INDENT.join((div[:1], div[1:]))
+    div = div.replace("\n", f"\n{INDENT}")
     return div
 
 
@@ -83,24 +60,8 @@ def _replace_id_script_string(script: str, attribute: str) -> str:
     id_start += script[id_start:].find('":"') + 3
     id_end = script[id_start:].find('"') + id_start
     script = attribute.join((script[:id_start], script[id_end:]))
+    script.replace("\n", f"\n{INDENT}")
     return script
-
-
-def _tidy_script_string(script: str) -> str:
-    """
-    Replaces "\n" with a "\n  ".
-
-    Parameters
-    ----------
-    script : str
-        Text of html script.
-
-    Returns
-    -------
-    str
-        Updated text of html script.
-    """
-    return script.replace("\n", f"\n{INDENT}")
 
 
 def create_header(title: str) -> str:
@@ -123,10 +84,16 @@ def create_header(title: str) -> str:
             "<!DOCTYPE html>",
             "<html>",
             "<head>",
-            f"{INDENT}<title>{title}</title>'.format()",
+            f"{INDENT}<title>{title}</title>",
             f'{INDENT}<link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">',
+            f'{INDENT}<link href="https://cdn.pydata.org/bokeh/release/bokeh-widgets-1.4.0.min.css" rel="stylesheet" type="text/css">',
+            f'{INDENT}<link href="https://cdn.pydata.org/bokeh/release/bokeh-1.3.4.min.css" rel="stylesheet" type="text/css">',
             f'{INDENT}<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>',
             f'{INDENT}<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>',
+            f'{INDENT}<script src="https://cdn.pydata.org/bokeh/release/bokeh-1.4.0.min.js"></script>',
+            f'{INDENT}<script src="https://cdn.pydata.org/bokeh/release/bokeh-widgets-1.4.0.min.js"></script>',
+            f'{INDENT}<script type="text/javascript"> Bokeh.set_log_level("info"); </script>',
+            "",
             f'{INDENT}<style media="screen" type="text/css">',
             f"{INDENT * 2}.cell-warning {{",
             f"{INDENT * 3}background-color: #FF6666;",
@@ -161,17 +128,14 @@ def create_table_head(columns: List[str]) -> str:
         Stringified table head that can be inserted into an HTML document.
     """
 
-    header = "\n".join((f"{INDENT * 5}<th>{col}</th>" for col in columns))
+    header = "\n".join((f"{INDENT * 4}<th>{col}</th>" for col in columns))
 
     head = "\n".join(
         (
             f'{INDENT * 2}<table class="table table-bordered table-hover table-sm" style="margin: auto; width: 100%; font-size:80%">',
-            f"{INDENT * 3}<thead>",
-            f"{INDENT * 4}<tr>",
-            f"{INDENT * 5}<th>#</th>",
+            f"{INDENT * 3}<tr>",
             header,
-            f"{INDENT * 4}</tr>",
-            f"{INDENT * 3}</thead>",
+            f"{INDENT * 3}</tr>",
         )
     )
     return head
@@ -209,22 +173,57 @@ def plot_single_attribute_error(
         Text of the div element to be embedded in an html file.
     """
 
+    # Create the data source
+    with np.errstate(divide="ignore", invalid="ignore"):
+        norm = np.absolute(y1 - y2) / y1
+    data = ColumnDataSource(data=dict(time=x, baseline=y1, local=y2, error=norm))
+
     # Plot the unadjusted comparison of values
     p1 = figure(title=title1)
-    p1.line(x, y1, color="#1b9e77", linewidth=3, legend="Baseline")
-    p1.line(x, y2, color="#d95f02", linewidth=1, lengend="Local")
-    p1.add_tools(HoverTool(tooltips=[("Time", "$x"), ("Value", "$y")]), mode="vline")
+    p1.line(
+        "time",
+        "baseline",
+        color="#1b9e77",
+        line_width=3,
+        legend_label="Baseline",
+        source=data,
+    )
+    p1.line(
+        "time",
+        "local",
+        color="#d95f02",
+        line_width=1,
+        legend_label="Local",
+        source=data,
+    )
+    p1.add_tools(
+        HoverTool(
+            tooltips=[
+                ("Time", "$x"),
+                ("Baseline", "@baseline"),
+                ("Local", "@local"),
+                ("Normalized Error", "@error"),
+            ],
+            mode="vline",
+        )
+    )
 
     # Plot the normalized difference between local and baseline
-    norm = np.absolute(y1 - y2) / y1
-    p2 = figure(title=title2)
-    p2.line(x, norm, color="#7570b3", linewidth=1, legend="Normalized Error")
+    p2 = figure(title=title2, x_range=p1.x_range)
+    p2.line(
+        "time",
+        "error",
+        color="#7570b3",
+        line_width=1,
+        legend_label="Normalized Error",
+        source=data,
+    )
     p2.add_tools(
         HoverTool(tooltips=[("Time", "$x"), ("Normalized Error", "$y")], mode="vline")
     )
 
     # Shared formatting
-    for _plot, _title in (p1, p2):
+    for _plot in (p1, p2):
         _plot.title.align = "center"
         _plot.xaxis.axis_label = xlabel
         _plot.grid.grid_line_alpha = 0.3
@@ -237,12 +236,8 @@ def plot_single_attribute_error(
 
 
 def plot_error(
-    baseline_data: list,
-    baseline_info: list,
-    test_data: list,
-    test_info: list,
-    attributes: list,
-) -> List[Tuple[str, str, str]]:
+    baseline_data: list, test_data: list, attributes: List[Tuple[str, str]],
+) -> List[Tuple[str, str]]:
     """
     Plots the raw baseline vs test results for each attribute in one column and
     the normalized differences between the two in a second column.
@@ -251,14 +246,10 @@ def plot_error(
     ----------
     baseline_data : list
         Baseline output included in distribution.
-    baseline_info : list
-        Attribute information for `baseline_data`.
     test_data : list
         User-produced output from OpenFAST.
-    test_info : list
-        Attribute information for `test_data`.
-    attributes : list
-        list of attribute names.
+    attributes : List[Tuple[str, str]]
+        List of tuples of attribute names and units.
 
     Returns
     -------
@@ -269,18 +260,17 @@ def plot_error(
 
     x = test_data[:, 0]
     plots = []
-    for attribute in attributes:
-        channel = test_info["attribute_names"].index(attribute)
+    for i, (name, units) in enumerate(attributes):
 
-        title1 = "".join((attribute, " (", test_info["attribute_units"][channel], ")"))
+        title1 = f"{name} ({units})"
         title2 = "Normalized Difference"
         xlabel = "Time (s)"
 
-        y1 = np.array(baseline_data[:, channel], dtype=np.float)
-        y2 = np.array(test_data[:, channel], dtype=np.float)
+        y1 = np.array(baseline_data[:, i], dtype=np.float)
+        y2 = np.array(test_data[:, i], dtype=np.float)
 
         script, div = plot_single_attribute_error(x, y1, y2, xlabel, title1, title2)
-        plots.append((script, div, attribute))
+        plots.append((script, div, name))
 
     return plots
 
@@ -305,15 +295,18 @@ def create_plot_body(html_head: str, plots: List[tuple]):
         Div objects to be included in the HTML body.
     """
 
+    if not plots:
+        return html_head, ""
+
     script_ix = html_head.rfind("</script>\n") + len("</script>\n")
 
-    div_body = "\n"
+    div_body = ""
     script_body = "\n"
     for script, div, attribute in plots:
-        div = _tidy_div_string(_replace_id_div_string(div, attribute))
-        div_body = "\n".join((div_body, div))
+        div = _replace_id_div_string(div, attribute)
+        div_body = "".join((div_body, div))
 
-        script = _tidy_script_string(_replace_id_script_string(script, attribute))
+        script = _replace_id_script_string(script, attribute)
         script_body = "\n".join((script_body, script))
 
     html_head = script_body.join((html_head[:script_ix], html_head[script_ix:]))
@@ -326,14 +319,10 @@ def create_case_summary(  ###### NEED TO ACTUALLY CREATE THE PLOTS
     case: str,
     results: np.ndarray,
     results_max: np.ndarray,
+    attributes: List[Tuple[str, str]],
+    results_columns: List[str],
+    plots: List[Tuple[str, str, str]],
     tolerance: float,
-    plots: List[str],
-    results_columns: List[str] = [
-        "max_norm",
-        "max_norm_over_range",
-        "l2_norm",
-        "relative_l2_norm",
-    ],
 ):
     """
     Creates the case summary and exports it to `path`/`case`_summary.html.
@@ -347,13 +336,15 @@ def create_case_summary(  ###### NEED TO ACTUALLY CREATE THE PLOTS
     results : np.ndarray, shape: [n_attributes, n_norms]
         Norm results by attribute.
     results_max : array-like
-        Max of each norm.
-    tolerance : float
-        Value at which all normed values must be below.
-    plots : List[str]
-        List of attributes to create plots for.
+        Index for the max value of each norm.
+    attributes : List[Tuple[str, str]]
+        List of tuples of attribute names and units.
     results_columns : List[str], optional
         List of norms that are being provided, by default ["max_norm", "max_norm_over_range", "l2_norm", "relative_l2_norm"]
+    plots : List[Tuple[str, str, str]]
+        List of tuples of scipt, div, and attribute name.
+    tolerance : float
+        Value at which all normed values must be below.
     """
 
     title = " ".join((case, "Summary"))
@@ -363,36 +354,33 @@ def create_case_summary(  ###### NEED TO ACTUALLY CREATE THE PLOTS
 
     data = [
         (f'<a href="#{attribute}">{attribute}</a>', *norms)
-        for attribute, *norms in results
+        for (attribute, _), *norms in zip(attributes, results)
     ]
-
-    table_body = "".join((INDENT * 3, "<tbody>"))
+    table_body = ""
     for i, d in enumerate(data):
         table_body = "\n".join(
             (
                 table_body,
-                f"{INDENT * 4}<tr>",
-                f'{INDENT * 5}<th scope="row">{i + 1}</th>',
-                f"{INDENT * 5}<td>{d[0]}</td>",
+                f"{INDENT * 3}<tr>",
+                # f'{INDENT * 4}<th scope="row">{i + 1}</th>',
+                f"{INDENT * 4}<td>{d[0]}</td>",
             )
         )
         for j, val in enumerate(d[1]):
-            if val == results_max[j]:
-                _class = ' class="cell-warning"'
-            elif val > tolerance:
+            if i == results_max[j]:
                 _class = ' class="cell-highlight"'
+            elif val > tolerance:
+                _class = ' class="cell-warning"'
             else:
                 _class = ""
 
-            cell = f"{INDENT * 5}<td{_class}>{val:0.4e}</td>"
+            cell = f"{INDENT * 4}<td{_class}>{val:0.4e}</td>"
 
             table_body = "\n".join((table_body, cell))
-        table_body = "\n".join((table_body, f"{INDENT * 4}</tr>"))
-    table_body = "\n".join((f"{INDENT * 3}</tbody>", f"{INDENT * 2}</table>"))
+        table_body = "\n".join((table_body, f"{INDENT * 3}</tr>"))
+    table_body = "\n".join((table_body, f"{INDENT * 2}</table>"))
 
     html_head, plot_body = create_plot_body(html_head, plots)
-    if not plots:
-        plot_body = ""
 
     html = "\n".join(
         (
@@ -400,15 +388,15 @@ def create_case_summary(  ###### NEED TO ACTUALLY CREATE THE PLOTS
             "",
             "<body>",
             f'{INDENT}<h2 class="text-center">{title}</h2>',
-            f'{INDENT}<h4 class="text-center">Maximum values for each norm are <span class="cell-warning">highlighted</span> and failing norms (norm >= {tolerance}) are <span class="cell-highlight">highlighted</span></h2>',
-            f'{INDENT}<div class="container"',
+            f'{INDENT}<h4 class="text-center">Maximum values for each norm are <span class="cell-highlight">highlighted</span> and failing norms (norm >= {tolerance}) are <span class="cell-warning">highlighted</span></h4>',
+            f'{INDENT}<div class="container">',
             table_head,
             table_body,
             f"{INDENT * 2}<br>",
             f"{INDENT}</div>",
             plot_body,
-            f"{INDENT * 2}</div>",
-            f"{INDENT}</div>",
+            # f"{INDENT * 2}</div>",
+            # f"{INDENT}</div>",
             "</body>",
             create_tail(),
         )
