@@ -34,7 +34,7 @@ setup(
     python_requires=">=3.6",
     install_requires=[
         "numpy",
-        "bokeh",
+        "bokeh==1.4.0",
         "pre-commit",
         "black",
         "isort",

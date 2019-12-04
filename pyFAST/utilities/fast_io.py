@@ -52,7 +52,7 @@ def load_output(filename):
             return load_binary_output(filename)
         elif "out" in filename:
             try:
-                print(f.readline())
+                _ = f.readline()
             except UnicodeDecodeError:
                 return load_binary_output(filename)
     return load_ascii_output(filename) + (np.ones(1),)
