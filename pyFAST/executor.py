@@ -26,8 +26,6 @@ from pyfast.utilities import (
     pass_regression_test,
 )
 
-SYSTEM_MAP = {"Darwin": "macos", "Linux": "linux", "Windows": "windows"}
-
 CASE_MAP = {
     "5MW_ITIBarge_DLL_WTurb_WavesIrr": "regression",
     "5MW_Land_BD_DLL_WTurb": "regression",
@@ -168,8 +166,8 @@ class Executor:
             System compiler id. Should be one of "intel" or "gnu".
         system : str
             Operating system version of results used for comparison, default
-            None (machine's OS). Should be one of "Windows", "Linux", or
-            "Darwin".
+            None (machine's OS). Should be one of "windows", "linux", or
+            "macos".
         tolerance: float, default: 1e-5
             Error tolerance for pass/fail condition.
         plot : int, default: 0
@@ -191,7 +189,9 @@ class Executor:
              - >0: Minimum of the number passed and the number of nodes available
         """
 
-        system = SYSTEM_MAP[platform.system() if system is None else system]
+        system = platform.system() if system is None else system.lower()
+        if system == "darwin":
+            system = "macos"
 
         if case == "all":
             self.case = [*CASE_MAP]
@@ -589,6 +589,7 @@ class Executor:
         else:
             self.plot_path = [self.plot_path] * len(case_list)
 
+        print(self.plot_path)
         for plots, case, path, norms, attributes in zip(
             plot_list, case_list, self.plot_path, norm_results, attributes_list
         ):

@@ -54,7 +54,12 @@ def main():
         required=True,
         help="Test-produced data file.",
     )
-
+    parser.add_argument(
+        "--system",
+        dest="system",
+        choices=["macos", "linux", "windows"],
+        help="Operating system to use for baseline results.",
+    )
     parser.add_argument(
         "-s",
         dest="source",
@@ -70,7 +75,6 @@ def main():
         choices=["intel", "gnu"],
         help="Compiler ID for the system",
     )
-
     parser.add_argument(
         "-t",
         "--tol",
@@ -80,6 +84,7 @@ def main():
         help="Tolerance for determing the failure of a norm",
     )
     parser.add_argument(
+        "-p",
         "--plot",
         dest="plot",
         choices=[0, 1, 2],
@@ -109,8 +114,6 @@ def main():
         action="store_true",
         help="Doesn't run the actual test case(s). The data should already exist.",
     )
-    # Doesn't run openfast, uses pre-compiled results
-
     parser.add_argument(
         "--norm",
         dest="norm_list",
@@ -136,6 +139,7 @@ def main():
         args.executable,
         args.source,
         args.compiler,
+        system=args.system,
         tolerance=args.tolerance,
         plot=args.plot,
         execution=execution,
