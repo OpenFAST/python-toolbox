@@ -103,6 +103,8 @@ def run_openfast_case(
         Flag to indicate a beamdyn case is being run, by default False.
     """
 
+    # Beamdyn runs from above where the input file is located
+    # better explain this decision making process
     if beamdyn:
         case_dir = os.path.sep.join(in_file.split(os.path.sep)[:-1])
         os.chdir(case_dir)

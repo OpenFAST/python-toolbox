@@ -92,7 +92,7 @@ def _get_regression_out_files(case: str, out_dir: str, baseline_dir: str):
     baseline = os.path.join(baseline_dir, case_file)
 
     for f in (local, baseline):
-        validate_file(f)
+        validate_file(f)  # try except return None, None
 
     return local, baseline
 
@@ -116,7 +116,7 @@ def _get_beamdyn_out_files(case: str, out_dir: str, baseline_dir: str):
     baseline = os.path.join(baseline_dir, "bd_driver.out")
 
     for f in (local, baseline):
-        validate_file(f)
+        validate_file(f)  # same as above
 
     return local, baseline
 
@@ -136,9 +136,9 @@ class Executor:
 
     def __init__(
         self,
-        case: str,
+        case: List[str],
         executable: List[str],
-        source: str,
+        source: str,  # project_root or something
         compiler: str,
         system: str = None,
         tolerance: float = 1e-5,
@@ -213,10 +213,9 @@ class Executor:
         self.rtest = os.path.join(self.source, "reg_tests", "r-test")
         self.module = os.path.join(self.rtest, "glue-codes", "openfast")
 
-        self.of_executable = source
-        self.bd_executable = source
         for exe in executable:
-            if exe.endswith("openfast"):
+            # split exe to be final part of path
+            if exe.endswith("openfast"):  # windows is __.exe
                 self.of_executable = Path(exe)
             elif exe.endswith("beamdyn_driver"):
                 self.bd_executable = Path(exe)
@@ -284,6 +283,8 @@ class Executor:
 
     def _build_5MW_directories(self):
         """Copies the 5MW Baseline folder"""
+
+        # NOTE: revisit this piece
 
         source = os.path.join(self.module, "5MW_Baseline")
         target = os.path.join(self.build, "local_results", "5MW_Baseline")
@@ -428,7 +429,9 @@ class Executor:
         ):
             # Process the files
             _func = self.FUNC_MAP[CASE_MAP[case]]
-            local, baseline = _func(case, out_dir, target)
+            local, baseline, *error = _func(
+                case, out_dir, target
+            )  # return some other error message to print at the end for a failure
 
             # Check for linear case
             if local is None and baseline is None:
@@ -458,7 +461,7 @@ class Executor:
             "l2_norm",
             "relative_l2_norm",
         ],
-        test_norm_condition: List[str] = ["relative_l2_norm"],
+        test_norm_condition: List[str] = ["relative_l2_norm"],  # flag in __main__.py
     ) -> Tuple[List[np.ndarray], List[bool], List[str]]:
         """
         Computes the norms for each of the valid test cases.
@@ -521,6 +524,7 @@ class Executor:
 
         return norm_results, pass_fail_list, norm_list
 
+    # parallelize this!
     def retrieve_plot_html(
         self,
         cases: List[str],
@@ -589,7 +593,6 @@ class Executor:
         else:
             self.plot_path = [self.plot_path] * len(case_list)
 
-        print(self.plot_path)
         for plots, case, path, norms, attributes in zip(
             plot_list, case_list, self.plot_path, norm_results, attributes_list
         ):
