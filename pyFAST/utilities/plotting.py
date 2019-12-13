@@ -34,7 +34,6 @@ def _replace_id_div_string(div: str, attribute: str) -> str:
     id_start = div.find("id=") + 4
     id_end = div[id_start:].find('"') + id_start
     div = attribute.join((div[:id_start], div[id_end:]))
-    # div = INDENT.join((div[:1], div[1:]))
     div = div.replace("\n", f"\n{INDENT}")
     return div
 
@@ -314,7 +313,7 @@ def create_plot_body(html_head: str, plots: List[tuple]):
     return html_head, div_body
 
 
-def create_case_summary(  ###### NEED TO ACTUALLY CREATE THE PLOTS
+def create_case_summary(
     path: str,
     case: str,
     results: np.ndarray,
@@ -395,58 +394,9 @@ def create_case_summary(  ###### NEED TO ACTUALLY CREATE THE PLOTS
             f"{INDENT * 2}<br>",
             f"{INDENT}</div>",
             plot_body,
-            # f"{INDENT * 2}</div>",
-            # f"{INDENT}</div>",
             "</body>",
             create_tail(),
         )
     )
     with open(os.path.join(path, ".".join((case, "html"))), "w") as f:
         f.write(html)
-
-
-# Left off here
-
-
-# def exportResultsSummary(path, results):
-#     with open(os.path.join(path, "regression_test_summary.html"), "w") as html:
-
-#         html.write(_htmlHead("Regression Test Summary"))
-
-#         html.write("<body>" + "\n")
-#         html.write(
-#             '  <h2 class="text-center">{}</h2>'.format("Regression Test Summary") + "\n"
-#         )
-#         html.write('  <div class="container">' + "\n")
-
-#         # Test Case - Pass/Fail - Max Relative Norm
-#         data = [
-#             ('<a href="{0}/{0}.html">{0}</a>'.format(r[0]), r[1])
-#             for i, r in enumerate(results)
-#         ]
-#         table = _tableHead(["Test Case", "Pass/Fail"])
-#         body = "      <tbody>" + "\n"
-#         for i, d in enumerate(data):
-#             body += "        <tr>" + "\n"
-#             body += '          <th scope="row">{}</th>'.format(i + 1) + "\n"
-#             body += "          <td>{0:s}</td>".format(d[0]) + "\n"
-
-#             fmt = "{0:s}"
-#             if d[1] == "FAIL":
-#                 body += ('          <td class="cell-warning">' + fmt + "</td>").format(
-#                     d[1]
-#                 ) + "\n"
-#             else:
-#                 body += ("          <td>" + fmt + "</td>").format(d[1]) + "\n"
-
-#             body += "        </tr>" + "\n"
-#         body += "      </tbody>" + "\n"
-#         table += body
-#         table += "    </table>" + "\n"
-#         html.write(table)
-
-#         html.write("    <br>" + "\n")
-#         html.write("  </div>" + "\n")
-#         html.write("</body>" + "\n")
-#         html.write(_htmlTail())
-#     html.close()
