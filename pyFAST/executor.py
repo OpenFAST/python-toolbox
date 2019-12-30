@@ -2,7 +2,6 @@
 
 
 import os
-import sys
 import shutil
 import platform
 from typing import List, Tuple
@@ -92,7 +91,10 @@ def _get_regression_out_files(case: str, out_dir: str, baseline_dir: str):
     baseline = os.path.join(baseline_dir, case_file)
 
     for f in (local, baseline):
-        validate_file(f)  # try except return None, None
+        try:
+            validate_file(f)
+        except FileExistsError as error:
+            return None, None, error
 
     return local, baseline
 
@@ -116,7 +118,10 @@ def _get_beamdyn_out_files(case: str, out_dir: str, baseline_dir: str):
     baseline = os.path.join(baseline_dir, "bd_driver.out")
 
     for f in (local, baseline):
-        validate_file(f)  # same as above
+        try:
+            validate_file(f)
+        except FileExistsError as error:
+            return None, None, error
 
     return local, baseline
 
@@ -138,7 +143,7 @@ class Executor:
         self,
         case: List[str],
         executable: List[str],
-        source: str,  # project_root or something
+        openfast_root: str,
         compiler: str,
         system: str = None,
         tolerance: float = 1e-5,
@@ -160,7 +165,7 @@ class Executor:
         executable : List[str]
             Path(s) to the OpenFAST executable(s). Should be no more than
             length 2 with one exe being for OpenFAST and the other for beamdyn.
-        source : str
+        openfast_root : str
             Path to OpenFAST repository.
         compiler : str
             System compiler id. Should be one of "intel" or "gnu".
@@ -200,8 +205,8 @@ class Executor:
         self.compiler = compiler
         self.output_type = "-".join((system, self.compiler.lower()))
 
-        self.source = Path(source)
-        self.build = os.path.join(self.source, "build")
+        self.root = Path(openfast_root)
+        self.build = os.path.join(self.root, "build")
 
         self.verbose = verbose
         self.execution = execution
@@ -210,14 +215,14 @@ class Executor:
         self.plot_path = plot_path
         self.jobs = jobs if jobs != 0 else -1
 
-        self.rtest = os.path.join(self.source, "reg_tests", "r-test")
+        self.rtest = os.path.join(self.root, "reg_tests", "r-test")
         self.module = os.path.join(self.rtest, "glue-codes", "openfast")
 
         for exe in executable:
-            # split exe to be final part of path
-            if exe.endswith("openfast"):  # windows is __.exe
+            _exe = os.path.basename(os.path.normpath(exe))
+            if "openfast" in _exe:
                 self.of_executable = Path(exe)
-            elif exe.endswith("beamdyn_driver"):
+            elif "beamdyn_driver" in _exe:
                 self.bd_executable = Path(exe)
 
         self._validate_inputs()
@@ -230,9 +235,9 @@ class Executor:
             self.output_type = "macos-gnu"
             print(f"Defaulting to {self.output_type} for output type")
 
-        if self.bd_executable != self.source:
+        if self.bd_executable != self.root:
             validate_executable(self.bd_executable)
-        if self.of_executable != self.source:
+        if self.of_executable != self.root:
             validate_executable(self.of_executable)
 
         validate_directory(self.build)
@@ -424,14 +429,15 @@ class Executor:
         case_list = []
         test_list = []
         baseline_list = []
+        error_list = []
         for ix, case, out_dir, target in zip(
             self.ix, self.case, self.test_build, self.outputs
         ):
             # Process the files
             _func = self.FUNC_MAP[CASE_MAP[case]]
-            local, baseline, *error = _func(
-                case, out_dir, target
-            )  # return some other error message to print at the end for a failure
+            local, baseline, *error = _func(case, out_dir, target)
+
+            error_list.append((case, error))
 
             # Check for linear case
             if local is None and baseline is None:
@@ -447,6 +453,14 @@ class Executor:
             baseline_data, baseline_info, _ = load_output(baseline)
             baseline_list.append((baseline_data, baseline_info))
 
+        error_list = [(error[0], error[1][0]) for error in error_list if error[1]]
+        if error_list:
+            print("\n\x1b[1;31mErrors:\x1b[0m")
+            for case, e in error_list:
+                case = f"\x1b[1;31m{case}\x1b[0m"
+                print(f"  {case}: {e}")
+            print("")
+
         return ix_list, case_list, baseline_list, test_list
 
     def test_norm(
@@ -461,7 +475,7 @@ class Executor:
             "l2_norm",
             "relative_l2_norm",
         ],
-        test_norm_condition: List[str] = ["relative_l2_norm"],  # flag in __main__.py
+        test_norm_condition: List[str] = ["relative_l2_norm"],
     ) -> Tuple[List[np.ndarray], List[bool], List[str]]:
         """
         Computes the norms for each of the valid test cases.
@@ -496,6 +510,14 @@ class Executor:
             `norm_list`.
         """
 
+        # Test to make sure that the test norm is included in the computed norms
+        if not set(test_norm_condition).issubset(norm_list):
+            message = (
+                f"test_norm_condition: {test_norm_condition} should be contained in "
+                f"norm_list: {norm_list}."
+            )
+            raise ValueError(message)
+
         norm_results = []
         arguments = [[b[0], t[0]] for b, t in zip(baseline_list, test_list)]
         partial_norms = partial(calculate_norms, norms=norm_list)
@@ -524,10 +546,39 @@ class Executor:
 
         return norm_results, pass_fail_list, norm_list
 
-    # parallelize this!
+    def plot_single_case(
+        self,
+        baseline: np.ndarray,
+        test: np.ndarray,
+        attributes: List[Tuple[str, str]],
+        passing: bool,
+    ):
+        """Plots a single case's error results.
+
+        Parameters
+        ----------
+        baseline : np.ndarray
+            Baseline data.
+        test : np.ndarray
+            Test data produced locally.
+        attributes : List[Tuple[str, str]]
+            List of tuples of attribute names and units.
+        passing : bool
+            Indicator if the test passed.
+
+        Returns
+        -------
+        List[Tuple[str, str, str]]
+            Returns the plotting information required for case summaries. Specifically,
+            the script, div, and attribute name are provided back for a case.
+        """
+
+        if self.plot == 2 or (self.plot == 1 and not passing):
+            return plot_error(baseline, test, attributes)
+        return []
+
     def retrieve_plot_html(
         self,
-        cases: List[str],
         baseline: List[np.ndarray],
         test: List[np.ndarray],
         attributes: List[List[Tuple[str, str]]],
@@ -537,8 +588,6 @@ class Executor:
 
         Parameters
         ----------
-        cases : List[str]
-            List of case names.
         baseline_data : List[np.ndarray]
             Baseline data for each case.
         test_data : List[np.ndarray]
@@ -559,12 +608,10 @@ class Executor:
         if self.plot == 0:
             return [[] for _ in pass_fail]
 
-        plots = []
-        for _pass, b, t, a in zip(pass_fail, baseline, test, attributes):
-            if self.plot == 2 or (self.plot == 1 and not _pass):
-                plots.append(plot_error(b, t, a))
-            else:
-                plots.append([])
+        arguments = zip(baseline, test, attributes, pass_fail)
+        with Pool(self.jobs) as pool:
+            plots = list(pool.starmap(self.plot_single_case, arguments))
+
         return plots
 
     def create_results_summary(

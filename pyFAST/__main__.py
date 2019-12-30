@@ -61,8 +61,8 @@ def main():
         help="Operating system to use for baseline results.",
     )
     parser.add_argument(
-        "-s",
-        dest="source",
+        "--openfast-root",
+        dest="openfast_root",
         type=str,
         required=True,
         help="Path to the OpenFAST repository",
@@ -119,8 +119,17 @@ def main():
         dest="norm_list",
         type=str,
         nargs="+",
+        default=["max_norm", "max_norm_over_range", "l2_norm", "relative_l2_norm"],
         choices=["max_norm", "max_norm_over_range", "l2_norm", "relative_l2_norm"],
         help="The norm(s) to be computed.",
+    )
+    parser.add_argument(
+        "--test-norm",
+        dest="test_norm",
+        nargs="+",
+        default=["relative_l2_norm"],
+        choices=["max_norm", "max_norm_over_range", "l2_norm", "relative_l2_norm"],
+        help="Norm(s) used to determine if the test(s) pass. Must be a normed passed to `-norm`.",
     )
 
     # Parse the arguments, find the cases to be run, and initialize the openFAST
@@ -137,7 +146,7 @@ def main():
     reg_test = Executor(
         cases,
         args.executable,
-        args.source,
+        args.openfast_root,
         args.compiler,
         system=args.system,
         tolerance=args.tolerance,
@@ -154,7 +163,14 @@ def main():
     ix, cases, baseline, test = reg_test.read_out_files()
 
     # Run the regression test
-    norm_res, pass_fail_list, norm_list = reg_test.test_norm(ix, cases, baseline, test)
+    norm_res, pass_fail_list, norm_list = reg_test.test_norm(
+        ix,
+        cases,
+        baseline,
+        test,
+        norm_list=args.norm_list,
+        test_norm_condition=args.test_norm,
+    )
 
     # Extract the attributes metadata and the data
     attributes = [
@@ -166,7 +182,7 @@ def main():
 
     # Create the case summary for each case
     plots = reg_test.retrieve_plot_html(
-        cases, baseline_data, test_data, attributes, pass_fail_list
+        baseline_data, test_data, attributes, pass_fail_list
     )
     reg_test.create_results_summary(cases, attributes, norm_res, norm_list, plots)
 
