@@ -131,7 +131,7 @@ def create_table_head(columns: List[str]) -> str:
 
     head = "\n".join(
         (
-            f'{INDENT * 2}<table class="table table-bordered table-hover table-sm" style="margin: auto; width: 100%; font-size:80%">',
+            f'{INDENT * 2}<table class="table table-bordered table-hover table-sm" style="margin: auto; width: 100%; font-size:80%; overflow-x: auto">',
             f"{INDENT * 3}<tr>",
             header,
             f"{INDENT * 3}</tr>",
@@ -339,7 +339,8 @@ def create_case_summary(
     attributes : List[Tuple[str, str]]
         List of tuples of attribute names and units.
     results_columns : List[str], optional
-        List of norms that are being provided, by default ["max_norm", "max_norm_over_range", "l2_norm", "relative_l2_norm"]
+        List of norms that are being provided, by default
+        ["max_norm", "max_norm_over_range", "l2_norm", "relative_l2_norm"]
     plots : List[Tuple[str, str, str]]
         List of tuples of scipt, div, and attribute name.
     tolerance : float
@@ -351,10 +352,16 @@ def create_case_summary(
     columns = ["Channel", *[r.replace("_", " ").title() for r in results_columns]]
     table_head = create_table_head(columns)
 
-    data = [
-        (f'<a href="#{attribute}">{attribute}</a>', *norms)
-        for (attribute, _), *norms in zip(attributes, results)
-    ]
+    if plots:
+        # creates a reference to the plot if they exist
+        data = [
+            (f'<a href="#{attribute}">{attribute}</a>', *norms)
+            for (attribute, _), *norms in zip(attributes, results)
+        ]
+    else:
+        data = [
+            (attribute, *norms) for (attribute, _), *norms in zip(attributes, results)
+        ]
     table_body = ""
     for i, d in enumerate(data):
         table_body = "\n".join(
