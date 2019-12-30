@@ -32,17 +32,10 @@ setup(
     ],
     packages=["pyfast"],
     python_requires=">=3.6",
-    # have a dev version
-    install_requires=[
-        "numpy",
-        "bokeh==1.4.0",
-        "pre-commit",
-        "black",
-        "isort",
-        "pytest",
-        "pytest-cov",
-        "pytest-xdist",
-    ],
+    install_requires=["numpy", "bokeh==1.4.0"],
+    extras_require={
+        "dev": ["pre-commit", "black", "isort", "pytest", "pytest-cov", "pytest-xdist"]
+    },
     test_suite="pytest",
     tests_require=["pytest", "pytest-xdist", "pytest-cov"],
     entry_points={"console_scripts": ["pyfast = pyfast.__main__:main"]},
