@@ -32,6 +32,7 @@ setup(
     ],
     packages=["pyfast"],
     python_requires=">=3.6",
+    # have a dev version
     install_requires=[
         "numpy",
         "bokeh==1.4.0",

@@ -34,7 +34,6 @@ def _replace_id_div_string(div: str, attribute: str) -> str:
     id_start = div.find("id=") + 4
     id_end = div[id_start:].find('"') + id_start
     div = attribute.join((div[:id_start], div[id_end:]))
-    # div = INDENT.join((div[:1], div[1:]))
     div = div.replace("\n", f"\n{INDENT}")
     return div
 
@@ -132,7 +131,7 @@ def create_table_head(columns: List[str]) -> str:
 
     head = "\n".join(
         (
-            f'{INDENT * 2}<table class="table table-bordered table-hover table-sm" style="margin: auto; width: 100%; font-size:80%">',
+            f'{INDENT * 2}<table class="table table-bordered table-hover table-sm" style="margin: auto; width: 100%; font-size:80%; overflow-x: auto">',
             f"{INDENT * 3}<tr>",
             header,
             f"{INDENT * 3}</tr>",
@@ -314,7 +313,7 @@ def create_plot_body(html_head: str, plots: List[tuple]):
     return html_head, div_body
 
 
-def create_case_summary(  ###### NEED TO ACTUALLY CREATE THE PLOTS
+def create_case_summary(
     path: str,
     case: str,
     results: np.ndarray,
@@ -340,7 +339,8 @@ def create_case_summary(  ###### NEED TO ACTUALLY CREATE THE PLOTS
     attributes : List[Tuple[str, str]]
         List of tuples of attribute names and units.
     results_columns : List[str], optional
-        List of norms that are being provided, by default ["max_norm", "max_norm_over_range", "l2_norm", "relative_l2_norm"]
+        List of norms that are being provided, by default
+        ["max_norm", "max_norm_over_range", "l2_norm", "relative_l2_norm"]
     plots : List[Tuple[str, str, str]]
         List of tuples of scipt, div, and attribute name.
     tolerance : float
@@ -352,10 +352,16 @@ def create_case_summary(  ###### NEED TO ACTUALLY CREATE THE PLOTS
     columns = ["Channel", *[r.replace("_", " ").title() for r in results_columns]]
     table_head = create_table_head(columns)
 
-    data = [
-        (f'<a href="#{attribute}">{attribute}</a>', *norms)
-        for (attribute, _), *norms in zip(attributes, results)
-    ]
+    if plots:
+        # creates a reference to the plot if they exist
+        data = [
+            (f'<a href="#{attribute}">{attribute}</a>', *norms)
+            for (attribute, _), *norms in zip(attributes, results)
+        ]
+    else:
+        data = [
+            (attribute, *norms) for (attribute, _), *norms in zip(attributes, results)
+        ]
     table_body = ""
     for i, d in enumerate(data):
         table_body = "\n".join(
@@ -395,58 +401,9 @@ def create_case_summary(  ###### NEED TO ACTUALLY CREATE THE PLOTS
             f"{INDENT * 2}<br>",
             f"{INDENT}</div>",
             plot_body,
-            # f"{INDENT * 2}</div>",
-            # f"{INDENT}</div>",
             "</body>",
             create_tail(),
         )
     )
     with open(os.path.join(path, ".".join((case, "html"))), "w") as f:
         f.write(html)
-
-
-# Left off here
-
-
-# def exportResultsSummary(path, results):
-#     with open(os.path.join(path, "regression_test_summary.html"), "w") as html:
-
-#         html.write(_htmlHead("Regression Test Summary"))
-
-#         html.write("<body>" + "\n")
-#         html.write(
-#             '  <h2 class="text-center">{}</h2>'.format("Regression Test Summary") + "\n"
-#         )
-#         html.write('  <div class="container">' + "\n")
-
-#         # Test Case - Pass/Fail - Max Relative Norm
-#         data = [
-#             ('<a href="{0}/{0}.html">{0}</a>'.format(r[0]), r[1])
-#             for i, r in enumerate(results)
-#         ]
-#         table = _tableHead(["Test Case", "Pass/Fail"])
-#         body = "      <tbody>" + "\n"
-#         for i, d in enumerate(data):
-#             body += "        <tr>" + "\n"
-#             body += '          <th scope="row">{}</th>'.format(i + 1) + "\n"
-#             body += "          <td>{0:s}</td>".format(d[0]) + "\n"
-
-#             fmt = "{0:s}"
-#             if d[1] == "FAIL":
-#                 body += ('          <td class="cell-warning">' + fmt + "</td>").format(
-#                     d[1]
-#                 ) + "\n"
-#             else:
-#                 body += ("          <td>" + fmt + "</td>").format(d[1]) + "\n"
-
-#             body += "        </tr>" + "\n"
-#         body += "      </tbody>" + "\n"
-#         table += body
-#         table += "    </table>" + "\n"
-#         html.write(table)
-
-#         html.write("    <br>" + "\n")
-#         html.write("  </div>" + "\n")
-#         html.write("</body>" + "\n")
-#         html.write(_htmlTail())
-#     html.close()
