@@ -475,7 +475,7 @@ class Executor:
             "l2_norm",
             "relative_l2_norm",
         ],
-        test_norm_condition: List[str] = ["relative_l2_norm"],
+        test_norm_condition: List[str] = ["relative_l2_norm"],  # flag in __main__.py
     ) -> Tuple[List[np.ndarray], List[bool], List[str]]:
         """
         Computes the norms for each of the valid test cases.
