@@ -54,7 +54,7 @@ def validate_file(file_path: str):
         Error is raised if the file can't be found.
     """
     if not os.path.isfile(file_path):
-        raise FileExistsError(f"{file_path} is not a valid file")
+        raise FileExistsError(f"{file_path} is not a file")
 
 
 def validate_executable(file_path: str):

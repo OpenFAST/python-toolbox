@@ -236,7 +236,7 @@ def plot_single_attribute_error(
 
 def plot_error(
     baseline_data: list, test_data: list, attributes: List[Tuple[str, str]],
-) -> List[Tuple[str, str]]:
+) -> List[Tuple[str, str, str]]:
     """
     Plots the raw baseline vs test results for each attribute in one column and
     the normalized differences between the two in a second column.
