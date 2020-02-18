@@ -15,11 +15,11 @@ with open(os.path.join(ROOT, "VERSION")) as version_file:
 
 
 setup(
-    name="pyfast",
-    description="pyfast",
+    name="pyFAST",
+    description="pyFAST",
     long_description=LONG_DESCRIPTION,
     version=VERSION,
-    url="https://github.com/RHammond2/pyfast/",
+    url="https://github.com/RHammond2/pyFAST/",
     author="Rob Hammond",
     author_email="robert.hammond@nrel.gov",
     classifiers=[
@@ -30,7 +30,7 @@ setup(
         "Programming Language :: Python :: 3.7",
         "Topic :: Software Development :: Version Control :: Git",
     ],
-    packages=["pyfast"],
+    packages=["pyFAST"],
     python_requires=">=3.6",
     install_requires=["numpy", "bokeh==1.4.0"],
     extras_require={
@@ -38,5 +38,5 @@ setup(
     },
     test_suite="pytest",
     tests_require=["pytest", "pytest-xdist", "pytest-cov"],
-    entry_points={"console_scripts": ["pyfast = pyfast.__main__:main"]},
+    entry_points={"console_scripts": ["pyFAST = pyFAST.__main__:main"]},
 )

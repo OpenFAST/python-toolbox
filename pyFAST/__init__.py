@@ -3,7 +3,7 @@
 
 import os
 
-from pyfast import utilities
+from pyFAST import utilities
 
 from .executor import Executor
 from .case_list import CASE_LIST
