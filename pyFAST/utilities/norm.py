@@ -8,8 +8,8 @@ from typing import List
 import numpy as np
 import numpy.linalg as LA
 
-from pyfast.utilities.fast_io import load_output
-from pyfast.utilities.utilities import validate_file
+from pyFAST.utilities.fast_io import load_output
+from pyFAST.utilities.utilities import validate_file
 
 
 def diff(baseline: np.ndarray, test: np.ndarray, abs_val: bool = True) -> np.ndarray:

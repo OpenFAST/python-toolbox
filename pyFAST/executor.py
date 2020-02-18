@@ -12,7 +12,7 @@ from multiprocessing.pool import Pool
 
 import numpy as np
 
-from pyfast.utilities import (
+from pyFAST.utilities import (
     plot_error,
     load_output,
     validate_file,

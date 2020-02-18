@@ -1,9 +1,9 @@
-"""CLI functionality for pyfast"""
+"""CLI functionality for pyFAST"""
 
 import argparse
 from typing import List
 
-from pyfast import CASE_LIST, Executor
+from pyFAST import CASE_LIST, Executor
 
 
 def match_cases(case_regex: str) -> List[str]:
@@ -29,7 +29,7 @@ def main():
     """
 
     parser = argparse.ArgumentParser(
-        description="Calculates the regression test norms.", prog="pyfast"
+        description="Calculates the regression test norms.", prog="pyFAST"
     )
 
     parser.add_argument(
