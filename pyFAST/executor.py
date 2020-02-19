@@ -160,7 +160,7 @@ class Executor:
 
         Parameters
         ----------
-        case : list(str, ...)
+        case : List[str]
             Test case name(s) as a list of strings.
         executable : List[str]
             Path(s) to the OpenFAST executable(s). Should be no more than
