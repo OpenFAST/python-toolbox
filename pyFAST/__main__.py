@@ -57,6 +57,7 @@ def main():
     parser.add_argument(
         "--system",
         dest="system",
+        type=str.lower,
         choices=["macos", "linux", "windows"],
         help="Operating system to use for baseline results.",
     )
@@ -70,7 +71,7 @@ def main():
     parser.add_argument(
         "-c",
         dest="compiler",
-        type=str,
+        type=str.lower,
         required=True,
         choices=["intel", "gnu"],
         help="Compiler ID for the system",
@@ -117,7 +118,7 @@ def main():
     parser.add_argument(
         "--norm",
         dest="norm_list",
-        type=str,
+        type=str.lower,
         nargs="+",
         default=["max_norm", "max_norm_over_range", "l2_norm", "relative_l2_norm"],
         choices=["max_norm", "max_norm_over_range", "l2_norm", "relative_l2_norm"],
@@ -126,6 +127,7 @@ def main():
     parser.add_argument(
         "--test-norm",
         dest="test_norm",
+        type=str.lower,
         nargs="+",
         default=["relative_l2_norm"],
         choices=["max_norm", "max_norm_over_range", "l2_norm", "relative_l2_norm"],
