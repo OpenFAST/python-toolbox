@@ -41,7 +41,7 @@ def main():
         default=["all"],
         required=False,
         help=(
-            '"Regex" case names where the text. Looks to see if the provided'
+            '"Regex" case names where the text. Looks to see if the provided '
             "string is contained in any of the valid cases. "
             "Note: not case sensitive"
         ),
