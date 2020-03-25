@@ -24,45 +24,7 @@ from pyFAST.utilities import (
     validate_executable,
     pass_regression_test,
 )
-
-CASE_MAP = {
-    "5MW_ITIBarge_DLL_WTurb_WavesIrr": "regression",
-    "5MW_Land_BD_DLL_WTurb": "regression",
-    "5MW_Land_BD_Linear": "linear",
-    "5MW_Land_DLL_WTurb": "regression",
-    "5MW_OC3Mnpl_DLL_WTurb_WavesIrr": "regression",
-    "5MW_OC3Spar_DLL_WTurb_WavesIrr": "regression",
-    "5MW_OC3Trpd_DLL_WSt_WavesReg": "regression",
-    "5MW_OC4Jckt_DLL_WTurb_WavesIrr_MGrowth": "regression",
-    "5MW_OC4Semi_WSt_WavesWN": "regression",
-    "5MW_TLP_DLL_WTurb_WavesIrr_WavesMulti": "regression",
-    "AOC_WSt": "regression",
-    "AOC_YFix_WSt": "regression",
-    "AOC_YFree_WTurb": "regression",
-    "AWT_WSt_StartUpShutDown": "regression",
-    "AWT_WSt_StartUp_HighSpShutDown": "regression",
-    "AWT_YFix_WSt": "regression",
-    "AWT_YFree_WSt": "regression",
-    "AWT_YFree_WTurb": "regression",
-    "Ideal_Beam_Fixed_Free_Linear": "linear",
-    "Ideal_Beam_Free_Free_Linear": "linear",
-    "SWRT_YFree_VS_EDC01": "regression",
-    "SWRT_YFree_VS_EDG01": "regression",
-    "SWRT_YFree_VS_WTurb": "regression",
-    "UAE_Dnwind_YRamp_WSt": "regression",
-    "UAE_Upwind_Rigid_WRamp_PwrCurve": "regression",
-    "WP_Stationary_Linear": "linear",
-    "WP_VSP_ECD": "regression",
-    "WP_VSP_WTurb": "regression",
-    "WP_VSP_WTurb_PitchFail": "regression",
-    "bd_5MW_dynamic": "beamdyn",
-    "bd_5MW_dynamic_gravity_Az00": "beamdyn",
-    "bd_5MW_dynamic_gravity_Az90": "beamdyn",
-    "bd_curved_beam": "beamdyn",
-    "bd_isotropic_rollup": "beamdyn",
-    "bd_static_cantilever_beam": "beamdyn",
-    "bd_static_twisted_with_k1": "beamdyn",
-}
+from .case_map import CASE_MAP
 
 
 def _get_linear_out_files(case, out_dir, target):
