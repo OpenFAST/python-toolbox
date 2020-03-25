@@ -6,7 +6,7 @@ import os
 from pyFAST import utilities
 
 from .executor import Executor
-from .case_list import CASE_LIST
+from .case_map import CASE_MAP
 
 ROOT = os.path.abspath(os.path.dirname(__file__))
 with open(os.path.join(ROOT, "..", "VERSION")) as version_file:
