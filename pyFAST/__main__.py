@@ -3,7 +3,7 @@
 import argparse
 from typing import List
 
-from pyFAST import CASE_MAP, Executor
+from . import CASE_MAP, Executor
 
 
 def match_cases(case_regex: str) -> List[str]:

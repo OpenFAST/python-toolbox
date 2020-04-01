@@ -9,10 +9,9 @@ from pathlib import Path
 from functools import partial
 from multiprocessing import cpu_count
 from multiprocessing.pool import Pool
-
 import numpy as np
 
-from pyFAST.utilities import (
+from .utilities import (
     plot_error,
     load_output,
     validate_file,
@@ -22,7 +21,7 @@ from pyFAST.utilities import (
     validate_directory,
     create_case_summary,
     validate_executable,
-    pass_regression_test,
+    pass_regression_test
 )
 from .case_map import CASE_MAP
 
