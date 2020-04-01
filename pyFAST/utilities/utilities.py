@@ -8,11 +8,11 @@ from stat import ST_MODE
 from time import perf_counter
 
 
-def ignore_baseline(directory, contents):
-    itemFilter = ("linux-intel", "linux-gnu", "macos-gnu", "windows-intel")
+def ignore_baseline(_, contents):
+    item_filter = ("linux-intel", "linux-gnu", "macos-gnu", "windows-intel")
     caught = []
     for c in contents:
-        if c in itemFilter:
+        if c in item_filter:
             caught.append(c)
     return caught
 
@@ -77,12 +77,12 @@ def validate_executable(file_path: str):
 
 
 def run_openfast_case(
-    executable: str,
-    in_file: str,
-    ix: str,
-    case: str,
-    verbose: bool = False,
-    beamdyn: str = False,
+        beamdyn: str = False,
+        executable: str,
+        in_file: str,
+        ix: str,
+        case: str,
+        verbose: bool = False,
 ):
     """
     Runs an OpenFAST regression test case.

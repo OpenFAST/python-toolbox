@@ -88,7 +88,8 @@ def _get_beamdyn_out_files(case: str, out_dir: str, baseline_dir: str):
 
 
 class Executor:
-    """Base execution class for OpenFast
+    """
+    Base execution class for OpenFAST regression tests. 
 
     Attributes
     ----------
@@ -101,18 +102,18 @@ class Executor:
     }
 
     def __init__(
-        self,
-        case: List[str],
-        executable: List[str],
-        openfast_root: str,
-        compiler: str,
-        system: str = None,
-        tolerance: float = 1e-5,
-        plot: int = 0,
-        plot_path: str = None,
-        execution: bool = False,
-        verbose: bool = False,
-        jobs: bool = -1,
+            self,
+            case: List[str],
+            executable: List[str],
+            openfast_root: str,
+            compiler: str,
+            system: str = None,
+            tolerance: float = 1e-5,
+            plot: int = 0,
+            plot_path: str = None,
+            execution: bool = False,
+            verbose: bool = False,
+            jobs: bool = -1,
     ):
         """
         Initialize the required inputs
@@ -269,7 +270,9 @@ class Executor:
                     shutil.copy2(_source, _target)
 
     def _build_test_directory(self):
-        """Copies the input data to the test build directory"""
+        """
+        Copies the input data to the test build directory
+        """
 
         for input_dir, test_dir in zip(self.inputs, self.test_build):
             if not os.path.isdir(test_dir):
@@ -280,7 +283,9 @@ class Executor:
                         shutil.copy2(os.path.join(input_dir, f), test_dir)
 
     def _build_test_output_directories(self):
-        """Creates the local output directories"""
+        """
+        Creates the local output directories
+        """
 
         _linear = ("Ideal_Beam", "WP_Baseline")
         _regression = ("AOC", "AWT27", "SWRT", "UAE_VI", "WP_Baseline")
@@ -309,8 +314,9 @@ class Executor:
         self._build_5MW_directories()
 
     def _build_directory_references(self):
-        """Builds the necessary directories"""
-
+        """
+        Builds the necessary directories
+        """
         self.inputs = []
         self.outputs = []
         self.test_build = []
@@ -425,18 +431,18 @@ class Executor:
         return ix_list, case_list, baseline_list, test_list
 
     def test_norm(
-        self,
-        ix_list: List[str],
-        case_list: List[str],
-        baseline_list: List[Tuple[np.ndarray, list]],
-        test_list: List[Tuple[np.ndarray, list]],
-        norm_list: List[str] = [
-            "max_norm",
-            "max_norm_over_range",
-            "l2_norm",
-            "relative_l2_norm",
-        ],
-        test_norm_condition: List[str] = ["relative_l2_norm"],  # flag in __main__.py
+            self,
+            ix_list: List[str],
+            case_list: List[str],
+            baseline_list: List[Tuple[np.ndarray, list]],
+            test_list: List[Tuple[np.ndarray, list]],
+            norm_list: List[str] = [
+                "max_norm",
+                "max_norm_over_range",
+                "l2_norm",
+                "relative_l2_norm",
+            ],
+            test_norm_condition: List[str] = ["relative_l2_norm"],  # flag in __main__.py
     ) -> Tuple[List[np.ndarray], List[bool], List[str]]:
         """
         Computes the norms for each of the valid test cases.
@@ -508,11 +514,11 @@ class Executor:
         return norm_results, pass_fail_list, norm_list
 
     def plot_single_case(
-        self,
-        baseline: np.ndarray,
-        test: np.ndarray,
-        attributes: List[Tuple[str, str]],
-        passing: bool,
+            self,
+            baseline: np.ndarray,
+            test: np.ndarray,
+            attributes: List[Tuple[str, str]],
+            passing: bool,
     ):
         """Plots a single case's error results.
 
@@ -539,11 +545,11 @@ class Executor:
         return []
 
     def retrieve_plot_html(
-        self,
-        baseline: List[np.ndarray],
-        test: List[np.ndarray],
-        attributes: List[List[Tuple[str, str]]],
-        pass_fail: List[bool],
+            self,
+            baseline: List[np.ndarray],
+            test: List[np.ndarray],
+            attributes: List[List[Tuple[str, str]]],
+            pass_fail: List[bool],
     ) -> Tuple[int, List[Tuple[str, str, str]]]:
         """Creates the plots for each case and attribute.
 
@@ -576,12 +582,12 @@ class Executor:
         return plots
 
     def create_results_summary(
-        self,
-        case_list: List[str],
-        attributes_list: List[List[Tuple[str, str]]],
-        norm_results: List[np.ndarray],
-        norm_list: List[str],
-        plot_list: List[List[Tuple[str, str, str]]],
+            self,
+            case_list: List[str],
+            attributes_list: List[List[Tuple[str, str]]],
+            norm_results: List[np.ndarray],
+            norm_list: List[str],
+            plot_list: List[List[Tuple[str, str, str]]],
     ):
         """
         Creates the results summary html file for each case in `case_list`.
@@ -601,9 +607,7 @@ class Executor:
         else:
             self.plot_path = [self.plot_path] * len(case_list)
 
-        for plots, case, path, norms, attributes in zip(
-            plot_list, case_list, self.plot_path, norm_results, attributes_list
-        ):
+        for plots, case, path, norms, attributes in zip(plot_list, case_list, self.plot_path, norm_results, attributes_list):
             norm_max = norms.argmax(axis=0)
             create_case_summary(
                 path,

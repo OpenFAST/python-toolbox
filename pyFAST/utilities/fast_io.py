@@ -14,14 +14,8 @@
 # limitations under the License.
 #
 
-"""
-Created on 03/09/2015
-@author: MMPE
-Copied from https://github.com/WISDEM/AeroelasticSE/tree/openmdao1/src/AeroelasticSE/old_files on 15 Aug 2016 by Ganesh Vijayakumar
-"""
 import os
 import struct
-
 import numpy as np
 
 

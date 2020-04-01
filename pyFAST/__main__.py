@@ -134,7 +134,7 @@ def main():
         help="Norm(s) used to determine if the test(s) pass. Must be a normed passed to `-norm`.",
     )
 
-    # Parse the arguments, find the cases to be run, and initialize the openFAST
+    # Parse the arguments, find the cases to be run, and initialize the OpenFAST
     # execution class
     args = parser.parse_args()
 
@@ -158,7 +158,7 @@ def main():
         jobs=args.jobs,
     )
 
-    # Run openFAST cases
+    # Run OpenFAST cases
     reg_test.run()
 
     # Gather the outputs
