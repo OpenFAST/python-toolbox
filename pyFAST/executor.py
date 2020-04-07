@@ -1,32 +1,33 @@
-"""Provides the Executor case"""
-
 
 import os
+import sys
 import shutil
 import platform
 from typing import List, Tuple
 from pathlib import Path
-from functools import partial
 from multiprocessing import cpu_count
 from multiprocessing.pool import Pool
-import numpy as np
+from time import perf_counter
+import subprocess
 
 from .utilities import (
-    load_output,
     validate_file,
-    calculate_norms,
-    ignore_baseline,
     validate_directory,
     validate_executable,
-    pass_regression_test
+    ignore_baseline,
+    load_output,
 )
 from .case_map import CASE_MAP
 
 
-
 class Executor:
     """
-    Base execution class for OpenFAST regression tests. 
+    Base execution class for OpenFAST regression tests.
+
+    This class first constructs the internal directories containing the test case input files.
+    Then, the test cases are executed using multiple processors, if requested.
+    The locally generated outputs are tested against their corresponding baselines.
+    Finally, a summary HTML file is created with plots, if requested.
 
     Attributes
     ----------
@@ -34,7 +35,7 @@ class Executor:
 
     def __init__(
             self,
-            case: List[str],
+            cases: List[str],
             executable: List[str],
             openfast_root: str,
             compiler: str,
@@ -42,7 +43,7 @@ class Executor:
             tolerance: float = 1e-5,
             plot: int = 0,
             plot_path: str = None,
-            execution: bool = False,
+            no_execution: bool = False,
             verbose: bool = False,
             jobs: bool = -1,
     ):
@@ -51,13 +52,20 @@ class Executor:
 
         NOTE: Make the plotting a little more modular so that all are done in one grid?
 
+        TODO:
+        - There should exist a test pipeline that executes the full regression test process for each case
+        - Thats what should be parallelized, not just the case execution
+        - As is, the regression test results must wait for all tests to finish executing
+        - We want to be able to bail if one test case fails the regression test but others havent finished
+
+        - Choose to use str or Path for all paths
+
         Parameters
         ----------
         case : List[str]
             Test case name(s) as a list of strings.
         executable : List[str]
-            Path(s) to the OpenFAST executable(s). Should be no more than
-            length 2 with one exe being for OpenFAST and the other for beamdyn.
+            Path(s) to the OpenFAST executable(s).
         openfast_root : str
             Path to OpenFAST repository.
         compiler : str
@@ -77,39 +85,40 @@ class Executor:
         plot_path : str, default None
             Path to save all case result summaries and their plots. If `None`,
             the local output directory is used.
-        execution : bool, default: True
-            Flag to run the test case(s). If `False`, ....
+        no_execution : bool, default: False
+            Flag to avoid executing the simulations, but proceed with the regression test.
         verbose : bool, default: False
             Flag to include system ouptut.
         jobs : int, default: -1
             Maximum number of parallel jobs to run:
-             - -1: 80% of maximum number of nodes available
+             - -1: Number of nodes available minus 1
              - >0: Minimum of the number passed and the number of nodes available
         """
+
+        # These path variables are used throughout Executor for brevity
+        self.build_directory = os.path.join(openfast_root, "build")
+        self.rtest_modules = os.path.join(openfast_root, "reg_tests", "r-test", "modules")
+        self.rtest_openfast = os.path.join(openfast_root, "reg_tests", "r-test", "glue-codes", "openfast")
+        self.local_test_location = os.path.join(self.build_directory, "local_results")
 
         system = platform.system() if system is None else system.lower()
         if system == "darwin":
             system = "macos"
 
-        if case == "all":
-            self.case = [*CASE_MAP]
+        # Cases should be a list of case names ["awt_yfree", "..."]
+        # to run all cases, pass an empty list or leave the argument out
+        if cases == 0:
+            self.cases = CASE_MAP
         else:
-            self.case = case if isinstance(case, list) else [case]
-        self.compiler = compiler
-        self.output_type = "-".join((system, self.compiler.lower()))
+            self.cases = {case: CASE_MAP[case] for case in cases}
 
-        self.root = Path(openfast_root)
-        self.build = os.path.join(self.root, "build")
-
+        self.output_type = "-".join((system, compiler.lower()))
         self.verbose = verbose
-        self.execution = execution
+        self.no_execution = no_execution
         self.tolerance = tolerance
         self.plot = plot
         self.plot_path = plot_path
         self.jobs = jobs if jobs != 0 else -1
-
-        self.rtest = os.path.join(self.root, "reg_tests", "r-test")
-        self.module = os.path.join(self.rtest, "glue-codes", "openfast")
 
         for exe in executable:
             _exe = os.path.basename(os.path.normpath(exe))
@@ -120,40 +129,42 @@ class Executor:
 
         self._validate_inputs()
 
-        # Initialize these variables for use when collecting test directories
-        # and opening files.
+        # Set the appropriate number of parallel jobs to run
+        if self.jobs == -1:
+            self.jobs = max(1, cpu_count() - 1)
+        if self.jobs > 0:
+            self.jobs = min(self.jobs, cpu_count())
+        if self.jobs > len(self.cases):
+            self.jobs = len(self.cases)
+
+        # Initialize these variables for use when collecting test directories and opening files
         self.inputs = []                  # Directory in r-test containing the test case inputs
         self.baseline_directories = []    # Directory in r-test containing the test case baseline solutions
         self.local_case_directories = []  # Direcory containing the locally generated test case inputs and outputs
-        self.local_test_location = os.path.join(self.build, "local_results")
 
     def _validate_inputs(self):
-        """Method to ensure inputs are valid."""
 
-        _opts = ("macos-gnu", "linux-intel", "linux-gnu", "windows-intel")
-        if self.output_type not in _opts:
+        # Is the output type one of the supported combinations?
+        _options = ("macos-gnu", "linux-intel", "linux-gnu", "windows-intel")
+        if self.output_type not in _options:
             self.output_type = "macos-gnu"
             print(f"Defaulting to {self.output_type} for output type")
 
-        if self.bd_executable != self.root:
-            validate_executable(self.bd_executable)
-        if self.of_executable != self.root:
-            validate_executable(self.of_executable)
+        # Are the required executable provided?
+        # TODO
+        # _required_executables = set([ CASE_MAP[c]["driver"] for c in self.cases ])
 
-        validate_directory(self.build)
+        # Do the given executables exist with the correct permissions?
+        validate_executable(self.bd_executable)
+        validate_executable(self.of_executable)
 
-        _opts = (0, 1, 2)
-        if self.plot not in _opts:
-            raise ValueError(f"Input 'plot' must be one of {_opts}!")
+        # Do the given directories exist?
+        validate_directory(self.build_directory)
 
-        if self.jobs < -1:
-            raise ValueError("Input 'jobs' cannot be negative!")
-        if self.jobs == -1:
-            self.jobs = int(np.ceil(cpu_count() * 0.8))
-        if self.jobs > 0:
-            self.jobs = min(self.jobs, cpu_count())
-        if self.jobs > len(self.case):
-            self.jobs = len(self.case)
+        # Is the plot flag within the supported range?
+        _options = (0, 1, 2)
+        if self.plot not in _options:
+            raise ValueError(f"Input 'plot' must be one of {_options}")
 
     def _build_beamdyn_output_directories(self, _to_build):
         """
@@ -206,18 +217,21 @@ class Executor:
                         shutil.copytree(_source, _target)
                 else:
                     shutil.copy2(_source, _target)
+        #  Is the jobs flag within the supported range?
+        if self.jobs < -1:
+            raise ValueError("Invalid value given for 'jobs'")
 
     def _build_local_test_directory(self):
         """
         Copies the input data to the test build directory
         """
-        for input_dir, test_dir in zip(self.inputs, self.local_case_directories):
-            if not os.path.isdir(test_dir):
-                shutil.copytree(input_dir, test_dir, ignore=ignore_baseline)
+        for source, destination in zip(self.inputs, self.local_case_directories):
+            if not os.path.isdir(destination):
+                shutil.copytree(source, destination, ignore=ignore_baseline)
             else:
-                for f in os.listdir(input_dir):
+                for f in os.listdir(source):
                     if os.path.isfile(f):
-                        shutil.copy2(os.path.join(input_dir, f), test_dir)
+                        shutil.copy2(os.path.join(source, f), destination)
 
     def _build_test_output_directories(self):
         """
@@ -252,18 +266,26 @@ class Executor:
 
     def _build_directory_references(self):
         """
-        Builds the necessary directories
+        Creates lists of the directories that will be used
+        throughout the test.
+        
+        These include
+        - Directories containing the input files for a single test case
+        - Directories containing the baseline results; for some cases this is the same as the
+            input directory, but other cases have designated baseline directories
+        - Directories that will be created locally to run the case on the tested system; these
+            are copied from the "input" directories above into a "build" directory on the tested
+            system. The local results are here.
         """
-        self.inputs = []
-        self.outputs = []
-        self.test_build = []
-        for i, case in enumerate(self.case):
-            if CASE_MAP[case] == "beamdyn":
-                self.inputs.append(os.path.join(self.rtest, "modules", "beamdyn", case))
+        for i, case in enumerate(self.cases):
+            # The driver is currently either "openfast" or a specific module
+            if CASE_MAP[case]["driver"] == "openfast":
+                self.inputs.append(os.path.join(self.rtest_openfast, case))
+                self.baseline_directories.append(os.path.join(self.inputs[i], self.output_type))
             else:
-                self.inputs.append(os.path.join(self.module, case))
-            self.outputs.append(os.path.join(self.inputs[i], self.output_type))
-            self.test_build.append(os.path.join(self.build, "local_results", case))
+                self.inputs.append(os.path.join(self.rtest_modules, CASE_MAP[case]["driver"], case))
+                self.baseline_directories.append(os.path.join(self.rtest_modules, CASE_MAP[case]["driver"], case))
+            self.local_case_directories.append(os.path.join(self.build_directory, "reg_tests", "local_results", CASE_MAP[case]["driver"], case))
 
     def _run_openfast_case(
             self,
@@ -321,7 +343,7 @@ class Executor:
 
         os.chdir(cwd)
 
-    def _run_single_case(self, ix: str, case: str, test_build: str):
+    def _run_single_case(self, index: str, case: str, test_build: str):
         """
         Runs a single OpenFAST test case
 
@@ -334,23 +356,23 @@ class Executor:
         test_build : str
                 Testing build directory.
         """
-
-        beamdyn = CASE_MAP[case] == "beamdyn"
-
-        if beamdyn:
+        if CASE_MAP[case]["driver"] == "beamdyn":
             exe = self.bd_executable
             case_input = os.path.join(test_build, "bd_driver.inp")
-        else:
+        elif CASE_MAP[case]["driver"] == "openfast":
             exe = self.of_executable
             case_input = os.path.join(test_build, "".join((case, ".fst")))
+        else:
+            raise ValueError
 
-        self._run_openfast_case(exe, case_input, ix, case, verbose=self.verbose)
+        self._run_openfast_case(exe, case_input, index, case, verbose=self.verbose)
 
     def _run_openfast_cases(self):
         """
-        Runs all of the openfast cases in parallel (if defined).
+        Runs all of the OpenFAST cases in parallel, if defined.
         """
-        arguments = list(zip(self.ix, self.cases, self.local_case_directories))
+        indeces = [f"{i}/{len(self.cases)}" for i in range(1, len(self.cases) + 1)]
+        arguments = list(zip(indeces, self.cases, self.local_case_directories))
         with Pool(self.jobs) as pool:
             pool.starmap(self._run_single_case, arguments)
 
@@ -361,9 +383,7 @@ class Executor:
         """
 
         self._build_directory_references()
-        self.n_cases = len(self.case)
-        self.ix = [f"{i}/{self.n_cases}" for i in range(1, self.n_cases + 1)]
-        if self.execution:
+        if not self.no_execution:
             self._build_test_output_directories()
             self._run_openfast_cases()
     
@@ -416,4 +436,3 @@ class Executor:
             print("")
 
         return baseline_list, test_list
-
