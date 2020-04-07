@@ -99,7 +99,7 @@ class Executor:
         self.build_directory = os.path.join(openfast_root, "build")
         self.rtest_modules = os.path.join(openfast_root, "reg_tests", "r-test", "modules")
         self.rtest_openfast = os.path.join(openfast_root, "reg_tests", "r-test", "glue-codes", "openfast")
-        self.local_test_location = os.path.join(self.build_directory, "local_results")
+        self.local_test_location = os.path.join(self.build_directory, "reg_tests", "local_results")
 
         system = platform.system() if system is None else system.lower()
         if system == "darwin":
@@ -137,11 +137,6 @@ class Executor:
         if self.jobs > len(self.cases):
             self.jobs = len(self.cases)
 
-        # Initialize these variables for use when collecting test directories and opening files
-        self.inputs = []                  # Directory in r-test containing the test case inputs
-        self.baseline_directories = []    # Directory in r-test containing the test case baseline solutions
-        self.local_case_directories = []  # Direcory containing the locally generated test case inputs and outputs
-
     def _validate_inputs(self):
 
         # Is the output type one of the supported combinations?
@@ -166,57 +161,6 @@ class Executor:
         if self.plot not in _options:
             raise ValueError(f"Input 'plot' must be one of {_options}")
 
-    def _build_beamdyn_output_directories(self, _to_build):
-        """
-        Creates the local output directories for BeamDyn cases and intializes
-        it with the input files.
-        """
-        for case in _to_build:
-            ix = self.case.index(case)
-            in_dir, test = self.inputs[ix], self.test_build[ix]
-            for bd_file in ("bd_driver.inp", "bd_primary.inp", "beam_props.inp"):
-                shutil.copy(os.path.join(in_dir, bd_file), test)
-
-    def _check_5MW_dll_files(self):
-        """
-        Checks for the .dll libraries in the 5MW Baseline folder and creates
-        them if they don't exist.
-        """
-
-        source = os.path.join(self.module, "5MW_Baseline", "ServoData")
-        target = os.path.join(self.build, "local_results", "5MW_Baseline", "ServoData")
-        if not os.path.isdir(target):
-            os.makedirs(target)
-
-        discon = "DISCON/build/DISCON.dll"
-        discon_itibarge = "DISCON_ITI/build/DISCON_ITIBarge.dll"
-        discon_oc3hywind = "DISCON_OC3/build/DISCON_OC3Hywind.dll"
-        for f in (discon, discon_itibarge, discon_oc3hywind):
-            to_copy = os.path.join(source, f)
-            _check = os.path.join(target, f.split("/")[-1])
-            if not os.path.isfile(_check):
-                shutil.copy2(to_copy, target)
-
-    def _build_5MW_directories(self):
-        """Copies the 5MW Baseline folder"""
-
-        # NOTE: revisit this piece
-
-        source = os.path.join(self.module, "5MW_Baseline")
-        target = os.path.join(self.build, "local_results", "5MW_Baseline")
-        if not os.path.isdir(target):
-            shutil.copytree(source, target)
-        else:
-            for name in os.listdir(source):
-                if name == "ServoData":
-                    continue
-                _source = os.path.join(source, name)
-                _target = os.path.join(target, name)
-                if os.path.isdir(_source):
-                    if not os.path.isdir(_target):
-                        shutil.copytree(_source, _target)
-                else:
-                    shutil.copy2(_source, _target)
         #  Is the jobs flag within the supported range?
         if self.jobs < -1:
             raise ValueError("Invalid value given for 'jobs'")
@@ -225,67 +169,30 @@ class Executor:
         """
         Copies the input data to the test build directory
         """
-        for source, destination in zip(self.inputs, self.local_case_directories):
-            if not os.path.isdir(destination):
-                shutil.copytree(source, destination, ignore=ignore_baseline)
-            else:
-                for f in os.listdir(source):
-                    if os.path.isfile(f):
-                        shutil.copy2(os.path.join(source, f), destination)
+        # _regression = ("AOC", "AWT27", "SWRT", "UAE_VI", "WP_Baseline")
 
-    def _build_test_output_directories(self):
-        """
-        Creates the local output directories
-        """
+        for case in self.cases:
+            case_info = CASE_MAP[case]
 
-        _linear = ("Ideal_Beam", "WP_Baseline")
-        _regression = ("AOC", "AWT27", "SWRT", "UAE_VI", "WP_Baseline")
-        directories = []
-        _to_build_beamdyn = []
-        _to_build_5mw = [c for c in self.case if "5MW" in c]
-
-        case_types = set(CASE_MAP[c] for c in self.case)
-        if "linear" in case_types:
-            directories.extend(_linear)
-
-        if "regression" in case_types:
-            directories.extend(_regression)
-
-        if "beamdyn" in case_types:
-            _to_build_beamdyn = [c for c in self.case if CASE_MAP[c] == "beamdyn"]
-
-        for data in directories:
-            _dir = os.path.join(self.build, "local_results", data)
-            if not os.path.isdir(_dir):
-                shutil.copytree(os.path.join(self.module, data), _dir)
-
-        self._build_beamdyn_output_directories(_to_build_beamdyn)
-        self._check_5MW_dll_files()
-        self._build_5MW_directories()
-        self._build_local_test_directory()
-
-    def _build_directory_references(self):
-        """
-        Creates lists of the directories that will be used
-        throughout the test.
-        
-        These include
-        - Directories containing the input files for a single test case
-        - Directories containing the baseline results; for some cases this is the same as the
-            input directory, but other cases have designated baseline directories
-        - Directories that will be created locally to run the case on the tested system; these
-            are copied from the "input" directories above into a "build" directory on the tested
-            system. The local results are here.
-        """
-        for i, case in enumerate(self.cases):
-            # The driver is currently either "openfast" or a specific module
             if CASE_MAP[case]["driver"] == "openfast":
-                self.inputs.append(os.path.join(self.rtest_openfast, case))
-                self.baseline_directories.append(os.path.join(self.inputs[i], self.output_type))
+                # Copy the case files
+                destination = os.path.join(self.local_test_location, "glue-codes",  case_info["driver"], case)
+                if not os.path.isdir(destination):
+                    source = os.path.join(self.rtest_openfast, case)
+                    shutil.copytree(source, destination, ignore=ignore_baseline)
+                
+                # Copy the required turbine model
+                destination = os.path.join(self.local_test_location, "glue-codes", case_info["driver"], case_info["turbine_directory"])
+                if not os.path.isdir(destination):
+                    source = os.path.join(self.rtest_openfast, case_info["turbine_directory"])
+                    shutil.copytree(source, destination, ignore=ignore_baseline)
+
             else:
-                self.inputs.append(os.path.join(self.rtest_modules, CASE_MAP[case]["driver"], case))
-                self.baseline_directories.append(os.path.join(self.rtest_modules, CASE_MAP[case]["driver"], case))
-            self.local_case_directories.append(os.path.join(self.build_directory, "reg_tests", "local_results", CASE_MAP[case]["driver"], case))
+                # Copy the case files
+                destination = os.path.join(self.local_test_location, "modules", case_info["driver"], case)
+                if not os.path.isdir(destination):
+                    source = os.path.join(self.rtest_modules, case_info["driver"], case)
+                    shutil.copytree(source, destination)
 
     def _run_openfast_case(
             self,
@@ -343,7 +250,7 @@ class Executor:
 
         os.chdir(cwd)
 
-    def _run_single_case(self, index: str, case: str, test_build: str):
+    def _run_single_case(self, index: str, case: str):
         """
         Runs a single OpenFAST test case
 
@@ -353,9 +260,14 @@ class Executor:
             String index as "i/n" for which case is being run.
         case : str
             Case name.
-        test_build : str
-                Testing build directory.
         """
+
+        case_info = CASE_MAP[case]
+        if CASE_MAP[case]["driver"] == "openfast":
+            test_build = os.path.join(self.local_test_location, "glue-codes", case_info["driver"], case)
+        else:
+            test_build = os.path.join(self.local_test_location, "modules", case_info["driver"], case)
+
         if CASE_MAP[case]["driver"] == "beamdyn":
             exe = self.bd_executable
             case_input = os.path.join(test_build, "bd_driver.inp")
@@ -372,7 +284,7 @@ class Executor:
         Runs all of the OpenFAST cases in parallel, if defined.
         """
         indeces = [f"{i}/{len(self.cases)}" for i in range(1, len(self.cases) + 1)]
-        arguments = list(zip(indeces, self.cases, self.local_case_directories))
+        arguments = list(zip(indeces, self.cases))
         with Pool(self.jobs) as pool:
             pool.starmap(self._run_single_case, arguments)
 
@@ -382,9 +294,8 @@ class Executor:
         OpenFAST, then the directories are created if they don't already exist.
         """
 
-        self._build_directory_references()
         if not self.no_execution:
-            self._build_test_output_directories()
+            self._build_local_test_directory()
             self._run_openfast_cases()
     
     def read_output_files(self) -> Tuple[list]:
@@ -407,8 +318,14 @@ class Executor:
         error_list = []
 
         # Get the baseline results
-        for directory, case in zip(self.baseline_directories, self.cases):
-            results_file = os.path.join(directory, CASE_MAP[case]["reference_output"])
+        for case in self.cases:
+
+            case_info = CASE_MAP[case]
+            if CASE_MAP[case]["driver"] == "openfast":
+                results_file = os.path.join(self.rtest_openfast, case, self.output_type, CASE_MAP[case]["reference_output"])
+            else: 
+                results_file = os.path.join(self.rtest_modules, case_info["driver"], case, CASE_MAP[case]["reference_output"])
+
             try:
                 validate_file(results_file)
             except FileNotFoundError as error:
@@ -418,8 +335,14 @@ class Executor:
                 baseline_list.append( (data, info) )
 
         # Get the local test results
-        for directory, case in zip(self.local_case_directories, self.cases):
-            results_file = os.path.join(directory, CASE_MAP[case]["reference_output"])
+        for case in self.cases:
+
+            case_info = CASE_MAP[case]
+            if CASE_MAP[case]["driver"] == "openfast":
+                results_file = os.path.join(self.local_test_location, "glue-codes", case_info["driver"], case, CASE_MAP[case]["reference_output"])
+            else:
+                results_file = os.path.join(self.local_test_location, "modules", case_info["driver"], case, CASE_MAP[case]["reference_output"])
+
             try:
                 validate_file(results_file)
             except FileNotFoundError as error:
