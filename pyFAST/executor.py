@@ -16,7 +16,6 @@ from .utilities import (
     validate_file,
     calculate_norms,
     ignore_baseline,
-    run_openfast_case,
     validate_directory,
     validate_executable,
     pass_regression_test
@@ -266,6 +265,62 @@ class Executor:
             self.outputs.append(os.path.join(self.inputs[i], self.output_type))
             self.test_build.append(os.path.join(self.build, "local_results", case))
 
+    def _run_openfast_case(
+            self,
+            executable: str,
+            in_file: str,
+            ix: str,
+            case: str,
+            verbose: bool = False,
+        ):
+        """
+        Runs an OpenFAST regression test case.
+
+        Parameters
+        ----------
+        executable : str
+            File path to the OpenFAST executable.
+        in_file : str
+            Input file for the OpenFAST test case.
+        ix : str
+            String index/total of case being run.
+        case : str
+            Name of the case being run
+        verbose : bool, optional
+            Flag to include verbose output, by default False.
+        """
+        cwd = os.getcwd()
+        os.chdir(os.path.dirname(in_file))
+
+        stdout = sys.stdout if verbose else open(os.devnull, "w")
+
+        validate_file(in_file)
+        executable = os.path.abspath(executable)
+        validate_executable(executable)
+
+        base = os.path.sep.join(in_file.split(os.path.sep)[-1].split(".")[:-1])
+        parent = os.path.sep.join(in_file.split(os.path.sep)[:-1])
+        log = os.path.join(parent, "".join((base, ".log")))
+
+        command = f"{executable} {in_file} > {log}"
+        print(f"{ix.rjust(6)} Start: {case}")
+        if verbose:
+            print(f"command: {command}")
+
+        start = perf_counter()
+        code = subprocess.call(command, stdout=stdout, shell=True)
+        end = perf_counter()
+        elapsed = f"{end - start:.2f}"
+        status = "FAILED".rjust(8) if code != 0 else "complete"
+        ix = ix.split("/")[0]
+        message = (
+            f"{ix.rjust(6)}   End: {case.ljust(40, '.')} {status} with code "
+            f"{code}{elapsed.rjust(8)} seconds"
+        )
+        print(message, flush=True)
+
+        os.chdir(cwd)
+
     def _run_single_case(self, ix: str, case: str, test_build: str):
         """
         Runs a single OpenFAST test case
@@ -289,9 +344,7 @@ class Executor:
             exe = self.of_executable
             case_input = os.path.join(test_build, "".join((case, ".fst")))
 
-        run_openfast_case(
-            exe, case_input, ix, case, verbose=self.verbose, beamdyn=beamdyn
-        )
+        self._run_openfast_case(exe, case_input, ix, case, verbose=self.verbose)
 
     def _run_openfast_cases(self):
         """
