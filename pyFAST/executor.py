@@ -26,66 +26,6 @@ from .utilities import (
 from .case_map import CASE_MAP
 
 
-def _get_linear_out_files(case, out_dir, target):
-    """
-    .. note:: Not yet implemented but don't want it to fail.
-    """
-    return None, None
-
-
-def _get_regression_out_files(case: str, out_dir: str, baseline_dir: str):
-    """
-    Reads the standard regression test output files for regression testing.
-
-    Parameters
-    ----------
-    case : str
-        Case name.
-    out_dir : str
-        Test build direcory.
-    baseline_dir : str
-        Target output directory.
-    """
-
-    case_file = "".join((case, ".outb"))
-    local = os.path.join(out_dir, case_file)
-    baseline = os.path.join(baseline_dir, case_file)
-
-    for f in (local, baseline):
-        try:
-            validate_file(f)
-        except FileExistsError as error:
-            return None, None, error
-
-    return local, baseline
-
-
-def _get_beamdyn_out_files(case: str, out_dir: str, baseline_dir: str):
-    """
-    Reads the beamdyn test output files for regression testing.
-
-    Parameters
-    ----------
-    case : str
-        Case name. Not used.
-    out_dir : str
-        Test build direcory.
-    baseline_dir : str
-        Target output directory.
-    """
-
-    baseline_dir = os.path.dirname(baseline_dir)
-    local = os.path.join(out_dir, "bd_driver.out")
-    baseline = os.path.join(baseline_dir, "bd_driver.out")
-
-    for f in (local, baseline):
-        try:
-            validate_file(f)
-        except FileExistsError as error:
-            return None, None, error
-
-    return local, baseline
-
 
 class Executor:
     """
@@ -94,12 +34,6 @@ class Executor:
     Attributes
     ----------
     """
-
-    FUNC_MAP = {
-        "linear": _get_linear_out_files,
-        "regression": _get_regression_out_files,
-        "beamdyn": _get_beamdyn_out_files,
-    }
 
     def __init__(
             self,
@@ -189,6 +123,13 @@ class Executor:
 
         self._validate_inputs()
 
+        # Initialize these variables for use when collecting test directories
+        # and opening files.
+        self.inputs = []                  # Directory in r-test containing the test case inputs
+        self.baseline_directories = []    # Directory in r-test containing the test case baseline solutions
+        self.local_case_directories = []  # Direcory containing the locally generated test case inputs and outputs
+        self.local_test_location = os.path.join(self.build, "local_results")
+
     def _validate_inputs(self):
         """Method to ensure inputs are valid."""
 
@@ -269,12 +210,11 @@ class Executor:
                 else:
                     shutil.copy2(_source, _target)
 
-    def _build_test_directory(self):
+    def _build_local_test_directory(self):
         """
         Copies the input data to the test build directory
         """
-
-        for input_dir, test_dir in zip(self.inputs, self.test_build):
+        for input_dir, test_dir in zip(self.inputs, self.local_case_directories):
             if not os.path.isdir(test_dir):
                 shutil.copytree(input_dir, test_dir, ignore=ignore_baseline)
             else:
@@ -308,10 +248,10 @@ class Executor:
             if not os.path.isdir(_dir):
                 shutil.copytree(os.path.join(self.module, data), _dir)
 
-        self._build_test_directory()
         self._build_beamdyn_output_directories(_to_build_beamdyn)
         self._check_5MW_dll_files()
         self._build_5MW_directories()
+        self._build_local_test_directory()
 
     def _build_directory_references(self):
         """
@@ -359,8 +299,7 @@ class Executor:
         """
         Runs all of the openfast cases in parallel (if defined).
         """
-
-        arguments = list(zip(self.ix, self.case, self.test_build))
+        arguments = list(zip(self.ix, self.cases, self.local_case_directories))
         with Pool(self.jobs) as pool:
             pool.starmap(self._run_single_case, arguments)
 
@@ -376,8 +315,8 @@ class Executor:
         if self.execution:
             self._build_test_output_directories()
             self._run_openfast_cases()
-
-    def read_out_files(self) -> Tuple[list]:
+    
+    def read_output_files(self) -> Tuple[list]:
         """
         Reads in the output files corresponding to `case` and returns the
         cases, baseline outputs, and locally produced outputs.
@@ -392,35 +331,32 @@ class Executor:
             List of valid non-linear regression test cases (attribute, data).
         """
 
-        ix_list = []
-        case_list = []
         test_list = []
         baseline_list = []
         error_list = []
-        for ix, case, out_dir, target in zip(
-            self.ix, self.case, self.test_build, self.outputs
-        ):
-            # Process the files
-            _func = self.FUNC_MAP[CASE_MAP[case]]
-            local, baseline, *error = _func(case, out_dir, target)
 
-            error_list.append((case, error))
+        # Get the baseline results
+        for directory, case in zip(self.baseline_directories, self.cases):
+            results_file = os.path.join(directory, CASE_MAP[case]["reference_output"])
+            try:
+                validate_file(results_file)
+            except FileNotFoundError as error:
+                error_list.append( (case, "Baseline: " + str(error)) )
+            else:
+                data, info, _ = load_output(results_file)
+                baseline_list.append( (data, info) )
 
-            # Check for linear case
-            if local is None and baseline is None:
-                continue
+        # Get the local test results
+        for directory, case in zip(self.local_case_directories, self.cases):
+            results_file = os.path.join(directory, CASE_MAP[case]["reference_output"])
+            try:
+                validate_file(results_file)
+            except FileNotFoundError as error:
+                error_list.append( (case, "Local: " + str(error)) )
+            else:
+                data, info, _ = load_output(results_file)
+                test_list.append( (data, info) )
 
-            ix_list.append(ix)
-            case_list.append(case)
-
-            # Extract the data
-            test_data, test_info, _ = load_output(local)
-            test_list.append((test_data, test_info))
-
-            baseline_data, baseline_info, _ = load_output(baseline)
-            baseline_list.append((baseline_data, baseline_info))
-
-        error_list = [(error[0], error[1][0]) for error in error_list if error[1]]
         if error_list:
             print("\n\x1b[1;31mErrors:\x1b[0m")
             for case, e in error_list:
@@ -428,7 +364,7 @@ class Executor:
                 print(f"  {case}: {e}")
             print("")
 
-        return ix_list, case_list, baseline_list, test_list
+        return baseline_list, test_list
 
     def test_norm(
             self,
