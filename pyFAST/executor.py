@@ -165,12 +165,10 @@ class Executor:
         if self.jobs < -1:
             raise ValueError("Invalid value given for 'jobs'")
 
-    def _build_local_test_directory(self):
+    def _build_local_case_directories(self):
         """
-        Copies the input data to the test build directory
+        Copies the input data to the local directories where the tests will be run
         """
-        # _regression = ("AOC", "AWT27", "SWRT", "UAE_VI", "WP_Baseline")
-
         for case in self.cases:
             case_info = CASE_MAP[case]
 
@@ -194,7 +192,7 @@ class Executor:
                     source = os.path.join(self.rtest_modules, case_info["driver"], case)
                     shutil.copytree(source, destination)
 
-    def _run_openfast_case(
+    def _execute_case(
             self,
             executable: str,
             in_file: str,
@@ -250,7 +248,7 @@ class Executor:
 
         os.chdir(cwd)
 
-    def _run_single_case(self, index: str, case: str):
+    def _run_case(self, index: str, case: str):
         """
         Runs a single OpenFAST test case
 
@@ -277,16 +275,16 @@ class Executor:
         else:
             raise ValueError
 
-        self._run_openfast_case(exe, case_input, index, case, verbose=self.verbose)
+        self._execute_case(exe, case_input, index, case, verbose=self.verbose)
 
-    def _run_openfast_cases(self):
+    def _run_cases(self):
         """
         Runs all of the OpenFAST cases in parallel, if defined.
         """
         indeces = [f"{i}/{len(self.cases)}" for i in range(1, len(self.cases) + 1)]
         arguments = list(zip(indeces, self.cases))
         with Pool(self.jobs) as pool:
-            pool.starmap(self._run_single_case, arguments)
+            pool.starmap(self._run_case, arguments)
 
     def run(self):
         """
@@ -295,8 +293,8 @@ class Executor:
         """
 
         if not self.no_execution:
-            self._build_local_test_directory()
-            self._run_openfast_cases()
+            self._build_local_case_directories()
+            self._run_cases()
     
     def read_output_files(self) -> Tuple[list]:
         """
