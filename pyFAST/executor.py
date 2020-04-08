@@ -145,13 +145,21 @@ class Executor:
             self.output_type = "macos-gnu"
             print(f"Defaulting to {self.output_type} for output type")
 
-        # Are the required executable provided?
-        # TODO
-        # _required_executables = set([ CASE_MAP[c]["driver"] for c in self.cases ])
+        # Are the required executables provided in a valid location with correct permissions?
+        _required_executables = set([ CASE_MAP[c]["driver"] for c in self.cases ])
+        if "openfast" in _required_executables:
+            try:
+                assert self.of_executable
+            except AttributeError as error:
+                raise AttributeError("An OpenFAST case was requested but no OpenFAST executable given.")
+            validate_executable(self.of_executable)
 
-        # Do the given executables exist with the correct permissions?
-        validate_executable(self.bd_executable)
-        validate_executable(self.of_executable)
+        if "beamdyn" in _required_executables:
+            try:
+                assert self.bd_executable
+            except AttributeError as error:
+                raise AttributeError("A BeamDyn case was requested but no BeamDyn Driver executable given.")
+            validate_executable(self.bd_executable)
 
         # Do the given directories exist?
         validate_directory(self.build_directory)
