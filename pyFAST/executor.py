@@ -106,11 +106,8 @@ class Executor:
             system = "macos"
 
         # Cases should be a list of case names ["awt_yfree", "..."]
-        # to run all cases, pass an empty list or leave the argument out
-        if cases == 0:
-            self.cases = CASE_MAP
-        else:
-            self.cases = {case: CASE_MAP[case] for case in cases}
+        # to run all cases, pass an empty list
+        self.cases = CASE_MAP if not cases else {case: CASE_MAP[case] for case in cases}
 
         self.output_type = "-".join((system, compiler.lower()))
         self.verbose = verbose

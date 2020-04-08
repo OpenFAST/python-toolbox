@@ -2,12 +2,14 @@
 
 import argparse
 from typing import List
+import re
 
 from . import CASE_MAP, Executor
 
 
 def match_cases(case_regex: str) -> List[str]:
-    """Match provided case with available test cases.
+    """
+    Match provided case with available test cases.
 
     Parameters
     ----------
@@ -17,11 +19,11 @@ def match_cases(case_regex: str) -> List[str]:
     Returns
     -------
     List[str]
-        List of cases that have `case_regex` as a non-case-sensitive substring.
+        List of cases that have `case_regex` as a case-sensitive substring.
     """
 
-    case_regex = case_regex.lower()
-    return [c for c in CASE_LIST if case_regex in c.lower()]
+    prog = re.compile(case_regex)
+    return [c for c in CASE_MAP if prog.match(c)]
 
 
 def main():
@@ -34,16 +36,14 @@ def main():
 
     parser.add_argument(
         "-r",
-        "--regex-case",
-        dest="case",
+        "--regex-cases",
+        dest="cases",
         type=str,
         nargs="+",
-        default=["all"],
+        default=[],
         required=False,
         help=(
-            '"Regex" case names where the text. Looks to see if the provided '
-            "string is contained in any of the valid cases. "
-            "Note: not case sensitive"
+            'Case sensitive regex of case names to run from the list of available cases.'
         ),
     )
     parser.add_argument(
@@ -138,11 +138,9 @@ def main():
     # execution class
     args = parser.parse_args()
 
-    cases = (
-        "all"
-        if "all" in args.case
-        else [c for el in args.case for c in match_cases(el)]
-    )
+    # Get the cases given by the reg ex, if requested
+    cases = args.cases if not args.cases else [c for el in args.cases for c in match_cases(el)]
+    cases = list(set(cases))
 
     execution = not args.no_execution
     reg_test = Executor(
