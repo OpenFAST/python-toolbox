@@ -3,6 +3,7 @@
 # Import the local packages for external use
 from .case_map import CASE_MAP
 from .executor import Executor
+from .regression_tester import RegressionTester
 
 import os
 ROOT = os.path.abspath(os.path.dirname(__file__))

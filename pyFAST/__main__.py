@@ -8,6 +8,7 @@ import re
 from pyFAST import (
     CASE_MAP,
     Executor,
+    RegressionTester,
 )
 
 
@@ -183,13 +184,13 @@ def main():
     baseline, test = executor.read_output_files()
 
     # Run the regression test
+    reg_test = RegressionTester(args.tolerance)
+    ix = [f"{i}/{len(executor.cases)}" for i in range(1, len(executor.cases) + 1)]
     norm_res, pass_fail_list, norm_list = reg_test.test_norm(
         ix,
         cases,
         baseline,
-        test,
-        # norm_list=args.norm_list,
-        # test_norm_condition=args.test_norm,
+        test
     )
 
     # Extract the attributes metadata and the data
