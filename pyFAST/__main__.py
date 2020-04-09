@@ -5,7 +5,10 @@ import argparse
 from typing import List
 import re
 
-from . import CASE_MAP, Executor
+from pyFAST import (
+    CASE_MAP,
+    Executor,
+)
 
 
 def match_cases(case_regex: str) -> List[str]:
@@ -28,11 +31,13 @@ def match_cases(case_regex: str) -> List[str]:
 
 
 def main():
-    """Runs the pyFAST suite.
+    """
+    Runs the pyFAST suite.
     """
 
     parser = argparse.ArgumentParser(
-        description="Calculates the regression test norms.", prog="pyFAST"
+        description="Executes the requested cases and quantifies the difference in local and baseline results.",
+        prog="pyFAST"
     )
 
     parser.add_argument(
@@ -64,18 +69,18 @@ def main():
         help="Test-produced data file.",
     )
     parser.add_argument(
+        "--openfast-root",
+        dest="openfast_root",
+        type=str,
+        required=not _list_flag_given,
+        help="Path to the OpenFAST repository",
+    )
+    parser.add_argument(
         "--system",
         dest="system",
         type=str.lower,
         choices=["macos", "linux", "windows"],
         help="Operating system to use for baseline results.",
-    )
-    parser.add_argument(
-        "--openfast-root",
-        dest="openfast_root",
-        type=str,
-        required=True,
-        help="Path to the OpenFAST repository",
     )
     parser.add_argument(
         "-c",
@@ -122,29 +127,27 @@ def main():
         "--no-execution",
         dest="no_execution",
         action="store_true",
-        help="Doesn't run the actual test case(s). The data should already exist.",
+        help="Avoid executing the OpenFAST case simulations. The simulation results should already exist and the results comparison will be performed.",
     )
-    parser.add_argument(
-        "--norm",
-        dest="norm_list",
-        type=str.lower,
-        nargs="+",
-        default=["max_norm", "max_norm_over_range", "l2_norm", "relative_l2_norm"],
-        choices=["max_norm", "max_norm_over_range", "l2_norm", "relative_l2_norm"],
-        help="The norm(s) to be computed.",
-    )
-    parser.add_argument(
-        "--test-norm",
-        dest="test_norm",
-        type=str.lower,
-        nargs="+",
-        default=["relative_l2_norm"],
-        choices=["max_norm", "max_norm_over_range", "l2_norm", "relative_l2_norm"],
-        help="Norm(s) used to determine if the test(s) pass. Must be a normed passed to `-norm`.",
-    )
+    # parser.add_argument(
+    #     "--norm",
+    #     dest="norm_list",
+    #     type=str.lower,
+    #     nargs="+",
+    #     default=["max_norm", "max_norm_over_range", "l2_norm", "relative_l2_norm"],
+    #     choices=["max_norm", "max_norm_over_range", "l2_norm", "relative_l2_norm"],
+    #     help="The norm(s) to be computed.",
+    # )
+    # parser.add_argument(
+    #     "--test-norm",
+    #     dest="test_norm",
+    #     type=str.lower,
+    #     nargs="+",
+    #     default=["relative_l2_norm"],
+    #     choices=["max_norm", "max_norm_over_range", "l2_norm", "relative_l2_norm"],
+    #     help="Norm(s) used to determine if the test(s) pass. Must be a normed passed to `-norm`.",
+    # )
 
-    # Parse the arguments, find the cases to be run, and initialize the OpenFAST
-    # execution class
     args = parser.parse_args()
 
     if args.list:
@@ -162,25 +165,22 @@ def main():
     cases = args.cases if not args.cases else [c for el in args.cases for c in match_cases(el)]
     cases = list(set(cases))
 
-    execution = not args.no_execution
-    reg_test = Executor(
+    executor = Executor(
         cases,
         args.executable,
         args.openfast_root,
         args.compiler,
         system=args.system,
-        tolerance=args.tolerance,
-        plot=args.plot,
-        execution=execution,
+        no_execution=args.no_execution,
         verbose=args.verbose,
         jobs=args.jobs,
     )
 
-    # Run OpenFAST cases
-    reg_test.run()
+    # Run cases
+    executor.run()
 
     # Gather the outputs
-    ix, cases, baseline, test = reg_test.read_out_files()
+    baseline, test = executor.read_output_files()
 
     # Run the regression test
     norm_res, pass_fail_list, norm_list = reg_test.test_norm(
@@ -188,8 +188,8 @@ def main():
         cases,
         baseline,
         test,
-        norm_list=args.norm_list,
-        test_norm_condition=args.test_norm,
+        # norm_list=args.norm_list,
+        # test_norm_condition=args.test_norm,
     )
 
     # Extract the attributes metadata and the data
