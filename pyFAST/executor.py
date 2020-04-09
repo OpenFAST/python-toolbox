@@ -27,7 +27,6 @@ class Executor:
     This class first constructs the internal directories containing the test case input files.
     Then, the test cases are executed using multiple processors, if requested.
     The locally generated outputs are tested against their corresponding baselines.
-    Finally, a summary HTML file is created with plots, if requested.
 
     Attributes
     ----------
@@ -40,16 +39,12 @@ class Executor:
             openfast_root: str,
             compiler: str,
             system: str = None,
-            plot: int = 0,
-            plot_path: str = None,
             no_execution: bool = False,
             verbose: bool = False,
             jobs: bool = -1,
     ):
         """
         Initialize the required inputs
-
-        NOTE: Make the plotting a little more modular so that all are done in one grid?
 
         TODO:
         - There should exist a test pipeline that executes the full regression test process for each case
@@ -73,15 +68,6 @@ class Executor:
             Operating system version of results used for comparison, default
             None (machine's OS). Should be one of "windows", "linux", or
             "macos".
-        plot : int, default: 0
-            Flag to include plotting:
-             - 0 (default): No plots will be produced
-             - 1: All plots will be produced.
-             - 2: Only the plots for failing cases will be produced.
-            All plots will be output to <path_to_case_name>/results.html.
-        plot_path : str, default None
-            Path to save all case result summaries and their plots. If `None`,
-            the local output directory is used.
         no_execution : bool, default: False
             Flag to avoid executing the simulations, but proceed with the regression test.
         verbose : bool, default: False
@@ -109,8 +95,6 @@ class Executor:
         self.output_type = "-".join((system, compiler.lower()))
         self.verbose = verbose
         self.no_execution = no_execution
-        self.plot = plot
-        self.plot_path = plot_path
         self.jobs = jobs if jobs != 0 else -1
 
         for exe in executable:
@@ -156,11 +140,6 @@ class Executor:
 
         # Do the given directories exist?
         validate_directory(self.build_directory)
-
-        # Is the plot flag within the supported range?
-        _options = (0, 1, 2)
-        if self.plot not in _options:
-            raise ValueError(f"Input 'plot' must be one of {_options}")
 
         #  Is the jobs flag within the supported range?
         if self.jobs < -1:
