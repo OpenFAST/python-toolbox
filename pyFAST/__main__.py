@@ -9,6 +9,7 @@ from pyFAST import (
     CASE_MAP,
     Executor,
     RegressionTester,
+    SummaryHandler
 )
 
 
@@ -201,11 +202,10 @@ def main():
     baseline_data = [data for data, _ in baseline]
     test_data = [data for data, _ in test]
 
-    # Create the case summary for each case
-    plots = reg_test.retrieve_plot_html(
-        baseline_data, test_data, attributes, pass_fail_list
-    )
-    reg_test.create_results_summary(cases, attributes, norm_res, norm_list, plots)
+    # Create the regression test summaries
+    summary = SummaryHandler(args.plot, executor.local_test_location)
+    plots = summary.retrieve_plot_html(baseline_data, test_data, attributes, pass_fail_list)
+    summary.create_results_summary(cases, attributes, norm_res, norm_list, plots, args.tolerance)
 
 
 if __name__ == "__main__":
