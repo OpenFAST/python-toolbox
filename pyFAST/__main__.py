@@ -1,5 +1,6 @@
 """CLI functionality for pyFAST"""
 
+import sys
 import argparse
 from typing import List
 import re
@@ -35,13 +36,21 @@ def main():
     )
 
     parser.add_argument(
+        "-l",
+        "--list-cases",
+        dest="list",
+        action="store_true",
+        help=('Display the available test cases.'),
+    )
+    _list_flag_given = '-l' in sys.argv or '--list' in sys.argv
+
+    parser.add_argument(
         "-r",
         "--regex-cases",
         dest="cases",
         type=str,
         nargs="+",
         default=[],
-        required=False,
         help=(
             'Case sensitive regex of case names to run from the list of available cases.'
         ),
@@ -51,7 +60,7 @@ def main():
         dest="executable",
         type=str,
         nargs="+",
-        required=True,
+        required=not _list_flag_given,
         help="Test-produced data file.",
     )
     parser.add_argument(
@@ -72,7 +81,7 @@ def main():
         "-c",
         dest="compiler",
         type=str.lower,
-        required=True,
+        required=not _list_flag_given,
         choices=["intel", "gnu"],
         help="Compiler ID for the system",
     )
@@ -137,6 +146,17 @@ def main():
     # Parse the arguments, find the cases to be run, and initialize the OpenFAST
     # execution class
     args = parser.parse_args()
+
+    if args.list:
+        # Display all available cases and return
+        print("OpenFAST cases:")
+        for case in [key for key, value in CASE_MAP.items() if value["driver"] == "openfast"]:
+            print(f"\t{case}")
+        print("")
+        print("BeamDyn module cases:")
+        for case in [key for key, value in CASE_MAP.items() if value["driver"] == "beamdyn"]:
+            print(f"\t{case}")
+        return
 
     # Get the cases given by the reg ex, if requested
     cases = args.cases if not args.cases else [c for el in args.cases for c in match_cases(el)]
