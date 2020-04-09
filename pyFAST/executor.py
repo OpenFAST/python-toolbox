@@ -40,7 +40,6 @@ class Executor:
             openfast_root: str,
             compiler: str,
             system: str = None,
-            tolerance: float = 1e-5,
             plot: int = 0,
             plot_path: str = None,
             no_execution: bool = False,
@@ -74,8 +73,6 @@ class Executor:
             Operating system version of results used for comparison, default
             None (machine's OS). Should be one of "windows", "linux", or
             "macos".
-        tolerance: float, default: 1e-5
-            Error tolerance for pass/fail condition.
         plot : int, default: 0
             Flag to include plotting:
              - 0 (default): No plots will be produced
@@ -112,7 +109,6 @@ class Executor:
         self.output_type = "-".join((system, compiler.lower()))
         self.verbose = verbose
         self.no_execution = no_execution
-        self.tolerance = tolerance
         self.plot = plot
         self.plot_path = plot_path
         self.jobs = jobs if jobs != 0 else -1
