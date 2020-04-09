@@ -120,9 +120,9 @@ class Executor:
         for exe in executable:
             _exe = os.path.basename(os.path.normpath(exe))
             if "openfast" in _exe:
-                self.of_executable = Path(exe)
+                self.of_executable = os.path.abspath(exe)
             elif "beamdyn_driver" in _exe:
-                self.bd_executable = Path(exe)
+                self.bd_executable = os.path.abspath(exe)
 
         self._validate_inputs()
 
@@ -200,7 +200,8 @@ class Executor:
     def _execute_case(
             self,
             executable: str,
-            in_file: str,
+            case_directory: str,
+            input_file: str,
             ix: str,
             case: str,
             verbose: bool = False,
@@ -211,9 +212,11 @@ class Executor:
         Parameters
         ----------
         executable : str
-            File path to the OpenFAST executable.
-        in_file : str
-            Input file for the OpenFAST test case.
+            File path to the approptiate executable for this case.
+        case_directory : str
+            Directory containing the test case files.
+        input_file : str
+            Input file for the test case.
         ix : str
             String index/total of case being run.
         case : str
@@ -222,19 +225,19 @@ class Executor:
             Flag to include verbose output, by default False.
         """
         cwd = os.getcwd()
-        os.chdir(os.path.dirname(in_file))
+        os.chdir(case_directory)
 
         stdout = sys.stdout if verbose else open(os.devnull, "w")
 
-        validate_file(in_file)
+        validate_file(input_file)
         executable = os.path.abspath(executable)
         validate_executable(executable)
 
-        base = os.path.sep.join(in_file.split(os.path.sep)[-1].split(".")[:-1])
-        parent = os.path.sep.join(in_file.split(os.path.sep)[:-1])
+        base = os.path.sep.join(input_file.split(os.path.sep)[-1].split(".")[:-1])
+        parent = os.path.sep.join(input_file.split(os.path.sep)[:-1])
         log = os.path.join(parent, "".join((base, ".log")))
 
-        command = f"{executable} {in_file} > {log}"
+        command = f"{executable} {input_file} > {log}"
         print(f"{ix.rjust(6)} Start: {case}")
         if verbose:
             print(f"command: {command}")
@@ -259,7 +262,7 @@ class Executor:
 
         Parameters
         ----------
-        ix : str
+        index : str
             String index as "i/n" for which case is being run.
         case : str
             Case name.
@@ -267,20 +270,20 @@ class Executor:
 
         case_info = CASE_MAP[case]
         if CASE_MAP[case]["driver"] == "openfast":
-            test_build = os.path.join(self.local_test_location, "glue-codes", case_info["driver"], case)
+            case_directory = os.path.join(self.local_test_location, "glue-codes", case_info["driver"], case)
         else:
-            test_build = os.path.join(self.local_test_location, "modules", case_info["driver"], case)
+            case_directory = os.path.join(self.local_test_location, "modules", case_info["driver"], case)
 
         if CASE_MAP[case]["driver"] == "beamdyn":
             exe = self.bd_executable
-            case_input = os.path.join(test_build, "bd_driver.inp")
+            case_input = "bd_driver.inp"
         elif CASE_MAP[case]["driver"] == "openfast":
             exe = self.of_executable
-            case_input = os.path.join(test_build, "".join((case, ".fst")))
+            case_input = "".join((case, ".fst"))
         else:
             raise ValueError
 
-        self._execute_case(exe, case_input, index, case, verbose=self.verbose)
+        self._execute_case(exe, case_directory, case_input, index, case, verbose=self.verbose)
 
     def _run_cases(self):
         """
