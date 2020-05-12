@@ -8,8 +8,8 @@ from typing import List
 import numpy as np
 import numpy.linalg as LA
 
-from pyFAST.utilities.fast_io import load_output
-from pyFAST.utilities.utilities import validate_file
+from .fast_io import load_output
+from .utilities import validate_file
 
 
 def diff(baseline: np.ndarray, test: np.ndarray, abs_val: bool = True) -> np.ndarray:
@@ -32,10 +32,7 @@ def diff(baseline: np.ndarray, test: np.ndarray, abs_val: bool = True) -> np.nda
     """
 
     diff = test - baseline
-    if not abs_val:
-        return diff
-
-    return np.absolute(diff)
+    return np.absolute(diff) if abs_val else diff
 
 
 def pass_regression_test(norm: np.ndarray, tolerance: float) -> bool:
