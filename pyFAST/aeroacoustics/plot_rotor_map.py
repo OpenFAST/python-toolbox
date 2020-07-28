@@ -22,7 +22,7 @@ n = 1
 ## Paths to files
 FAST_directory  = os.path.dirname( os.path.dirname( os.path.dirname( os.path.dirname( os.path.realpath(__file__) ) ) ) ) + os.sep + 'openfast' + os.sep + 'reg_tests' + os.sep + 'r-test' + os.sep + 'glue-codes' + os.sep + 'openfast' + os.sep + 'IEA_LB_RWT-AeroAcoustics'
 AAfilename      = FAST_directory + os.sep + 'IEA_LB_RWT-AeroAcoustics_4.out'
-OF2filename     = FAST_directory + os.sep + 'IEA_LB_RWT-AeroAcoustics.out'
+OFfilename      = FAST_directory + os.sep + 'IEA_LB_RWT-AeroAcoustics.out'
 locfilename     = FAST_directory + os.sep + 'AA_ObserverLocations.dat'
 output_dir      = os.path.dirname( os.path.realpath(__file__) )
 outputfilename  = output_dir + os.sep + "data_output4"
@@ -34,7 +34,7 @@ location = pd.read_csv(locfilename,delimiter='\s+',skiprows=[0,1],names=['x','y'
 
 
 AA_1 = weio.FASTOutFile(AAfilename).toDataFrame()
-OF2  = weio.FASTOutFile(OF2filename).toDataFrame()
+OF  = weio.FASTOutFile(OFfilename).toDataFrame()
 
 
 with open(AAfilename, 'r') as f:
@@ -51,8 +51,8 @@ for i in range(n_obs):
     if location['x'][i] < 0:
         k[i] = -1
 
-phi = OF2['Azimuth_[deg]'] / 180. * np.pi
-phi_interp = np.interp(AA_1['Time_[s]'], OF2['Time_[s]'], phi)
+phi = OF['Azimuth_[deg]'] / 180. * np.pi
+phi_interp = np.interp(AA_1['Time_[s]'], OF['Time_[s]'], phi)
 index = []
 for i in range(1, len(phi_interp)):
     if phi_interp[i] < phi_interp[i-1]:

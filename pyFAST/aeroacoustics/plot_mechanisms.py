@@ -21,7 +21,7 @@ n = 1
 ## Paths to files
 FAST_directory  = os.path.dirname( os.path.dirname( os.path.dirname( os.path.dirname( os.path.realpath(__file__) ) ) ) ) + os.sep + 'openfast' + os.sep + 'reg_tests' + os.sep + 'r-test' + os.sep + 'glue-codes' + os.sep + 'openfast' + os.sep + 'IEA_LB_RWT-AeroAcoustics'
 AAfilename      = FAST_directory + os.sep + 'IEA_LB_RWT-AeroAcoustics_3.out'
-OF2filename     = FAST_directory + os.sep + 'IEA_LB_RWT-AeroAcoustics.out'
+OFfilename      = FAST_directory + os.sep + 'IEA_LB_RWT-AeroAcoustics.out'
 output_dir      = os.path.dirname( os.path.realpath(__file__) )
 outputfilename  = output_dir + os.sep + "data_output2"
 
@@ -30,13 +30,13 @@ outputfilename  = output_dir + os.sep + "data_output2"
 
 # Read in file data
 AA_3 = weio.FASTOutFile(AAfilename).toDataFrame()
-OF2  = weio.FASTOutFile(OF2filename).toDataFrame()
+OF   = weio.FASTOutFile(OFfilename).toDataFrame()
 
 # Determine number of observers
 num_obs = int((AA_3.shape[1]-1)/(7*34))
 
 # Calculate sample time for n revolutions
-rpm = OF2[["RotSpeed_[rpm]"]].mean()[0]
+rpm = OF[["RotSpeed_[rpm]"]].mean()[0]
 time_revs = n*60/rpm
 tot_time = AA_3["Time_[s]"].max()
 if time_revs < tot_time:

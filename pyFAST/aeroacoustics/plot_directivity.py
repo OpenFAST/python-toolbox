@@ -21,7 +21,7 @@ n = 1
 ## Paths to files
 FAST_directory  = os.path.dirname( os.path.dirname( os.path.dirname( os.path.dirname( os.path.realpath(__file__) ) ) ) ) + os.sep + 'openfast' + os.sep + 'reg_tests' + os.sep + 'r-test' + os.sep + 'glue-codes' + os.sep + 'openfast' + os.sep + 'IEA_LB_RWT-AeroAcoustics'
 AAfilename      = FAST_directory + os.sep + 'IEA_LB_RWT-AeroAcoustics_1.out'
-OF2filename     = FAST_directory + os.sep + 'IEA_LB_RWT-AeroAcoustics.out'
+OFfilename      = FAST_directory + os.sep + 'IEA_LB_RWT-AeroAcoustics.out'
 locfilename     = FAST_directory + os.sep + 'AA_ObserverLocations_Map.dat'
 output_dir      = os.path.dirname( os.path.realpath(__file__) )
 outputfilename  = output_dir + os.sep + "data_output1"
@@ -29,16 +29,16 @@ outputfilename  = output_dir + os.sep + "data_output1"
 #########################################################################################################################################
 ## Read in data, manipulate it, and plot it
 # reads in file data
-AA_1 = weio.FASTOutFile(AAfilename).toDataFrame()
-OF2 = weio.FASTOutFile(OF2filename).toDataFrame()
+AA_1     = weio.FASTOutFile(AAfilename).toDataFrame()
+OF       = weio.FASTOutFile(OFfilename).toDataFrame()
 location = pd.read_csv(locfilename,delimiter='\s+',skiprows=[0,1],names=['x','y','z'])
 
 # determine number of observers
 num_obs = AA_1.shape[1]-1
 
 # calculate sample time for n revolutions
-rpm = OF2[["RotSpeed_[rpm]"]].mean()[0]
-yaw = OF2[["YawPzn_[deg]"]].mean()[0] / 180. * np.pi
+rpm = OF[["RotSpeed_[rpm]"]].mean()[0]
+yaw = OF[["YawPzn_[deg]"]].mean()[0] / 180. * np.pi
 time_revs = n*60/rpm
 tot_time = AA_1["Time_[s]"].max()
 if time_revs < tot_time:
