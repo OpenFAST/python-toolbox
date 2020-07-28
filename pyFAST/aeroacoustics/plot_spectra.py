@@ -23,7 +23,7 @@ FAST_directory  = os.path.dirname( os.path.dirname( os.path.dirname( os.path.dir
 AAfilename      = FAST_directory + os.sep + 'IEA_LB_RWT-AeroAcoustics_2.out'
 OF2filename     = FAST_directory + os.sep + 'IEA_LB_RWT-AeroAcoustics.out'
 output_dir      = os.path.dirname( os.path.realpath(__file__) )
-outputfilename  = output_dir + "data_output2"
+outputfilename  = output_dir + os.sep + "data_output2"
 
 #########################################################################################################################################
 ## Read in data, manipulate it, and plot it
