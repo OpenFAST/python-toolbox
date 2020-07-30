@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 import weio
 from parse import *
 import re
-import seaborn as sb
 import os
 
 #########################################################################################################################################
