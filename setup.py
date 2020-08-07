@@ -32,7 +32,7 @@ setup(
     ],
     packages=["pyFAST"],
     python_requires=">=3.6",
-    install_requires=["numpy", "bokeh==1.4.0"],
+    install_requires=["numpy", "bokeh==1.4.0", "future", "pandas"],
     extras_require={
         "dev": ["pre-commit", "black", "isort", "pytest", "pytest-cov", "pytest-xdist"]
     },
