@@ -12,6 +12,7 @@ from ROSCO_toolbox import utilities as ROSCO_utilities
 from ROSCO_toolbox import controller as ROSCO_controller
 from ROSCO_toolbox import turbine as ROSCO_turbine
 import pyFAST.case_generation.runner as runner
+from pCrunch.Analysis import Loads_Analysis
 import yaml
 
 
@@ -111,40 +112,73 @@ if __name__ == '__main__':
 
 
     # sweep controller.pc_omega and run linearization
-    ww = np.linspace(.05,.45,6)
+    fast_data_lin = []
 
-    for om in ww:
-        # Tune controller 
-        controller.omega_pc = om
-        controller.tune_controller(turbine)
+    if True:
+        ww = np.linspace(.05,.45,6)
 
-        controller.turbine = turbine
+        for om in ww:
+            # Tune controller 
+            controller.omega_pc = om
+            controller.tune_controller(turbine)
 
-        # update linear controller
-        linCont = lin_mod.LinearControlModel(controller)
+            controller.turbine = turbine
 
-        # solve 
-        Lin_OutList, Lin_OutData, P_cl = linTurb.solve(tt,u_h,Plot=False,open_loop=False,controller=linCont)
+            # update linear controller
+            linCont = lin_mod.LinearControlModel(controller)
 
-        comp_channels = ['RtVAvgxh','GenSpeed','TwrBsMyt','PtfmPitch']
-        ax = [None] * len(comp_channels)
-        plt.figure(3)
+            # solve 
+            Lin_OutList, Lin_OutData, P_cl = linTurb.solve(tt,u_h,Plot=False,open_loop=False,controller=linCont)
 
-        for iPlot in range(0,len(comp_channels)):
-            ax[iPlot] = plt.subplot(len(comp_channels),1,iPlot+1)
+            # convert into pCrunch form
+            fd_lin  = {}
+            fd_lin['TwrBsMyt'] = Lin_OutData[:,Lin_OutList.index('TwrBsMyt')]
+            fd_lin['meta']    = {}
+            fd_lin['meta']['name'] = 'omega: ' + str(om)
+            fast_data_lin.append(fd_lin)
 
-            try:
-                ax[iPlot].plot(tt,Lin_OutData[:,Lin_OutList.index(comp_channels[iPlot])])
-            except:
-                print(comp_channels[iPlot] + ' is not in Linearization OutList')
-            ax[iPlot].set_ylabel(comp_channels[iPlot])
-            ax[iPlot].grid(True)
-            if not iPlot == (len(comp_channels) - 1):
-                ax[iPlot].set_xticklabels([])
 
-    plt.show()
+
+            comp_channels = ['RtVAvgxh','GenSpeed','TwrBsMyt','PtfmPitch']
+            ax = [None] * len(comp_channels)
+            plt.figure(3)
+
+            for iPlot in range(0,len(comp_channels)):
+                ax[iPlot] = plt.subplot(len(comp_channels),1,iPlot+1)
+
+                try:
+                    ax[iPlot].plot(tt,Lin_OutData[:,Lin_OutList.index(comp_channels[iPlot])])
+                except:
+                    print(comp_channels[iPlot] + ' is not in Linearization OutList')
+                ax[iPlot].set_ylabel(comp_channels[iPlot])
+                ax[iPlot].grid(True)
+                if not iPlot == (len(comp_channels) - 1):
+                    ax[iPlot].set_xticklabels([])
+
+
+            
+
+        plt.show()
+        
+        
+
+    # Try some post processing using pCrunch
+    chan_info = ('TwrBsMyt',4)
+
+
     
+
+    la = Loads_Analysis()
+    fDEL = la.get_DEL(fast_data_lin,chan_info)
+
+    fd_non  = {}
+    fd_non['TwrBsMyt'] = Non_OutData[:,Non_OutList.index('TwrBsMyt')]
+    fd_non['meta']    = {}
+    fd_non['meta']['name'] = 'nonlinear'
+
+    fDEL_nl = la.get_DEL([fd_non],chan_info)
     print('here')
+
 
 
 
