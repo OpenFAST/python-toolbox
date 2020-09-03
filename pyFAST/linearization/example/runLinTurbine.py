@@ -7,7 +7,6 @@ import pyFAST.case_generation.case_gen as case_gen
 import pyFAST.input_output.fast_output_file as fo
 import pyFAST.input_output.rosco_input_file as ri
 import sys
-sys.path.insert(1,'/Users/dzalkind/Tools/ROSCO_toolbox')  # hack this in until a better method found
 from ROSCO_toolbox import utilities as ROSCO_utilities
 from ROSCO_toolbox import controller as ROSCO_controller
 from ROSCO_toolbox import turbine as ROSCO_turbine
@@ -18,7 +17,6 @@ import yaml
 
 
 import matplotlib.pyplot as plt
-
 
 
 
@@ -160,13 +158,9 @@ if __name__ == '__main__':
 
         plt.show()
         
-        
 
     # Try some post processing using pCrunch
     chan_info = ('TwrBsMyt',4)
-
-
-    
 
     la = Loads_Analysis()
     fDEL = la.get_DEL(fast_data_lin,chan_info)
