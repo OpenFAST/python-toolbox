@@ -32,7 +32,7 @@ The repository contains a set of small packages:
 
 
 
-## Future work and "friend pojects"
+## Future work and friend projects
 
 This repository intends to provide simple scripts to help users of OpenFAST. 
 The repo is still in its early phase, so you may find that functionalities are missing or not bullet proof. 
