@@ -16,6 +16,8 @@ aoa             = np.linspace(-5., 25., 30)             # List of angles of atta
 Re              = np.array([0.5e+06, 1.e+06, 5.e+06, 10.e+06])  # List of Reynolds numbers
 TEoffset        = 1 # Number of nodes away from the TE where the BL properties are extracted, TEoffset = 0 is prone to convergence issues 
 trip            = 0 # Flag to set free (0) or force (1)
+TEAngle         = 10.*np.ones(n_stations) # Distribution of trailing edge angles for BPM trailing edge bluntness noise model
+TEThick         = 0.005*np.ones(n_stations) # Distribution of trailing edge angles for BPM trailing edge bluntness noise model
 
 ## code
 
@@ -131,7 +133,12 @@ for id in range(5,len(inputs_list)):
         fid.write('(deg) \t \t \t (-) \t \t \t (-) \t \t \t (-) \t \t \t (-) \t \t \t (-) \t \t \t (-) \t \t \t (-) \t \t \t (-)\n')
         for j in range(len(aoa)):
             fid.write('%1.5f \t %1.5e \t %1.5e \t %1.5e \t %1.5e \t %1.5e \t %1.5e \t %1.5e \t %1.5e \n' % (aoa[j], Ue_Vinf_SS[j,k], Ue_Vinf_PS[j,k], Dstar_SS[j,k], Dstar_PS[j,k], Delta_SS[j,k], Delta_PS[j,k], Cf_SS[j,k], Cf_PS[j,k]))
-        
+    
+    fid.write('\n')
+    fid.write('! Inputs to trailing edge bluntness noise model\n')
+    fid.write('%1.5f \t TEAngle    - Angle of the trailing edge (deg)\n'%TEAngle[id])
+    fid.write('%1.5f \t TEThick    - Finite thickness of the trailing edge (deg)\n'%TEThick[id])
+
     fid.close()
     
     
