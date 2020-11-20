@@ -48,7 +48,7 @@ class Test(unittest.TestCase):
 
         F=FASTInputFile(os.path.join(MyDir,'FASTIn_AD15.dat'))
         F.test_ascii(bCompareWritesOnly=True,bDelete=True)
-        self.assertEqual(F['TipLoss'],'True')
+        self.assertTrue(F['TipLoss'])
 
         F=FASTInputFile(os.path.join(MyDir,'FASTIn_ExtPtfm_SubSef.dat'))
         F.test_ascii(bCompareWritesOnly=True,bDelete=True)
