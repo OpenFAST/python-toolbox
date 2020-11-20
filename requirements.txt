@@ -1,7 +1,0 @@
-numpy>=1.15.2
-matplotlib 
-pandas
-future
-chardet
-scipy
-sympy
