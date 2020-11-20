@@ -32,9 +32,19 @@ setup(
     ],
     packages=["pyFAST"],
     python_requires=">=3.6",
-    install_requires=["numpy", "bokeh==1.4.0", "future", "pandas"],
+    install_requires=[
+        "numpy>=1.15.2",
+        "bokeh==1.4.0",
+        "future",
+        "pandas",
+        "matplotlib",
+        "chardet",
+        "scipy",
+        "sympy",
+        "pytest"
+    ],
     extras_require={
-        "dev": ["pre-commit", "black", "isort", "pytest", "pytest-cov", "pytest-xdist"]
+        "dev": ["pre-commit", "black", "isort", "pytest-cov", "pytest-xdist"]
     },
     test_suite="pytest",
     tests_require=["pytest", "pytest-xdist", "pytest-cov"],

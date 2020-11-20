@@ -14,7 +14,6 @@ This repository intends to provide simple scripts to help OpenFAST users setup m
 ```bash
 git clone http://github.com/OpenFAST/python-toolbox
 cd python-toolbox
-python -m pip install -r requirements.txt
 python -m pip install -e .
 pytest
 ```
