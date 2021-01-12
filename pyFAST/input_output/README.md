@@ -30,7 +30,7 @@ Additional methods may be present depending on the file format.
 
 Read an AeroDyn file, modifies some values and write the modified file:
 ```python
-from pyFast.input_output import FASTInputFile
+from pyFAST.input_output import FASTInputFile
 filename = 'AeroDyn.dat'
 f = FASTInputFile(filename)
 f['TwrAero'] = True
@@ -40,7 +40,7 @@ f.write('AeroDyn_Changed.dat')
 
 Read an OpenFAST binary output file and convert it to a pandas DataFrame
 ```python
-from pyFast.input_output import FASTOutputFile
+from pyFAST.input_output import FASTOutputFile
 df = FASTOutputFile('5MW.outb').toDataFrame()
 time  = df['Time_[s]']
 Omega = df['RotSpeed_[rpm]']
@@ -48,7 +48,7 @@ Omega = df['RotSpeed_[rpm]']
 
 Read a TurbSim binary file
 ```python 
-from pyFast.input_output import TurbSimFile
+from pyFAST.input_output import TurbSimFile
 ts = TurbSimFile('Turb.bts')
 print(ts.keys())
 print(ts['u'].shape)  
