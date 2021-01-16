@@ -10,8 +10,8 @@ import stat
 import re
 
 # --- External library for io
-from pyFAST.input_output import FASTInputFile
-from pyFAST.input_output import FASTOutputFile
+import pyFAST.input_output.fast_input_file as fi
+import pyFAST.input_output.fast_output_file
 
 # --------------------------------------------------------------------------------}
 # --- Template replace 
@@ -156,7 +156,7 @@ def templateReplaceGeneral(PARAMS, templateDir=None, outputDir=None, main_file=N
             #print('NewFile         :', newfilename)
             #print('NewFileFull     :', newfilename_full)
             shutil.copyfile(templatefilename_full, newfilename_full)
-            f= FASTInputFile(newfilename_full) # open the template file for that filekey 
+            f= fi.FASTInputFile(newfilename_full) # open the template file for that filekey 
             Files[FileKey]=f # store it
 
         # --- Changing parameters in that file
@@ -371,6 +371,56 @@ def paramsWS_RPM_Pitch(WS,RPM,Pitch,baseDict=None,FlatInputs=False):
         PARAMS.append(p)
     return PARAMS
 
+def paramsLinearTrim(p=dict()):
+
+    # Set a few DOFs, move this to main file
+    p['Linearize']              = 'True'
+    p['CalcSteady']             = 'True'
+    p['TrimGain']               = 1e-4
+    p['TrimTol']                = 1e-5
+    p['CompMooring']            = 0
+    p['CompHydro']              = 0
+    p['LinOutJac']              = 'False'
+    p['LinOutMod']              = 'False'
+
+
+    p['AeroFile|AFAeroMod']     = 1
+    p['AeroFile|CavitCheck']    = 'False'
+    p['AeroFile|CompAA']        = 'False'
+    
+    p['ServoFile|PCMode']       = 0
+    p['ServoFile|VSContrl']     = 1
+    p['ServoFile|VS_RtGnSp']    = 1173 * .9
+    p['ServoFile|VS_RtTq']      = 47402
+    p['ServoFile|VS_Rgn2K']     = 0.0226
+    p['ServoFile|VS_SlPc']      = 10.
+
+    p['ServoFile|CompNTMD']      = 'False'
+    p['ServoFile|CompTTMD']      = 'False'
+
+    # Set all DOFs off, enable as desired
+    p['EDFile|FlapDOF1']        = 'False'
+    p['EDFile|FlapDOF2']        = 'False'
+    p['EDFile|EdgeDOF']         = 'False'
+    p['EDFile|TeetDOF']         = 'False'
+    p['EDFile|DrTrDOF']         = 'False'
+    p['EDFile|GenDOF']          = 'False'
+    p['EDFile|YawDOF']          = 'False'
+    p['EDFile|TwFADOF1']        = 'False'
+    p['EDFile|TwFADOF2']        = 'False'
+    p['EDFile|TwSSDOF1']        = 'False'
+    p['EDFile|TwSSDOF2']        = 'False'
+    p['EDFile|PtfmSgDOF']       = 'False'
+    p['EDFile|PtfmSwDOF']       = 'False'
+    p['EDFile|PtfmHvDOF']       = 'False'
+    p['EDFile|PtfmRDOF']        = 'False'
+    p['EDFile|PtfmPDOF']        = 'False'
+    p['EDFile|PtfmYDOF']        = 'False'
+
+    p['EDFile|RotSpeed']        = 12.1
+
+    return p
+
 
 # --------------------------------------------------------------------------------}
 # --- Tools for typical wind turbine study 
@@ -392,8 +442,8 @@ def CPCT_LambdaPitch(refdir,main_fastfile,Lambda=None,Pitch=np.linspace(-10,40,5
         main_fastfile=os.path.basename(main_fastfile)
 
     # --- Reading main fast file to get rotor radius 
-    fst = FASTInputFile(os.path.join(refdir,main_fastfile))
-    ed  = FASTInputFile(os.path.join(refdir,fst['EDFile'].replace('"','')))
+    fst = fi.FASTInputFile(os.path.join(refdir,main_fastfile))
+    ed  = fi.FASTInputFile(os.path.join(refdir,fst['EDFile'].replace('"','')))
     R = ed['TipRad']
 
     # --- Making sure we have 
