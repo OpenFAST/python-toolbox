@@ -383,17 +383,12 @@ def paramsLinearTrim(p=dict()):
     p['LinOutJac']              = 'False'
     p['LinOutMod']              = 'False'
 
-
     p['AeroFile|AFAeroMod']     = 1
     p['AeroFile|CavitCheck']    = 'False'
     p['AeroFile|CompAA']        = 'False'
     
     p['ServoFile|PCMode']       = 0
     p['ServoFile|VSContrl']     = 1
-    p['ServoFile|VS_RtGnSp']    = 1173 * .9
-    p['ServoFile|VS_RtTq']      = 47402
-    p['ServoFile|VS_Rgn2K']     = 0.0226
-    p['ServoFile|VS_SlPc']      = 10.
 
     p['ServoFile|CompNTMD']      = 'False'
     p['ServoFile|CompTTMD']      = 'False'
@@ -417,7 +412,6 @@ def paramsLinearTrim(p=dict()):
     p['EDFile|PtfmPDOF']        = 'False'
     p['EDFile|PtfmYDOF']        = 'False'
 
-    p['EDFile|RotSpeed']        = 12.1
 
     return p
 

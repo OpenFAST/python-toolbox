@@ -64,6 +64,15 @@ def run_linearization():
         p['EDFile|FlapDOF1']         = 'True'
         p['EDFile|TwFADOF1']         = 'True'
 
+        # NREL-5MW rated generator speed, torque, control params
+        p['ServoFile|VS_RtGnSp']    = 1173 * .9
+        p['ServoFile|VS_RtTq']      = 47402
+        p['ServoFile|VS_Rgn2K']     = 0.0226
+        p['ServoFile|VS_SlPc']      = 10.
+
+        # Trim solution will converge to this rotor speed
+        p['EDFile|RotSpeed']        = 12.1
+
         # Set number of linearizations
         p['NLinTimes']              = 12
 
