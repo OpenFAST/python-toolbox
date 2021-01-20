@@ -92,13 +92,8 @@ def run_linearization():
 if __name__ == '__main__':
 
     # 1. Run linearizations
-    # outfiles = run_linearization()
+    outfiles = run_linearization()
 
-    outfiles = [
-    '/Users/dzalkind/Tools/python-toolbox/pyFAST/linearization/example/NREL-5MW_Linear/000_ws14.0.out',
-    '/Users/dzalkind/Tools/python-toolbox/pyFAST/linearization/example/NREL-5MW_Linear/001_ws16.0.out',
-    '/Users/dzalkind/Tools/python-toolbox/pyFAST/linearization/example/NREL-5MW_Linear/002_ws18.0.out'
-    ]
 
     # 2. Do MBC
     MBC = lin.run_pyMBC(outfiles)
