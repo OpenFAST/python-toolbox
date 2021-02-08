@@ -5,11 +5,7 @@ import pyFAST.linearization.linearization as lin
 # import pyFAST.linearization.LinearModel as lin_mod
 import pyFAST.case_generation.case_gen as case_gen
 import pyFAST.input_output.fast_output_file as fo
-import pyFAST.input_output.rosco_input_file as ri
 import sys
-# from ROSCO_toolbox import utilities as ROSCO_utilities
-# from ROSCO_toolbox import controller as ROSCO_controller
-# from ROSCO_toolbox import turbine as ROSCO_turbine
 import pyFAST.case_generation.runner as runner
 # from pCrunch.Analysis import Loads_Analysis
 import yaml
