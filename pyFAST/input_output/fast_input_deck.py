@@ -3,7 +3,7 @@ import numpy as np
 import re
 import pandas as pd
 
-from .fast_input_file import FastInputFile
+from .fast_input_file import FASTInputFile
 
 __all__  = ['FASTInputDeck']
 # --------------------------------------------------------------------------------}
