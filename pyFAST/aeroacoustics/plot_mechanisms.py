@@ -1,9 +1,9 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import weio
 from parse import *
 import re, os, platform
+from pyFAST.input_output.fast_output_file import FASTOutputFile
 
 #########################################################################################################################################
 ## User inputs
@@ -30,8 +30,8 @@ outputfilename  = output_dir + os.sep + "data_output2"
 ## Read in data, manipulate it, and plot it
 
 # Read in file data
-AA_3 = weio.FASTOutFile(AAfilename).toDataFrame()
-OF   = weio.FASTOutFile(OFfilename).toDataFrame()
+AA_3 = FASTOutputFile(AAfilename).toDataFrame()
+OF   = FASTOutputFile(OFfilename).toDataFrame()
 
 # Determine number of observers
 num_obs = int((AA_3.shape[1]-1)/(7*34))
