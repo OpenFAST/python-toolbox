@@ -1,7 +1,7 @@
 # pyfast
 
 [![Status: beta](https://img.shields.io/badge/status-beta-yellow)](https://github.com/openfast/python-toolbox/tree/dev)
-[![Build status](https://github.com/OpenFAST/python-toolbox/workflows/development-pipeline/badge.svg)](https://github.com/OpenFAST/python-toolbox/actions?query=workflow%3A%22Development+Pipeline%22)
+[![Build status](https://github.com/openfast/python-toolbox/workflows/Development%20Pipeline/badge.svg)](https://github.com/OpenFAST/python-toolbox/actions?query=workflow%3A%22Development+Pipeline%22)
 [![Python: 3.6+](https://img.shields.io/badge/python-3.6%2B-informational)](https://www.python.org/)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
