@@ -5,10 +5,10 @@ import pandas as pd
 import numpy as np
 import re
 
-# --- External library for io
-from pyFAST.input_output import FASTInputFile
-from pyFAST.input_output import FASTOutputFile
-
+# --- fast libraries
+from pyFAST.input_output.fast_input_file import FASTInputFile
+from pyFAST.input_output.fast_output_file import FASTOutputFile
+from pyFAST.input_output.fast_input_deck import FASTInputDeck
 
 # --------------------------------------------------------------------------------}
 # --- Tools for IO 
@@ -18,7 +18,7 @@ def ED_BldStations(ED):
     INPUTS:
        - ED: either:
            - a filename of a ElastoDyn input file
-           - an instance of FileCl, as returned by reading the file, ED = pyFAST.read(ED_filename)
+           - an instance of FileCl, as returned by reading the file, ED = weio.read(ED_filename)
 
     OUTUPTS:
         - bld_fract: fraction of the blade length were stations are defined
@@ -37,7 +37,7 @@ def ED_TwrStations(ED):
     INPUTS:
        - ED: either:
            - a filename of a ElastoDyn input file
-           - an instance of FileCl, as returned by reading the file, ED = pyFAST.read(ED_filename)
+           - an instance of FileCl, as returned by reading the file, ED = weio.read(ED_filename)
 
     OUTPUTS:
         - r_fract: fraction of the towet length were stations are defined
@@ -58,13 +58,16 @@ def ED_BldGag(ED):
     INPUTS:
        - ED: either:
            - a filename of a ElastoDyn input file
-           - an instance of FileCl, as returned by reading the file, ED = pyFAST.read(ED_filename)
+           - an instance of FileCl, as returned by reading the file, ED = weio.read(ED_filename)
     OUTPUTS:
        - r_gag: The radial positions of the gages, given from the rotor apex
     """
     if not isinstance(ED,FASTInputFile):
         ED = FASTInputFile(ED)
     _,r_nodes= ED_BldStations(ED)
+    
+    #     if ED.hasNodal:
+    #         return r_nodes, None
     nOuts = ED['NBlGages']
     if nOuts<=0:
         return np.array([]), np.array([])
@@ -80,7 +83,7 @@ def ED_TwrGag(ED):
     INPUTS:
        - ED: either:
            - a filename of a ElastoDyn input file
-           - an instance of FileCl, as returned by reading the file, ED = pyFAST.read(ED_filename)
+           - an instance of FileCl, as returned by reading the file, ED = weio.read(ED_filename)
     OUTPUTS:
        - h_gag: The heights of the gages, given from the ground height (tower base + TowerBsHt)
     """
@@ -103,7 +106,7 @@ def AD14_BldGag(AD):
     INPUTS:
        - AD: either:
            - a filename of a AeroDyn input file
-           - an instance of FileCl, as returned by reading the file, AD = pyFAST.read(AD_filename)
+           - an instance of FileCl, as returned by reading the file, AD = weio.read(AD_filename)
     OUTPUTS:
        - r_gag: The radial positions of the gages, given from the blade root
     """
@@ -125,10 +128,10 @@ def AD_BldGag(AD,AD_bld,chordOut=False):
     INPUTS:
        - AD: either:
            - a filename of a AeroDyn input file
-           - an instance of FileCl, as returned by reading the file, AD = pyFAST.read(AD_filename)
+           - an instance of FileCl, as returned by reading the file, AD = weio.read(AD_filename)
        - AD_bld: either:
            - a filename of a AeroDyn Blade input file
-           - an instance of FileCl, as returned by reading the file, AD_bld = pyFAST.read(AD_bld_filename)
+           - an instance of FileCl, as returned by reading the file, AD_bld = weio.read(AD_bld_filename)
     OUTPUTS:
        - r_gag: The radial positions of the gages, given from the blade root
     """
@@ -157,7 +160,7 @@ def BD_BldGag(BD):
     INPUTS:
        - BD: either:
            - a filename of a BeamDyn input file
-           - an instance of FileCl, as returned by reading the file, BD = pyFAST.read(BD_filename)
+           - an instance of FileCl, as returned by reading the file, BD = weio.read(BD_filename)
     OUTPUTS:
        - r_gag: The radial positions of the gages, given from the rotor apex
     """
@@ -239,7 +242,7 @@ def _HarmonizeSpanwiseData(Name, Columns, vr, R, IR=None) :
 
     return dfRad,  nrMax, ValidRow
 
-def insert_radial_columns(df, vr, R=None, IR=None):
+def insert_radial_columns(df, vr=None, R=None, IR=None):
     """
     Add some columns to the radial data
     """
@@ -249,7 +252,7 @@ def insert_radial_columns(df, vr, R=None, IR=None):
         return None
     nrMax=len(df)
     ids=np.arange(nrMax)
-    if vr is None:
+    if vr is None or R is None:
         # Radial position unknown
         vr_bar = ids/(nrMax-1)
         df.insert(0, 'i/n_[-]', vr_bar)
@@ -258,7 +261,8 @@ def insert_radial_columns(df, vr, R=None, IR=None):
         if (nrMax)<=len(vr_bar):
             vr_bar=vr_bar[:nrMax]
         elif (nrMax)>len(vr_bar):
-            raise Exception('Inconsitent length between radial stations and max index present in output chanels')
+            print(vr_bar)
+            raise Exception('Inconsitent length between radial stations ({:d}) and max index present in output chanels ({:d})'.format(len(vr_bar),nrMax))
         df.insert(0, 'r/R_[-]', vr_bar)
 
     if IR is not None:
@@ -320,98 +324,124 @@ def spanwiseColBD(Cols):
     """ Return column info, available columns and indices that contain BD spanwise data"""
     BDSpanMap=dict()
     for sB in ['B1','B2','B3']:
-        BDSpanMap['^'+sB+'N(\d)TDxr_\[m\]']=sB+'TDxr_[m]'
-        BDSpanMap['^'+sB+'N(\d)TDyr_\[m\]']=sB+'TDyr_[m]'
-        BDSpanMap['^'+sB+'N(\d)TDzr_\[m\]']=sB+'TDzr_[m]'
+        BDSpanMap['^'+sB+r'N(\d)TDxr_\[m\]']=sB+'TDxr_[m]'
+        BDSpanMap['^'+sB+r'N(\d)TDyr_\[m\]']=sB+'TDyr_[m]'
+        BDSpanMap['^'+sB+r'N(\d)TDzr_\[m\]']=sB+'TDzr_[m]'
     return find_matching_columns(Cols, BDSpanMap)
 
 def spanwiseColED(Cols):
     """ Return column info, available columns and indices that contain ED spanwise data"""
     EDSpanMap=dict()
+    # All Outs
+    for sB in ['B1','B2','B3']:
+        EDSpanMap['^[A]*'+sB+r'N(\d*)ALx_\[m/s^2\]' ] = sB+'ALx_[m/s^2]'
+        EDSpanMap['^[A]*'+sB+r'N(\d*)ALy_\[m/s^2\]' ] = sB+'ALy_[m/s^2]'
+        EDSpanMap['^[A]*'+sB+r'N(\d*)ALz_\[m/s^2\]' ] = sB+'ALz_[m/s^2]'
+        EDSpanMap['^[A]*'+sB+r'N(\d*)TDx_\[m\]'     ] = sB+'TDx_[m]'
+        EDSpanMap['^[A]*'+sB+r'N(\d*)TDy_\[m\]'     ] = sB+'TDy_[m]'
+        EDSpanMap['^[A]*'+sB+r'N(\d*)TDz_\[m\]'     ] = sB+'TDz_[m]'
+        EDSpanMap['^[A]*'+sB+r'N(\d*)RDx_\[deg\]'   ] = sB+'RDx_[deg]'
+        EDSpanMap['^[A]*'+sB+r'N(\d*)RDy_\[deg\]'   ] = sB+'RDy_[deg]'
+        EDSpanMap['^[A]*'+sB+r'N(\d*)RDz_\[deg\]'   ] = sB+'RDz_[deg]'
+        EDSpanMap['^[A]*'+sB+r'N(\d*)MLx_\[kN-m\]'  ] = sB+'MLx_[kN-m]'
+        EDSpanMap['^[A]*'+sB+r'N(\d*)MLy_\[kN-m\]'  ] = sB+'MLy_[kN-m]'
+        EDSpanMap['^[A]*'+sB+r'N(\d*)MLz_\[kN-m\]'  ] = sB+'MLz_[kN-m]'
+        EDSpanMap['^[A]*'+sB+r'N(\d*)FLx_\[kN\]'    ] = sB+'FLx_[kN]'
+        EDSpanMap['^[A]*'+sB+r'N(\d*)FLy_\[kN\]'    ] = sB+'FLy_[kN]'
+        EDSpanMap['^[A]*'+sB+r'N(\d*)FLz_\[kN\]'    ] = sB+'FLz_[kN]'
+        EDSpanMap['^[A]*'+sB+r'N(\d*)FLxNT_\[kN\]'  ] = sB+'FLxNT_[kN]'
+        EDSpanMap['^[A]*'+sB+r'N(\d*)FLyNT_\[kN\]'  ] = sB+'FLyNT_[kN]'
+        EDSpanMap['^[A]*'+sB+r'N(\d*)FlyNT_\[kN\]'  ] = sB+'FLyNT_[kN]'   # <<< Unfortunate
+        EDSpanMap['^[A]*'+sB+r'N(\d*)MLxNT_\[kN-m\]'] = sB+'MLxNT_[kN-m]'
+        EDSpanMap['^[A]*'+sB+r'N(\d*)MLyNT_\[kN-m\]'] = sB+'MLyNT_[kN-m]'
+    # Old
     for sB in ['b1','b2','b3']:
         SB=sB.upper()
-        EDSpanMap['^Spn(\d)ALx'+sB+'_\[m/s^2\]']=SB+'ALx_[m/s^2]'
-        EDSpanMap['^Spn(\d)ALy'+sB+'_\[m/s^2\]']=SB+'ALy_[m/s^2]'
-        EDSpanMap['^Spn(\d)ALz'+sB+'_\[m/s^2\]']=SB+'ALz_[m/s^2]'
-        EDSpanMap['^Spn(\d)TDx'+sB+'_\[m\]'    ]=SB+'TDx_[m]'
-        EDSpanMap['^Spn(\d)TDy'+sB+'_\[m\]'    ]=SB+'TDy_[m]'
-        EDSpanMap['^Spn(\d)TDz'+sB+'_\[m\]'    ]=SB+'TDz_[m]'
-        EDSpanMap['^Spn(\d)RDx'+sB+'_\[deg\]'  ]=SB+'RDx_[deg]'
-        EDSpanMap['^Spn(\d)RDy'+sB+'_\[deg\]'  ]=SB+'RDy_[deg]'
-        EDSpanMap['^Spn(\d)RDz'+sB+'_\[deg\]'  ]=SB+'RDz_[deg]'
-        EDSpanMap['^Spn(\d)FLx'+sB+'_\[kN\]'   ]=SB+'FLx_[kN]'
-        EDSpanMap['^Spn(\d)FLy'+sB+'_\[kN\]'   ]=SB+'FLy_[kN]'
-        EDSpanMap['^Spn(\d)FLz'+sB+'_\[kN\]'   ]=SB+'FLz_[kN]'
-        EDSpanMap['^Spn(\d)MLy'+sB+'_\[kN-m\]' ]=SB+'MLx_[kN-m]'
-        EDSpanMap['^Spn(\d)MLx'+sB+'_\[kN-m\]' ]=SB+'MLy_[kN-m]'  
-        EDSpanMap['^Spn(\d)MLz'+sB+'_\[kN-m\]' ]=SB+'MLz_[kN-m]'
+        EDSpanMap[r'^Spn(\d)ALx'+sB+r'_\[m/s^2\]']=SB+'ALx_[m/s^2]'
+        EDSpanMap[r'^Spn(\d)ALy'+sB+r'_\[m/s^2\]']=SB+'ALy_[m/s^2]'
+        EDSpanMap[r'^Spn(\d)ALz'+sB+r'_\[m/s^2\]']=SB+'ALz_[m/s^2]'
+        EDSpanMap[r'^Spn(\d)TDx'+sB+r'_\[m\]'    ]=SB+'TDx_[m]'
+        EDSpanMap[r'^Spn(\d)TDy'+sB+r'_\[m\]'    ]=SB+'TDy_[m]'
+        EDSpanMap[r'^Spn(\d)TDz'+sB+r'_\[m\]'    ]=SB+'TDz_[m]'
+        EDSpanMap[r'^Spn(\d)RDx'+sB+r'_\[deg\]'  ]=SB+'RDx_[deg]'
+        EDSpanMap[r'^Spn(\d)RDy'+sB+r'_\[deg\]'  ]=SB+'RDy_[deg]'
+        EDSpanMap[r'^Spn(\d)RDz'+sB+r'_\[deg\]'  ]=SB+'RDz_[deg]'
+        EDSpanMap[r'^Spn(\d)FLx'+sB+r'_\[kN\]'   ]=SB+'FLx_[kN]'
+        EDSpanMap[r'^Spn(\d)FLy'+sB+r'_\[kN\]'   ]=SB+'FLy_[kN]'
+        EDSpanMap[r'^Spn(\d)FLz'+sB+r'_\[kN\]'   ]=SB+'FLz_[kN]'
+        EDSpanMap[r'^Spn(\d)MLy'+sB+r'_\[kN-m\]' ]=SB+'MLx_[kN-m]'
+        EDSpanMap[r'^Spn(\d)MLx'+sB+r'_\[kN-m\]' ]=SB+'MLy_[kN-m]'  
+        EDSpanMap[r'^Spn(\d)MLz'+sB+r'_\[kN-m\]' ]=SB+'MLz_[kN-m]'
     return find_matching_columns(Cols, EDSpanMap)
 
 def spanwiseColAD(Cols):
     """ Return column info, available columns and indices that contain AD spanwise data"""
     ADSpanMap=dict()
     for sB in ['B1','B2','B3']:
-        ADSpanMap['^'+sB+'N(\d*)Alpha_\[deg\]']=sB+'Alpha_[deg]'
-        ADSpanMap['^'+sB+'N(\d*)AOA_\[deg\]'  ]=sB+'Alpha_[deg]' # DBGOuts
-        ADSpanMap['^'+sB+'N(\d*)AxInd_\[-\]'  ]=sB+'AxInd_[-]'  
-        ADSpanMap['^'+sB+'N(\d*)TnInd_\[-\]'  ]=sB+'TnInd_[-]'  
-        ADSpanMap['^'+sB+'N(\d*)AIn_\[deg\]'  ]=sB+'AxInd_[-]'   # DBGOuts NOTE BUG Unit
-        ADSpanMap['^'+sB+'N(\d*)ApI_\[deg\]'  ]=sB+'TnInd_[-]'   # DBGOuts NOTE BUG Unit
-        ADSpanMap['^'+sB+'N(\d*)AIn_\[-\]'    ]=sB+'AxInd_[-]'   # DBGOuts
-        ADSpanMap['^'+sB+'N(\d*)ApI_\[-\]'    ]=sB+'TnInd_[-]'   # DBGOuts
-        ADSpanMap['^'+sB+'N(\d*)Uin_\[m/s\]'  ]=sB+'Uin_[m/s]'     # DBGOuts
-        ADSpanMap['^'+sB+'N(\d*)Uit_\[m/s\]'  ]=sB+'Uit_[m/s]'     # DBGOuts
-        ADSpanMap['^'+sB+'N(\d*)Uir_\[m/s\]'  ]=sB+'Uir_[m/s]'     # DBGOuts
-        ADSpanMap['^'+sB+'N(\d*)Cl_\[-\]'     ]=sB+'Cl_[-]'   
-        ADSpanMap['^'+sB+'N(\d*)Cd_\[-\]'     ]=sB+'Cd_[-]'   
-        ADSpanMap['^'+sB+'N(\d*)Cm_\[-\]'     ]=sB+'Cm_[-]'   
-        ADSpanMap['^'+sB+'N(\d*)Cx_\[-\]'     ]=sB+'Cx_[-]'   
-        ADSpanMap['^'+sB+'N(\d*)Cy_\[-\]'     ]=sB+'Cy_[-]'   
-        ADSpanMap['^'+sB+'N(\d*)Cn_\[-\]'     ]=sB+'Cn_[-]'   
-        ADSpanMap['^'+sB+'N(\d*)Ct_\[-\]'     ]=sB+'Ct_[-]'   
-        ADSpanMap['^'+sB+'N(\d*)Re_\[-\]'     ]=sB+'Re_[-]' 
-        ADSpanMap['^'+sB+'N(\d*)Vrel_\[m/s\]' ]=sB+'Vrel_[m/s]' 
-        ADSpanMap['^'+sB+'N(\d*)Theta_\[deg\]']=sB+'Theta_[deg]'
-        ADSpanMap['^'+sB+'N(\d*)Phi_\[deg\]'  ]=sB+'Phi_[deg]'
-        ADSpanMap['^'+sB+'N(\d*)Twst_\[deg\]' ]=sB+'Twst_[deg]' #DBGOuts
-        ADSpanMap['^'+sB+'N(\d*)Curve_\[deg\]']=sB+'Curve_[deg]'
-        ADSpanMap['^'+sB+'N(\d*)Vindx_\[m/s\]']=sB+'Vindx_[m/s]'
-        ADSpanMap['^'+sB+'N(\d*)Vindy_\[m/s\]']=sB+'Vindy_[m/s]'
-        ADSpanMap['^'+sB+'N(\d*)Fx_\[N/m\]'   ]=sB+'Fx_[N/m]'   
-        ADSpanMap['^'+sB+'N(\d*)Fy_\[N/m\]'   ]=sB+'Fy_[N/m]'   
-        ADSpanMap['^'+sB+'N(\d*)Fl_\[N/m\]'   ]=sB+'Fl_[N/m]'   
-        ADSpanMap['^'+sB+'N(\d*)Fd_\[N/m\]'   ]=sB+'Fd_[N/m]'   
-        ADSpanMap['^'+sB+'N(\d*)Fn_\[N/m\]'   ]=sB+'Fn_[N/m]'   
-        ADSpanMap['^'+sB+'N(\d*)Ft_\[N/m\]'   ]=sB+'Ft_[N/m]'   
-        ADSpanMap['^'+sB+'N(\d*)VUndx_\[m/s\]']=sB+'VUndx_[m/s]'
-        ADSpanMap['^'+sB+'N(\d*)VUndy_\[m/s\]']=sB+'VUndy_[m/s]'
-        ADSpanMap['^'+sB+'N(\d*)VUndz_\[m/s\]']=sB+'VUndz_[m/s]'
-        ADSpanMap['^'+sB+'N(\d*)VDisx_\[m/s\]']=sB+'VDisx_[m/s]'
-        ADSpanMap['^'+sB+'N(\d*)VDisy_\[m/s\]']=sB+'VDisy_[m/s]'
-        ADSpanMap['^'+sB+'N(\d*)VDisz_\[m/s\]']=sB+'VDisz_[m/s]'
-        ADSpanMap['^'+sB+'N(\d*)Vx_\[m/s\]'   ]=sB+'Vx_[m/s]'
-        ADSpanMap['^'+sB+'N(\d*)Vy_\[m/s\]'   ]=sB+'Vy_[m/s]'
-        ADSpanMap['^'+sB+'N(\d*)Vz_\[m/s\]'   ]=sB+'Vz_[m/s]'
-        ADSpanMap['^'+sB+'N(\d*)DynP_\[Pa\]'  ]=sB+'DynP_[Pa]' 
-        ADSpanMap['^'+sB+'N(\d*)M_\[-\]'      ]=sB+'M_[-]' 
-        ADSpanMap['^'+sB+'N(\d*)Mm_\[N-m/m\]' ]=sB+'Mm_[N-m/m]'   
-        ADSpanMap['^'+sB+'N(\d*)Gam_\['       ]=sB+'Gam_[m^2/s]' #DBGOuts
+        ADSpanMap['^[A]*'+sB+r'N(\d*)Alpha_\[deg\]']=sB+'Alpha_[deg]'
+        ADSpanMap['^[A]*'+sB+r'N(\d*)AOA_\[deg\]'  ]=sB+'Alpha_[deg]' # DBGOuts
+        ADSpanMap['^[A]*'+sB+r'N(\d*)AxInd_\[-\]'  ]=sB+'AxInd_[-]'  
+        ADSpanMap['^[A]*'+sB+r'N(\d*)TnInd_\[-\]'  ]=sB+'TnInd_[-]'  
+        ADSpanMap['^[A]*'+sB+r'N(\d*)AIn_\[deg\]'  ]=sB+'AxInd_[-]'   # DBGOuts NOTE BUG Unit
+        ADSpanMap['^[A]*'+sB+r'N(\d*)ApI_\[deg\]'  ]=sB+'TnInd_[-]'   # DBGOuts NOTE BUG Unit
+        ADSpanMap['^[A]*'+sB+r'N(\d*)AIn_\[-\]'    ]=sB+'AxInd_[-]'   # DBGOuts
+        ADSpanMap['^[A]*'+sB+r'N(\d*)ApI_\[-\]'    ]=sB+'TnInd_[-]'   # DBGOuts
+        ADSpanMap['^[A]*'+sB+r'N(\d*)Uin_\[m/s\]'  ]=sB+'Uin_[m/s]'     # DBGOuts
+        ADSpanMap['^[A]*'+sB+r'N(\d*)Uit_\[m/s\]'  ]=sB+'Uit_[m/s]'     # DBGOuts
+        ADSpanMap['^[A]*'+sB+r'N(\d*)Uir_\[m/s\]'  ]=sB+'Uir_[m/s]'     # DBGOuts
+        ADSpanMap['^[A]*'+sB+r'N(\d*)Cl_\[-\]'     ]=sB+'Cl_[-]'   
+        ADSpanMap['^[A]*'+sB+r'N(\d*)Cd_\[-\]'     ]=sB+'Cd_[-]'   
+        ADSpanMap['^[A]*'+sB+r'N(\d*)Cm_\[-\]'     ]=sB+'Cm_[-]'   
+        ADSpanMap['^[A]*'+sB+r'N(\d*)Cx_\[-\]'     ]=sB+'Cx_[-]'   
+        ADSpanMap['^[A]*'+sB+r'N(\d*)Cy_\[-\]'     ]=sB+'Cy_[-]'   
+        ADSpanMap['^[A]*'+sB+r'N(\d*)Cn_\[-\]'     ]=sB+'Cn_[-]'   
+        ADSpanMap['^[A]*'+sB+r'N(\d*)Ct_\[-\]'     ]=sB+'Ct_[-]'   
+        ADSpanMap['^[A]*'+sB+r'N(\d*)Re_\[-\]'     ]=sB+'Re_[-]' 
+        ADSpanMap['^[A]*'+sB+r'N(\d*)Vrel_\[m/s\]' ]=sB+'Vrel_[m/s]' 
+        ADSpanMap['^[A]*'+sB+r'N(\d*)Theta_\[deg\]']=sB+'Theta_[deg]'
+        ADSpanMap['^[A]*'+sB+r'N(\d*)Phi_\[deg\]'  ]=sB+'Phi_[deg]'
+        ADSpanMap['^[A]*'+sB+r'N(\d*)Twst_\[deg\]' ]=sB+'Twst_[deg]' #DBGOuts
+        ADSpanMap['^[A]*'+sB+r'N(\d*)Curve_\[deg\]']=sB+'Curve_[deg]'
+        ADSpanMap['^[A]*'+sB+r'N(\d*)Vindx_\[m/s\]']=sB+'Vindx_[m/s]'
+        ADSpanMap['^[A]*'+sB+r'N(\d*)Vindy_\[m/s\]']=sB+'Vindy_[m/s]'
+        ADSpanMap['^[A]*'+sB+r'N(\d*)Fx_\[N/m\]'   ]=sB+'Fx_[N/m]'   
+        ADSpanMap['^[A]*'+sB+r'N(\d*)Fy_\[N/m\]'   ]=sB+'Fy_[N/m]'   
+        ADSpanMap['^[A]*'+sB+r'N(\d*)Fl_\[N/m\]'   ]=sB+'Fl_[N/m]'   
+        ADSpanMap['^[A]*'+sB+r'N(\d*)Fd_\[N/m\]'   ]=sB+'Fd_[N/m]'   
+        ADSpanMap['^[A]*'+sB+r'N(\d*)Fn_\[N/m\]'   ]=sB+'Fn_[N/m]'   
+        ADSpanMap['^[A]*'+sB+r'N(\d*)Ft_\[N/m\]'   ]=sB+'Ft_[N/m]'   
+        ADSpanMap['^[A]*'+sB+r'N(\d*)VUndx_\[m/s\]']=sB+'VUndx_[m/s]'
+        ADSpanMap['^[A]*'+sB+r'N(\d*)VUndy_\[m/s\]']=sB+'VUndy_[m/s]'
+        ADSpanMap['^[A]*'+sB+r'N(\d*)VUndz_\[m/s\]']=sB+'VUndz_[m/s]'
+        ADSpanMap['^[A]*'+sB+r'N(\d*)VDisx_\[m/s\]']=sB+'VDisx_[m/s]'
+        ADSpanMap['^[A]*'+sB+r'N(\d*)VDisy_\[m/s\]']=sB+'VDisy_[m/s]'
+        ADSpanMap['^[A]*'+sB+r'N(\d*)VDisz_\[m/s\]']=sB+'VDisz_[m/s]'
+        ADSpanMap['^[A]*'+sB+r'N(\d*)STVx_\[m/s\]' ]=sB+'STVx_[m/s]'
+        ADSpanMap['^[A]*'+sB+r'N(\d*)STVy_\[m/s\]' ]=sB+'STVy_[m/s]'
+        ADSpanMap['^[A]*'+sB+r'N(\d*)STVz_\[m/s\]' ]=sB+'STVz_[m/s]'
+        ADSpanMap['^[A]*'+sB+r'N(\d*)Vx_\[m/s\]'   ]=sB+'Vx_[m/s]'
+        ADSpanMap['^[A]*'+sB+r'N(\d*)Vy_\[m/s\]'   ]=sB+'Vy_[m/s]'
+        ADSpanMap['^[A]*'+sB+r'N(\d*)Vz_\[m/s\]'   ]=sB+'Vz_[m/s]'
+        ADSpanMap['^[A]*'+sB+r'N(\d*)DynP_\[Pa\]'  ]=sB+'DynP_[Pa]' 
+        ADSpanMap['^[A]*'+sB+r'N(\d*)M_\[-\]'      ]=sB+'M_[-]' 
+        ADSpanMap['^[A]*'+sB+r'N(\d*)Mm_\[N-m/m\]' ]=sB+'Mm_[N-m/m]'   
+        ADSpanMap['^[A]*'+sB+r'N(\d*)Gam_\['       ]=sB+'Gam_[m^2/s]' #DBGOuts
     # --- AD 14
-    ADSpanMap['^Alpha(\d*)_\[deg\]'  ]='Alpha_[deg]'  
-    ADSpanMap['^DynPres(\d*)_\[Pa\]' ]='DynPres_[Pa]' 
-    ADSpanMap['^CLift(\d*)_\[-\]'    ]='CLift_[-]'    
-    ADSpanMap['^CDrag(\d*)_\[-\]'    ]='CDrag_[-]'    
-    ADSpanMap['^CNorm(\d*)_\[-\]'    ]='CNorm_[-]'    
-    ADSpanMap['^CTang(\d*)_\[-\]'    ]='CTang_[-]'    
-    ADSpanMap['^CMomt(\d*)_\[-\]'    ]='CMomt_[-]'    
-    ADSpanMap['^Pitch(\d*)_\[deg\]'  ]='Pitch_[deg]'  
-    ADSpanMap['^AxInd(\d*)_\[-\]'    ]='AxInd_[-]'    
-    ADSpanMap['^TanInd(\d*)_\[-\]'   ]='TanInd_[-]'   
-    ADSpanMap['^ForcN(\d*)_\[N\]'    ]='ForcN_[N]'    
-    ADSpanMap['^ForcT(\d*)_\[N\]'    ]='ForcT_[N]'    
-    ADSpanMap['^Pmomt(\d*)_\[N-m\]'  ]='Pmomt_[N-N]'  
-    ADSpanMap['^ReNum(\d*)_\[x10^6\]']='ReNum_[x10^6]'
-    ADSpanMap['^Gamma(\d*)_\[m^2/s\]']='Gamma_[m^2/s]'
+    ADSpanMap[r'^Alpha(\d*)_\[deg\]'  ]='Alpha_[deg]'  
+    ADSpanMap[r'^DynPres(\d*)_\[Pa\]' ]='DynPres_[Pa]' 
+    ADSpanMap[r'^CLift(\d*)_\[-\]'    ]='CLift_[-]'    
+    ADSpanMap[r'^CDrag(\d*)_\[-\]'    ]='CDrag_[-]'    
+    ADSpanMap[r'^CNorm(\d*)_\[-\]'    ]='CNorm_[-]'    
+    ADSpanMap[r'^CTang(\d*)_\[-\]'    ]='CTang_[-]'    
+    ADSpanMap[r'^CMomt(\d*)_\[-\]'    ]='CMomt_[-]'    
+    ADSpanMap[r'^Pitch(\d*)_\[deg\]'  ]='Pitch_[deg]'  
+    ADSpanMap[r'^AxInd(\d*)_\[-\]'    ]='AxInd_[-]'    
+    ADSpanMap[r'^TanInd(\d*)_\[-\]'   ]='TanInd_[-]'   
+    ADSpanMap[r'^ForcN(\d*)_\[N\]'    ]='ForcN_[N]'    
+    ADSpanMap[r'^ForcT(\d*)_\[N\]'    ]='ForcT_[N]'    
+    ADSpanMap[r'^Pmomt(\d*)_\[N-m\]'  ]='Pmomt_[N-N]'  
+    ADSpanMap[r'^ReNum(\d*)_\[x10^6\]']='ReNum_[x10^6]'
+    ADSpanMap[r'^Gamma(\d*)_\[m^2/s\]']='Gamma_[m^2/s]'
 
     return find_matching_columns(Cols, ADSpanMap)
 
@@ -462,7 +492,7 @@ def spanwisePostPro(FST_In=None,avgMethod='constantwindow',avgParam=5,out_ext='.
     """
     # --- Opens Fast output  and performs averaging
     if df is None:
-        df = FASTOutputFile(FST_In.replace('.fst',out_ext)).toDataFrame()
+        df = FASTOutputFile(FST_In.replace('.fst',out_ext).replace('.dvr',out_ext)).toDataFrame()
         returnDF=True
     else:
         returnDF=False
@@ -595,6 +625,8 @@ def FASTRadialOutputs(FST_In, OutputCols=None):
     """ Returns radial positions where FAST has outputs
     INPUTS:
        FST_In: fast input file (.fst)
+    OUTPUTS:
+       r_AD: radial positions of FAST Outputs from the rotor center
     """
     R           = None
     r_hub =0
@@ -606,7 +638,7 @@ def FASTRadialOutputs(FST_In, OutputCols=None):
     IR_BD       = None
     fst=None
     if FST_In is not None:
-        fst = pyFAST.FASTInputDeck(FST_In, readlist=['AD','ED','BD'])
+        fst = FASTInputDeck(FST_In, readlist=['AD','ED','BD'])
         # NOTE: all this below should be in FASTInputDeck
         if fst.version == 'F7':
             # --- FAST7
@@ -629,7 +661,11 @@ def FASTRadialOutputs(FST_In, OutputCols=None):
             else:
                 R           = fst.ED['TipRad']
                 r_hub       = fst.ED['HubRad']
-                r_ED, IR_ED = ED_BldGag(fst.ED)
+                if fst.ED.hasNodal:
+                    _, r_ED = ED_BldStations(fst.ED)
+                    IR_ED =None
+                else:
+                    r_ED, IR_ED = ED_BldGag(fst.ED)
 
             # --- BeamDyn
             if  hasattr(fst,'BD'):
@@ -648,13 +684,18 @@ def FASTRadialOutputs(FST_In, OutputCols=None):
                     if  not hasattr(fst.AD,'Bld1'):
                         raise Exception('The AeroDyn blade file couldn''t be found or read, from main file: '+FST_In)
                     
-                    if 'B1N001Cl_[-]' in OutputCols:
+                    if 'B1N001Cl_[-]' in OutputCols or np.any(np.char.find(list(OutputCols),'AB1N')==0):
                         # This was compiled with all outs
                         r_AD   = fst.AD.Bld1['BldAeroNodes'][:,0] # Full span
                         r_AD   += r_hub
                         IR_AD  = None
                     else:
                         r_AD,_ = AD_BldGag(fst.AD,fst.AD.Bld1, chordOut = True) # Only at Gages locations
+                        r_AD   += r_hub
+
+                    if R is None:
+                        # ElastoDyn was not read, we use R from AD
+                        R = fst.AD.Bld1['BldAeroNodes'][-1,0]
 
                 elif fst.ADversion == 'AD14':
                     r_AD,IR_AD = AD14_BldGag(fst.AD)
@@ -682,6 +723,19 @@ def addToOutlist(OutList, Signals):
 # --------------------------------------------------------------------------------{
 def remap_df(df, ColMap, bColKeepNewOnly=False, inPlace=False):
     """ Add/rename columns of a dataframe, potentially perform operations between columns
+
+    Example:
+
+        ColumnMap={
+          'WS_[m/s]'         : '{Wind1VelX_[m/s]}'             , # create a new column from existing one
+          'RtTSR_[-]'        : '{RtTSR_[-]} * 2  +  {RtAeroCt_[-]}'    , # change value of column
+          'RotSpeed_[rad/s]' : '{RotSpeed_[rpm]} * 2*np.pi/60 ', # new column [rpm] -> [rad/s]
+        }
+        # Read
+        df = weio.read('FASTOutBin.outb').toDataFrame()
+        # Change columns based on formulae, potentially adding new columns
+        df = fastlib.remap_df(df, ColumnMap, inplace=True)
+
     """
     if not inPlace:
         df=df.copy()
@@ -800,7 +854,10 @@ def find_matching_pattern(List, pattern):
         match=reg_pattern.search(l)
         if match:
             MatchedElements.append(l)
-            MatchedStrings.append(match.groups(1)[0])
+            if len(match.groups(1))>0:
+                MatchedStrings.append(match.groups(1)[0])
+            else:
+                MatchedStrings.append('')
     return MatchedElements, MatchedStrings
 
         
@@ -871,6 +928,61 @@ def extractSpanTS(ts, nr, col_pattern, colname, IR=None):
     if len(colsExist)>nr:
         print('[WARN] More values found for {}, found {}/{}'.format(colname,len(cols),nr))
     return (colname,Values)
+
+def radialInterpTS(df, r, varName, r_ref, blade=1, bldFmt='AB{:d}', ndFmt='N{:03d}', method='interp'):
+    """ 
+    Interpolate a time series at a given radial position for a given variable (varName)
+    INPUTS:
+     - df     : a dataframe (typically with OpenFAST time series)
+     - r      : radial positions of node where data is to be interpolated
+     - varName: variable name (and unit) to be interpolated. 
+                The dataframe column will be assumed to be "BldFmt"+"ndFmt"+varName
+     - r_ref  : radial position of nodal data present in the dataframe
+     - bldFmt : format for blade number, e.g. 'B{:d}' or 'AB{:d}'
+     - ndFmt  : format for node number, e.g.  'N{:d}' or 'N{:03d}'
+    OUTPUT:
+      - interpolated time series
+    """
+    # --- Sanity checks
+    r_ref = np.asarray(r_ref)
+    if not np.all(r_ref[:-1] <= r_ref[1:]):
+        raise Exception('This function only works for ascending radial values')
+
+    # No extrapolation
+    if r<np.min(r_ref) or r>np.max(r_ref):
+        raise Exception('Extrapolation not supported')
+
+    # Exactly on first or last nodes
+    if r==r_ref[0]:
+        col=bldFmt.format(blade) + ndFmt.format(1) + varName
+        if col in df.columns.values:
+            return df[col]
+        else:
+            raise Exception('Column {} not found in dataframe'.format(col))
+    elif r==r_ref[-1]:
+        col=bldFmt.format(blade) + ndFmt.format(len(r_ref)+1) + varName
+        if col in df.columns.values:
+            return df[col]
+        else:
+            raise Exception('Column {} not found in dataframe'.format(col))
+
+    if method=='interp':
+        # Interpolation
+        iBef = np.where(r_ref<r)[0][-1]
+        iAft = iBef+1
+        #print(r_ref[iBef], r,  r_ref[iAft], '          ',iBef+1, iAft+1)
+        fact= np.interp(r, r_ref[iBef:iAft+1], [0,1])
+        col=bldFmt.format(blade) + ndFmt.format(iBef+1) + varName
+        if col in df.columns.values:
+            bef=df[bldFmt.format(blade) + ndFmt.format(iBef+1) + varName]
+            aft=df[bldFmt.format(blade) + ndFmt.format(iAft+1) + varName]
+        else:
+            raise Exception('Column {} not found in dataframe'.format(col))
+        return bef*(1-fact) + aft*fact
+    else: 
+        raise NotImplementedError()
+
+
 
 def bin_mean_DF(df, xbins, colBin ):
     """ 
