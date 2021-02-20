@@ -7,7 +7,6 @@ import pandas as pd
 import numpy as np
 import re
 
-
 class FASTLinearizationFile(File):
     """ 
     Read/write an OpenFAST linearization file. The object behaves like a dictionary.
@@ -34,7 +33,6 @@ class FASTLinearizationFile(File):
         print(df['A'])
 
     """
-
     @staticmethod
     def defaultExtensions():
         return ['.lin']
@@ -272,7 +270,6 @@ class FASTLinearizationFile(File):
             dfs['A'] = pd.DataFrame(data = self['A'], index=xdescr_short, columns=xdescr_short)
         except:
             pass
-        dfs={}
         try:
             udescr_short=self.udescr()
             dfs['B'] = pd.DataFrame(data = self['B'], index=xdescr_short, columns=udescr_short)
