@@ -24,8 +24,8 @@ pytest
 
 The repository contains a set of small packages:
 
-- input\_output: read and write OpenFAST input files (see [README](pyFAST/input_output))
-- linearization: tools to deal with OpenFAST linearization (partial support, still relying on Matlab/Octave)
+- input\_output: read/write OpenFAST input files (see [README](pyFAST/input_output)) and postprocess OpenFAST outputs (see [examples](pyFAST/input_output/examples))
+- linearization: tools to deal with OpenFAST linearization (see [examples](pyFAST/linearization/examples/))
 - aeroacoustics: tools for aeroacoustics (generate BL files and plot outputs)
 - case\_generation: tools to generate and run a set of input of OpenFAST input files (see [examples](pyFAST/case_generation/examples))
 
