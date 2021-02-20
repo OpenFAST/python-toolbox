@@ -34,12 +34,13 @@ class CSVFile(File):
         return 'CSV file'
 
     def __init__(self, filename=None, sep=None, colNames=[], commentChar=None, commentLines=[],\
-                       colNamesLine=None, **kwargs):
+                       colNamesLine=None, detectColumnNames=True, **kwargs):
         self.sep          = sep
         self.colNames     = colNames
         self.commentChar  = commentChar
         self.commentLines = commentLines
         self.colNamesLine = colNamesLine
+        self.detectColumnNames = detectColumnNames
         self.data=[]
         self.header=[]
         self.nHeader=0
@@ -154,11 +155,14 @@ class CSVFile(File):
                 iStartLine = max(iStartLine,self.colNamesLine+1)
         elif len(self.colNames)>0:
             pass
+        elif not self.detectColumnNames:
+            pass
         else:
             # Looking at first line of data, if mainly floats -> it's not the column names
             colNames = split(readline(iStartLine))
             nFloat = sum([strIsFloat(s) for s in colNames])
-            if nFloat <= len(colNames)-1:
+            if nFloat ==0 or (len(colNames)>2 and nFloat <= len(colNames)/2):
+                # We assume that the line contains the column names
                 self.colNames=colNames
                 self.colNamesLine = iStartLine
                 iStartLine = iStartLine+1
