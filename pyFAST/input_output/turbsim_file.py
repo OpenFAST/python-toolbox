@@ -225,8 +225,9 @@ class TurbSimFile(File):
 
 
     def __repr__(self):
-        s='<TurbSimFile object> with keys:\n'
-        s+=' - ID {}\n'.format(self['ID'])
+        s='<{} object> with keys:\n'.format(type(self).__name__)
+        s+=' - filename: {}\n'.format(self.filename)
+        s+=' - ID: {}\n'.format(self['ID'])
         s+=' - z: [{} ... {}],  dz: {}, n: {} \n'.format(self['z'][0],self['z'][-1],self['z'][1]-self['z'][0],len(self['z']))
         s+=' - y: [{} ... {}],  dy: {}, n: {} \n'.format(self['y'][0],self['y'][-1],self['y'][1]-self['y'][0],len(self['y']))
         s+=' - t: [{} ... {}],  dt: {}, n: {} \n'.format(self['t'][0],self['t'][-1],self['t'][1]-self['t'][0],len(self['t']))

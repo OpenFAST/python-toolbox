@@ -1,7 +1,7 @@
 # pyfast
 
 [![Status: beta](https://img.shields.io/badge/status-beta-yellow)](https://github.com/openfast/python-toolbox/tree/dev)
-[![Build status](https://github.com/OpenFAST/python-toolbox/workflows/development-pipeline/badge.svg)](https://github.com/OpenFAST/python-toolbox/actions?query=workflow%3A%22Development+Pipeline%22)
+[![Build status](https://github.com/openfast/python-toolbox/workflows/Development%20Pipeline/badge.svg)](https://github.com/OpenFAST/python-toolbox/actions?query=workflow%3A%22Development+Pipeline%22)
 [![Python: 3.6+](https://img.shields.io/badge/python-3.6%2B-informational)](https://www.python.org/)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
@@ -24,8 +24,8 @@ pytest
 
 The repository contains a set of small packages:
 
-- input\_output: read and write OpenFAST input files (see [README](pyFAST/input_output))
-- linearization: tools to deal with OpenFAST linearization (partial support, still relying on Matlab/Octave)
+- input\_output: read/write OpenFAST input files (see [README](pyFAST/input_output)) and postprocess OpenFAST outputs (see [examples](pyFAST/input_output/examples))
+- linearization: tools to deal with OpenFAST linearization (see [examples](pyFAST/linearization/examples/))
 - aeroacoustics: tools for aeroacoustics (generate BL files and plot outputs)
 - case\_generation: tools to generate and run a set of input of OpenFAST input files (see [examples](pyFAST/case_generation/examples))
 

@@ -12,15 +12,16 @@ import shutil
 import stat
 import re
 
-# --- External library for io
-from pyFAST.input_output import FASTInputFile
-from pyFAST.input_output import FASTOutputFile
+# --- Fast libraries
+from pyFAST.input_output.fast_input_file import FASTInputFile
+from pyFAST.input_output.fast_output_file import FASTOutputFile
 
 FAST_EXE='openfast'
 
 # --------------------------------------------------------------------------------}
 # --- Tools for executing FAST
 # --------------------------------------------------------------------------------{
+# --- START cmd.py
 def run_cmds(inputfiles, exe, parallel=True, showOutputs=True, nCores=None, showCommand=True): 
     """ Run a set of simple commands of the form `exe input_file`
     By default, the commands are run in "parallel" (though the method needs to be improved)
@@ -84,13 +85,13 @@ def run_cmd(input_file_or_arglist, exe, wait=True, showOutputs=False, showComman
         input_file_abs = input_file
     else:
         input_file=input_file_or_arglist
-        if not os.path.isabs(input_file):
-            input_file_abs=os.path.abspath(input_file)
-        else:
-            input_file_abs=input_file
-        if not os.path.exists(exe):
-            raise Exception('Executable not found: {}'.format(exe))
-        args= [exe,input_file]
+    if not os.path.isabs(input_file):
+        input_file_abs=os.path.abspath(input_file)
+    else:
+        input_file_abs=input_file
+    if not os.path.exists(exe):
+        raise Exception('Executable not found: {}'.format(exe))
+    args= [exe,input_file]
     #args = 'cd '+workDir+' && '+ exe +' '+basename
     shell=False
     if showOutputs:
@@ -113,6 +114,7 @@ def run_cmd(input_file_or_arglist, exe, wait=True, showOutputs=False, showComman
     p.input_file_abs = input_file_abs
     p.exe            = exe
     return p
+# --- END cmd.py
 
 def run_fastfiles(fastfiles, fastExe=None, parallel=True, showOutputs=True, nCores=None, showCommand=True, reRun=True):
     if fastExe is None:

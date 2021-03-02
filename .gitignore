@@ -105,3 +105,15 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+# OpenFAST files
+*.exe
+*.dll
+*.sum
+*.ech
+*.out
+*.outb
+
+#  Hidding files starting with underscore except init
+_*
+!__init__.py

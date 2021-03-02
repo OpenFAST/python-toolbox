@@ -1,30 +1,15 @@
 import unittest
-import glob
-import pyFAST
-from pyFAST.input_output import FASTSummaryFile
 import os
 import numpy as np
-MyDir=os.path.join(os.path.dirname(__file__),'example_files')
+
+from .helpers_for_test import MyDir, reading_test 
+import pyFAST
+from pyFAST.input_output import FASTSummaryFile
 
 class Test(unittest.TestCase):
 
     def test_001_read_all(self, DEBUG=True):
-        nError=0
-        for f in glob.glob(os.path.join(MyDir,'FASTSum*.*')):
-            if os.path.splitext(f)[-1] in ['.py','.pyc'] or f.find('_TMP')>0:
-                continue
-            try:
-                obj = FASTSummaryFile(f)
-                s=type(obj).__name__.replace('file','')[:20]
-                if DEBUG:
-                    print('[ OK ] {:30s}\t{:20s}'.format(os.path.basename(f)[:30],s))
-            except:
-                nError += 1
-                if DEBUG:
-                    print('[FAIL] {:30s}\tException occurred'.format(os.path.basename(f)[:30]))
-                raise 
-        if nError>0:
-            raise Exception('Some tests failed')
+        reading_test('FASTSum*.*', FASTSummaryFile)
 
     def test_FASTSum(self):
         f = FASTSummaryFile(os.path.join(MyDir, 'FASTSum_Pendulum.SD.sum.yaml'))

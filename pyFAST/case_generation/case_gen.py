@@ -9,9 +9,10 @@ import shutil
 import stat
 import re
 
-# --- External library for io
-from pyFAST.input_output import FASTInputFile
-from pyFAST.input_output import FASTOutputFile
+# --- Misc fast libraries
+import pyFAST.input_output.fast_input_file as fi
+import pyFAST.case_generation.runner as runner
+import pyFAST.input_output.postpro as postpro
 
 # --------------------------------------------------------------------------------}
 # --- Template replace 
@@ -89,7 +90,7 @@ def templateReplaceGeneral(PARAMS, templateDir=None, outputDir=None, main_file=N
       PARAMS: list of dictionaries. Each key of the dictionary should be a key present in the 
               template file when read with `weio` (see: weio.read(main_file).keys() )
 
-               PARAMS[0]={'FAST|DT':0.1, 'EDFile|GBRatio':1, 'ServoFile|GenEff':0.8}
+               PARAMS[0]={'DT':0.1, 'EDFile|GBRatio':1, 'ServoFile|GenEff':0.8}
 
       templateDir: if provided, this directory and its content will be copied to `outputDir` 
                       before doing the parametric substitution
@@ -156,7 +157,7 @@ def templateReplaceGeneral(PARAMS, templateDir=None, outputDir=None, main_file=N
             #print('NewFile         :', newfilename)
             #print('NewFileFull     :', newfilename_full)
             shutil.copyfile(templatefilename_full, newfilename_full)
-            f= FASTInputFile(newfilename_full) # open the template file for that filekey 
+            f= fi.FASTInputFile(newfilename_full) # open the template file for that filekey 
             Files[FileKey]=f # store it
 
         # --- Changing parameters in that file
@@ -265,7 +266,7 @@ def templateReplaceGeneral(PARAMS, templateDir=None, outputDir=None, main_file=N
 
 def templateReplace(PARAMS, templateDir, outputDir=None, main_file=None, removeAllowed=False, removeRefSubFiles=False, oneSimPerDir=False):
     """ Replace parameters in a fast folder using a list of dictionaries where the keys are for instance:
-        'FAST|DT', 'EDFile|GBRatio', 'ServoFile|GenEff'
+        'DT', 'EDFile|GBRatio', 'ServoFile|GenEff'
     """
     # --- For backward compatibility, remove "FAST|" from the keys
     for p in PARAMS:
@@ -276,6 +277,17 @@ def templateReplace(PARAMS, templateDir, outputDir=None, main_file=None, removeA
     
     return templateReplaceGeneral(PARAMS, templateDir, outputDir=outputDir, main_file=main_file, 
             removeAllowed=removeAllowed, removeRefSubFiles=removeRefSubFiles, oneSimPerDir=oneSimPerDir)
+
+def removeFASTOuputs(workDir):
+    # Cleaning folder
+    for f in glob.glob(os.path.join(workDir,'*.out')):
+        os.remove(f)
+    for f in glob.glob(os.path.join(workDir,'*.outb')):
+        os.remove(f)
+    for f in glob.glob(os.path.join(workDir,'*.ech')):
+        os.remove(f)
+    for f in glob.glob(os.path.join(workDir,'*.sum')):
+        os.remove(f)
 
 # --------------------------------------------------------------------------------}
 # --- Tools for template replacement 
@@ -327,8 +339,11 @@ def paramsStiff(p=dict()):
     p['EDFile|PtfmYDOF']  = 'False'
     return p
 
-def paramsWS_RPM_Pitch(WS,RPM,Pitch,baseDict=None,FlatInputs=False):
-    """ """
+def paramsWS_RPM_Pitch(WS, RPM, Pitch, baseDict=None, flatInputs=False):
+    """ 
+    Generate OpenFAST "parameters" (list of dictionaries with "address")
+    chaing the inputs in ElastoDyn, InflowWind for different wind speed, RPM and Pitch
+    """
     # --- Ensuring everythin is an iterator
     def iterify(x):
         if not isinstance(x, collections.Iterable): x = [x]
@@ -371,6 +386,85 @@ def paramsWS_RPM_Pitch(WS,RPM,Pitch,baseDict=None,FlatInputs=False):
         PARAMS.append(p)
     return PARAMS
 
+def paramsLinearTrim(p=dict()):
+
+    # Set a few DOFs, move this to main file
+    p['Linearize']              = 'True'
+    p['CalcSteady']             = 'True'
+    p['TrimGain']               = 1e-4
+    p['TrimTol']                = 1e-5
+    p['CompMooring']            = 0
+    p['CompHydro']              = 0
+    p['LinOutJac']              = 'False'
+    p['LinOutMod']              = 'False'
+
+    p['AeroFile|AFAeroMod']     = 1
+    p['AeroFile|CavitCheck']    = 'False'
+    p['AeroFile|CompAA']        = 'False'
+    
+    p['ServoFile|PCMode']       = 0
+    p['ServoFile|VSContrl']     = 1
+
+    p['ServoFile|CompNTMD']      = 'False'
+    p['ServoFile|CompTTMD']      = 'False'
+
+    # Set all DOFs off, enable as desired
+    p['EDFile|FlapDOF1']        = 'False'
+    p['EDFile|FlapDOF2']        = 'False'
+    p['EDFile|EdgeDOF']         = 'False'
+    p['EDFile|TeetDOF']         = 'False'
+    p['EDFile|DrTrDOF']         = 'False'
+    p['EDFile|GenDOF']          = 'False'
+    p['EDFile|YawDOF']          = 'False'
+    p['EDFile|TwFADOF1']        = 'False'
+    p['EDFile|TwFADOF2']        = 'False'
+    p['EDFile|TwSSDOF1']        = 'False'
+    p['EDFile|TwSSDOF2']        = 'False'
+    p['EDFile|PtfmSgDOF']       = 'False'
+    p['EDFile|PtfmSwDOF']       = 'False'
+    p['EDFile|PtfmHvDOF']       = 'False'
+    p['EDFile|PtfmRDOF']        = 'False'
+    p['EDFile|PtfmPDOF']        = 'False'
+    p['EDFile|PtfmYDOF']        = 'False'
+
+
+    return p
+
+# --------------------------------------------------------------------------------}
+# ---  
+# --------------------------------------------------------------------------------{
+def createStepWind(filename,WSstep=1,WSmin=3,WSmax=25,tstep=100,dt=0.5,tmin=0,tmax=999):
+    f = weio.FASTWndFile()
+    Steps= np.arange(WSmin,WSmax+WSstep,WSstep)
+    print(Steps)
+    nCol = len(f.colNames)
+    nRow = len(Steps)*2
+    M = np.zeros((nRow,nCol));
+    M[0,0] = tmin
+    M[0,1] = WSmin
+    for i,s in enumerate(Steps[:-1]):
+        M[2*i+1,0] = tmin + (i+1)*tstep-dt 
+        M[2*i+2,0] = tmin + (i+1)*tstep
+        M[2*i+1,1] = Steps[i]
+        if i<len(Steps)-1:
+            M[2*i+2,1] = Steps[i+1]
+        else:
+            M[2*i+2,1] = Steps[-1]
+    M[-1,0]= max(tmax, (len(Steps)+1)*tstep)
+    M[-1,1]= WSmax
+    f.data=pd.DataFrame(data=M,columns=f.colNames)
+    #
+    print(f.data)
+    f.write(filename)
+    #plt.plot(M[:,0],M[:,1])
+    #plt.show()
+
+    #print(f.toDataFrame())
+    #pass
+#createStepWind('test.wnd',tstep=200,WSmax=28)
+# createStepWind('test.wnd',tstep=200,WSmin=5,WSmax=7,WSstep=2)
+
+
 
 # --------------------------------------------------------------------------------}
 # --- Tools for typical wind turbine study 
@@ -392,8 +486,8 @@ def CPCT_LambdaPitch(refdir,main_fastfile,Lambda=None,Pitch=np.linspace(-10,40,5
         main_fastfile=os.path.basename(main_fastfile)
 
     # --- Reading main fast file to get rotor radius 
-    fst = FASTInputFile(os.path.join(refdir,main_fastfile))
-    ed  = FASTInputFile(os.path.join(refdir,fst['EDFile'].replace('"','')))
+    fst = fi.FASTInputFile(os.path.join(refdir,main_fastfile))
+    ed  = fi.FASTInputFile(os.path.join(refdir,fst['EDFile'].replace('"','')))
     R = ed['TipRad']
 
     # --- Making sure we have 
@@ -420,7 +514,7 @@ def CPCT_LambdaPitch(refdir,main_fastfile,Lambda=None,Pitch=np.linspace(-10,40,5
             RPM_flat.append(rpm)
             Pitch_flat.append(pitch)
     # --- Setting up default options
-    baseDict={'FAST|TMax': TMax, 'FAST|DT': 0.01, 'FAST|DT_Out': 0.1} # NOTE: Tmax should be at least 2pi/Omega
+    baseDict={'TMax': TMax, 'DT': 0.01, 'DT_Out': 0.1} # NOTE: Tmax should be at least 2pi/Omega
     baseDict = paramsNoController(baseDict)
     if bStiff:
         baseDict = paramsStiff(baseDict)
@@ -437,18 +531,18 @@ def CPCT_LambdaPitch(refdir,main_fastfile,Lambda=None,Pitch=np.linspace(-10,40,5
     workDir = refdir.strip('/').strip('\\')+'_CPLambdaPitch'
     print('>>> Generating inputs files in {}'.format(workDir))
     RemoveAllowed=reRun # If the user want to rerun, we can remove, otherwise we keep existing simulations
-    fastFiles=templateReplace(PARAMS, refdir, workDir=workDir,RemoveRefSubFiles=True,RemoveAllowed=RemoveAllowed,main_file=main_fastfile)
+    fastFiles=templateReplace(PARAMS, refdir, outputDir=workDir,removeRefSubFiles=True,removeAllowed=RemoveAllowed,main_file=main_fastfile)
 
     # --- Running fast simulations
     print('>>> Running {} simulations...'.format(len(fastFiles)))
-    run_fastfiles(fastFiles, showOutputs=showOutputs, fastExe=fastExe, nCores=nCores, reRun=reRun)
+    runner.run_fastfiles(fastFiles, showOutputs=showOutputs, fastExe=fastExe, nCores=nCores, reRun=reRun)
 
     # --- Postpro - Computing averages at the end of the simluation
     print('>>> Postprocessing...')
     outFiles = [os.path.splitext(f)[0]+'.outb' for f in fastFiles]
     # outFiles = glob.glob(os.path.join(workDir,'*.outb'))
     ColKeepStats  = ['RotSpeed_[rpm]','BldPitch1_[deg]','RtAeroCp_[-]','RtAeroCt_[-]','Wind1VelX_[m/s]']
-    result = averagePostPro(outFiles,avgMethod='periods',avgParam=1,ColKeep=ColKeepStats,ColSort='RotSpeed_[rpm]')
+    result = postpro.averagePostPro(outFiles,avgMethod='periods',avgParam=1,ColKeep=ColKeepStats,ColSort='RotSpeed_[rpm]')
     # print(result)        
 
     # --- Adding lambda, sorting and keeping only few columns
@@ -474,10 +568,10 @@ def CPCT_LambdaPitch(refdir,main_fastfile,Lambda=None,Pitch=np.linspace(-10,40,5
 if __name__=='__main__':
     # --- Test of templateReplace
     PARAMS                          = {}
-    PARAMS['FAST|TMax']             = 10
+    PARAMS['TMax']             = 10
     PARAMS['__name__']             =  'MyName'
-    PARAMS['FAST|DT']               = 0.01
-    PARAMS['FAST|DT_Out']           = 0.1
+    PARAMS['DT']               = 0.01
+    PARAMS['DT_Out']           = 0.1
     PARAMS['EDFile|RotSpeed']       = 100
     PARAMS['EDFile|BlPitch(1)']     = 1
     PARAMS['EDFile|GBoxEff']        = 0.92
