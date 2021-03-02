@@ -1,31 +1,17 @@
 import unittest
-import glob
-import pyFAST
-from pyFAST.input_output import FASTInputFile
 import os
 import numpy as np
 
-MyDir=os.path.join(os.path.dirname(__file__),'example_files')
+from .helpers_for_test import MyDir, reading_test 
+
+import pyFAST
+from pyFAST.input_output import FASTInputFile
+
 
 class Test(unittest.TestCase):
  
     def test_001_read_all(self, DEBUG=True):
-        nError=0
-        for f in glob.glob(os.path.join(MyDir,'FASTIn*.*')):
-            if os.path.splitext(f)[-1] in ['.py','.pyc'] or f.find('_TMP')>0:
-                continue
-            try:
-                obj = FASTInputFile(f)
-                s=type(obj).__name__.replace('file','')[:20]
-                if DEBUG:
-                    print('[ OK ] {:30s}\t{:20s}'.format(os.path.basename(f)[:30],s))
-            except:
-                nError += 1
-                if DEBUG:
-                    print('[FAIL] {:30s}\tException occurred'.format(os.path.basename(f)[:30]))
-                raise 
-        if nError>0:
-            raise Exception('Some tests failed')
+        reading_test('FASTIn*.*', FASTInputFile)
 
     def test_FASTIn(self):
         F=FASTInputFile(os.path.join(MyDir,'FASTIn_BD.dat'))
@@ -33,6 +19,14 @@ class Test(unittest.TestCase):
         self.assertEqual(F['PitchK'],2.0e+07)
         self.assertEqual(F['MemberGeom'][-1,2],61.5)
         self.assertEqual(F['MemberGeom'][-2,3],0.023000)
+
+        F=FASTInputFile(os.path.join(MyDir,'FASTIn_BD_bld.dat'))
+        F.test_ascii(bCompareWritesOnly=False,bDelete=True)
+        self.assertEqual(F['DampingCoeffs'][0][0],0.01)
+        # TODO BeamDyn Blade properties are not really "user friendly"
+        self.assertEqual(F['BeamProperties']['span'][1],1.0)
+        self.assertEqual(F['BeamProperties']['K'][1][0,0],1.8e+08) # K11 @ section 2
+        self.assertEqual(F['BeamProperties']['M'][1][0,0],1.2) # M11 @ section 2
 
         F=FASTInputFile(os.path.join(MyDir,'FASTIn_ED.dat'))
         F.test_ascii(bCompareWritesOnly=True,bDelete=True)
@@ -71,6 +65,10 @@ class Test(unittest.TestCase):
         F=FASTInputFile(os.path.join(MyDir,'FASTIn_SD.dat'))
         F.test_ascii(bCompareWritesOnly=True,bDelete=True)
         self.assertEqual(F['PitManRat(1)'],2)
+        
+        F=FASTInputFile(os.path.join(MyDir,'FASTIn_MD.dat'))
+        F.test_ascii(bCompareWritesOnly=True,bDelete=True)
+        self.assertEqual(float(F['LineTypes'][0,1]),0.02)
 
 if __name__ == '__main__':
     #Test().test_FASTIn()

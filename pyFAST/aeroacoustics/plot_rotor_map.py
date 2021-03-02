@@ -1,10 +1,10 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import weio
 from parse import *
 import re, os, platform
 import matplotlib.colors
+from pyFAST.input_output.fast_output_file import FASTOutputFile
 
 #########################################################################################################################################
 ## User inputs
@@ -36,8 +36,8 @@ outputfilename  = output_dir + os.sep + "data_output4"
 location = pd.read_csv(locfilename,delimiter='\s+',skiprows=[0,1],names=['x','y','z'])
 
 
-AA_1 = weio.FASTOutFile(AAfilename).toDataFrame()
-OF  = weio.FASTOutFile(OFfilename).toDataFrame()
+AA_1 = FASTOutputFile(AAfilename).toDataFrame()
+OF  = FASTOutputFile(OFfilename).toDataFrame()
 
 
 with open(AAfilename, 'r') as f:

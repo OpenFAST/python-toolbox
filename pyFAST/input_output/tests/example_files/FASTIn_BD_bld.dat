@@ -1,12 +1,12 @@
 ------- BEAMDYN V1.00.* INDIVIDUAL BLADE INPUT FILE --------------------------
 ! Constant property beam Tube
  ---------------------- BLADE PARAMETERS --------------------------------------
-  2  station_total    - Number of blade input stations (-)
-  1  damp_type        - Damping type (switch): 0: no damping; 1: viscous damping
+2             station_total - Number of blade input stations (-)
+1             damp_type     - Damping type (switch): 0: no damping; 1: viscous damping
   ---------------------- DAMPING COEFFICIENT------------------------------------
-   mu1        mu2        mu3        mu4        mu5        mu6
-   (s)        (s)        (s)        (s)        (s)        (s)
- 0.01 0.01 0.01 0.01 0.01 0.01 
+mu1             mu2             mu3             mu4             mu5             mu6            
+(s)             (s)             (s)             (s)             (s)             (s)            
+ 1.00000000e-02	 1.00000000e-02	 1.00000000e-02	 1.00000000e-02	 1.00000000e-02	 1.00000000e-02
  ---------------------- DISTRIBUTED PROPERTIES---------------------------------
 0.000000
    1.800000E+08 0.000000E+00 0.000000E+00 0.000000E+00 0.000000E+00 0.000000E+00
@@ -37,3 +37,5 @@
    0.000000E+00 0.000000E+00 0.000000E+00 1.000000E-01 0.000000E+00 0.000000E+00
    0.000000E+00 0.000000E+00 6.000000E-01 0.000000E+00 1.000000E-01 0.000000E+00
    0.000000E+00 -6.000000E-01 0.000000E+00 0.000000E+00 0.000000E+00 2.000000E-01
+
+

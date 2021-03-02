@@ -31,12 +31,13 @@ def postproMBC(xlsFile=None, csvBase=None, sortedSuffix=None, csvModesID=None, x
   Generate Cambell diagram data from an xls file, or a set of csv files
  
 """
-import os
+import os, glob
 import pandas as pd
 import numpy as np
 from pandas import ExcelFile
 from pyFAST.input_output import FASTInputFile
 from pyFAST.case_generation.case_gen import templateReplace
+import pyFAST.linearization.mbc.mbc3 as mbc
 import pyFAST.case_generation.runner as runner
 
 def campbell(templateFstFile, operatingPointsFile, tStart, nPerPeriod, workDir, toolboxDir, matlabExe, fastExe,  
@@ -593,6 +594,20 @@ def plotCampbell(OP, Freq, Damp, sx='WS_[m/s]', UnMapped=None, fig=None, axes=No
     axes[1].set_ylim(DampRange)
     return fig, axes
 
+def run_pyMBC(outfiles):
+    """
+    Run mbc transform on set of openfast linear outputs
+    """
+
+    MBC = [None]*len(outfiles)
+    for i_lin, outfile in enumerate(outfiles):
+        filebase        = outfile.split('.out')[0]
+        lin_file_fmt    = '{}.*.lin'.format(filebase)
+        lin_files       = glob.glob(lin_file_fmt)
+
+        MBC[i_lin], matData, FAST_linData = mbc.fx_mbc3(lin_files)
+
+    return MBC
 
 def plotCampbellDataFile(xls_or_csv, ws_or_rpm='rpm', sheetname=None, ylim=None):
     """ 
