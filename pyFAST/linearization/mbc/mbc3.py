@@ -232,7 +232,7 @@ def campbell_diagram_data(mbc_data, BladeLen, TowerLen):
         CData['StateHasMaxAtThisMode']=tmp
                     
         #print(CData['StateHasMaxAtThisMode'])
-        print(CData['NaturalFreq_Hz'])
+        #print(CData['NaturalFreq_Hz'])
         CampbellData['Modes'].append(CData)
 
     #print(CampbellData[0]['MagnitudePhase'])
@@ -272,6 +272,56 @@ def campbell_diagram_data(mbc_data, BladeLen, TowerLen):
     #print(CampbellData['ModesTable'])
     return CampbellData
     
+
+
+def extractShortModeDescription(Mode):
+    """ 
+    Look at which modes have max, append these description, perform shortening substitution
+    The escription starts with noMax if no maximum exsits in this mode
+    """
+    Desc = np.array(Mode['DescStates'])[Mode['StateHasMaxAtThisMode']]
+    DescCat = ''
+    DescCatED = ''
+    if len(Desc) == 0:
+        DescCat = ''
+        DescCatED = 'NoMax -'
+        Desc = Mode['DescStates'][:5]
+    nBD = 0
+    for iD, s in enumerate(Desc):
+        s = replaceModeDescription(s)
+        if Desc[iD].startswith('BD'):
+            nBD = nBD + 1
+        elif Desc[iD].startswith('ED'):
+                DescCatED = s +' - '+DescCatED
+        else:
+            DescCat += DescCat+' - '+s
+    DescCat =DescCatED+DescCat
+    return DescCat
+
+
+def replaceModeDescription(s):
+    """ Perform substitutions to make the mode description shorter"""
+    s = s.replace('First time derivative of','d/dt of')
+    s = s.replace('fore-aft bending mode DOF, m','FA')
+    s = s.replace('side-to-side bending mode DOF, m','SS')
+    s = s.replace('bending-mode DOF of blade ','')
+    s = s.replace(' rotational-flexibility DOF, rad','-rot')
+    s = s.replace('rotational displacement in ','rot')
+    s = s.replace('translational displacement in ','trans')
+    s = s.replace(', rad','')
+    s = s.replace(', m','')
+    s = s.replace('finite element node ','N')
+    s = s.replace('cosine','cos')
+    s = s.replace('sine','sin')
+    s = s.replace('collective','coll.')
+    s = s.replace('Blade','Bld')
+    s = s.replace('rotZ','TORS-ROT')
+    s = s.replace('transX','FLAP-DISP')
+    s = s.replace('transY','EDGE-DISP')
+    s = s.replace('rotX','EDGE')
+    s = s.replace('rotY','FLAP')
+    return s
+
 
 def PrettyStateDescriptions(DescStates, ndof2, performedTransformation):
     idx=np.array(list(range(0,ndof2))+list(range(ndof2*2+1,len(DescStates))))    
@@ -435,9 +485,9 @@ def eiganalysis(A, ndof2, ndof1):
     
     return mbc,EigenVects_save[:,:,0]
 
-def fx_mbc3(FileNames):
+def fx_mbc3(FileNames, verbose=True):
     MBC={}
-    matData, FAST_linData = gm.get_Mats(FileNames)
+    matData, FAST_linData = gm.get_Mats(FileNames, verbose=verbose)
 
     # print('matData[Omega] ', matData['Omega'])
     # print('matData[OmegaDot] ', matData['OmegaDot'])

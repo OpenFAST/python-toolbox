@@ -53,7 +53,7 @@ def findBladeTriplets_EDstate(rotFrame,Desc):
     return Triplets,NTriplets;
 
 
-def findBladeTriplets(rotFrame,Desc):
+def findBladeTriplets(rotFrame,Desc, verbose=True):
 
     # Find the number of, and indices for, triplets in the rotating frame:
     chkStr = ['[Bb]lade \d', '[Bb]lade [Rr]oot \d', 'BD_\d', '[Bb]\d', '[Bb]lade\d', 'PitchBearing\d', '\d']
@@ -124,9 +124,11 @@ def findBladeTriplets(rotFrame,Desc):
                                 break;
                 
                 if foundTriplet==False:
-                    print('Rotating channel "', i, Desc[i], '" does not form a unique blade triplet. Blade(s) not found: ', np.array(np.where(Tmp == -1))+1 )
+                    if verbose:
+                        print('Rotating channel "', i, Desc[i], '" does not form a unique blade triplet. Blade(s) not found: ', np.array(np.where(Tmp == -1))+1 )
             else:
-                print( 'Could not find blade number in rotating channel "', Desc[i], '".')
+                if verbose:
+                    print( 'Could not find blade number in rotating channel "', Desc[i], '".')
     #print(NTriplets)
     #print(Triplets)
 
@@ -221,24 +223,41 @@ def getStateOrderingIndx(matData):
     #print(StateOrderingIndx)
     return StateOrderingIndx, checkEDstates
 
+def readOP(fid, n, defaultDerivOrder=2):
+    OP=[]
+    Var = {'RotatingFrame': [], 'DerivativeOrder': [], 'Description': []}
+    colNames=fid.readline().strip()
+    dummy=   fid.readline().strip()
+    bHasDeriv= colNames.find('Derivative Order')>=0
+    for i, line in enumerate(fid):
+        sp=line.strip().split()
+        if sp[1].find(',')>=0:
+            #  Most likely this OP has three values (e.g. orientation angles)
+            # For now we discard the two other values
+            OP.append(float(sp[1][:-1]))
+            iRot=4
+        else:
+            OP.append(float(sp[1]))
+            iRot=2
+        Var['RotatingFrame'].append(sp[iRot])
+        if bHasDeriv:
+            Var['DerivativeOrder'].append(int(sp[iRot+1]))
+            Var['Description'].append(' '.join(sp[iRot+2:]).strip())
+        else:
+            Var['DerivativeOrder'].append(defaultDerivOrder)
+            Var['Description'].append(' '.join(sp[iRot+1:]).strip())
+        if i>=n-1:
+            break
 
-def readLinTable(f,n):
-    tmp={}
-    op=[]
-    RF=[]
-    DO=[]
-    desc=[]
-    for line in islice(f,n):
-        op.append(np.float(line.split()[1]))
-        RF.append(_isbool(line.split()[2]))
-        DO.append(np.int(line.split()[3]))
-        desc.append(" ".join(line.split()[4:]))
-        
-    tmp['x_op']=op
-    tmp['x_rotFrame']=RF
-    tmp['x_DerivOrder']=DO
-    tmp['x_desc']=desc
+    tmp = dict()
+    tmp['x_op']         = OP
+    tmp['x_rotFrame']   = Var['RotatingFrame']
+    tmp['x_DerivOrder'] = Var['DerivativeOrder']
+    tmp['x_desc']       = Var['Description']
+
     return tmp
+
+
 
 def readFASTMatrix(f):
     name=""
@@ -258,98 +277,130 @@ def readFASTMatrix(f):
         for line in islice(f,m):
             tmp.append([np.float(num) for num in line.split()])
         tmp=np.array(tmp)
+
     return name,tmp
     
 def ReadFASTLinear(filename):
+
+    def extractVal(lines, key):
+        for l in lines:
+            if l.find(key)>=0:
+                return l.split(key)[1].split()[0]
+        return None
+
+    def readToMarker(fid, marker, nMax):
+        lines=[]
+        for i, line in enumerate(fid):
+            if i>nMax:
+                raise BrokenFormatError('`{}` not found in file'.format(marker))
+            if line.find(marker)>=0:
+                break
+            lines.append(line.strip())
+        return lines, line
+
     with open(filename) as f:
         info = {}
         data = {}
         SetOfMatrices = 1
         info['name'] = os.path.splitext(os.path.basename(filename))[0]
+
+        # --- 
+        header, lastLine=readToMarker(f, 'Jacobians included', 30)
+        header.append(lastLine)
+        data['t']   = float(extractVal(header,'Simulation time:'          ))
+        data['n_x'] = int(extractVal(header,'Number of continuous states:'))
+        data['n_xd'] = int(extractVal(header,'Number of discrete states:'  ))
+        data['n_z'] = int(extractVal(header,'Number of constraint states:'))
+        data['n_u'] = int(extractVal(header,'Number of inputs:'           ))
+        data['n_y'] = int(extractVal(header,'Number of outputs:'          ))
+        bJac =    extractVal(header,'Jacobians included in this file?')
+        if bJac: 
+            SetOfMatrices = 2
         try:
-            header = [f.readline() for _ in range(17)]
-            info['fast_version'] = header[1].strip()
-            info['modules'] = header[2].strip()
-            info['description'] = header[4].strip()
+            data['Azimuth'] = float(extractVal(header,'Azimuth:'))
+        except:
+            data['Azimuth'] = None
+        try:
+            data['RotSpeed'] = float(extractVal(header,'Rotor Speed:')) # rad/s
+        except:
+            data['RotSpeed'] = None
+        try:
+            data['WindSpeed'] = float(extractVal(header,'Wind Speed:'))
+        except:
+            data['WindSpeed'] = None
 
-            ln=7;
-            #data = np.array([line.split() for line in f.readlines()]).astype(np.float)
-            data['t']=np.float(header[ln].split(':')[1].strip().split(' ')[0])
-            data['RotSpeed']=np.float(header[ln+1].split(':')[1].strip().split(' ')[0])
-            data['Azimuth']=np.float(header[ln+2].split(':')[1].strip().split(' ')[0])
-            data['WindSpeed']=np.float(header[ln+3].split(':')[1].strip().split(' ')[0])
-            data['n_x']=np.float(header[ln+4].split(':')[1].strip().split(' ')[0])
-            data['n_xd']=np.float(header[ln+5].split(':')[1].strip().split(' ')[0])
-            data['n_z']=np.float(header[ln+6].split(':')[1].strip().split(' ')[0])
-            data['n_u']=np.float(header[ln+7].split(':')[1].strip().split(' ')[0])
-            data['n_y']=np.float(header[ln+8].split(':')[1].strip().split(' ')[0])
+        # --- Old method for reading
+        #  header = [f.readline() for _ in range(17)]
+        #  info['fast_version'] = header[1].strip()
+        #  info['modules'] = header[2].strip()
+        #  info['description'] = header[4].strip()
+        #  ln=7;
+        #  data = np.array([line.split() for line in f.readlines()]).astype(np.float)
+        #  data['t']=np.float(header[ln].split(':')[1].strip().split(' ')[0])
+        #  data['RotSpeed']=np.float(header[ln+1].split(':')[1].strip().split(' ')[0])
+        #  data['Azimuth']=np.float(header[ln+2].split(':')[1].strip().split(' ')[0])
+        #  data['WindSpeed']=np.float(header[ln+3].split(':')[1].strip().split(' ')[0])
+        #  data['n_x']=np.float(header[ln+4].split(':')[1].strip().split(' ')[0])
+        #  data['n_xd']=np.float(header[ln+5].split(':')[1].strip().split(' ')[0])
+        #  data['n_z']=np.float(header[ln+6].split(':')[1].strip().split(' ')[0])
+        #  data['n_u']=np.float(header[ln+7].split(':')[1].strip().split(' ')[0])
+        #  data['n_y']=np.float(header[ln+8].split(':')[1].strip().split(' ')[0])
+        #  if header[ln+9].split('?')[1].strip()=='Yes':
+        #      SetOfMatrices=2
             
-            data['Azimuth']=np.mod(data['Azimuth'],2.0*np.pi)
-
-            if header[ln+9].split('?')[1].strip()=='Yes':
-                SetOfMatrices=2
-
+        data['Azimuth']=np.mod(data['Azimuth'],2.0*np.pi)
+        try:
             # skip next three lines
-            for line in islice(f,4):
+            for line in islice(f,2):
                 pass
-            
-            #ln=ln+9+3
-
-            #header = [f.readline() for _ in range(ln,3)]
-            
             if data['n_x'] > 0:
-                temp=readLinTable(f,int(data['n_x']))
+                temp = readOP(f, data['n_x'])
                 data['x_op']=temp['x_op']
                 data['x_rotFrame']=temp['x_rotFrame']
                 data['x_DerivOrder']=temp['x_DerivOrder']
                 data['x_desc']=temp['x_desc']
 
                 # skip next three lines
-                for line in islice(f,4):
+                for line in islice(f,2):
                     pass
 
-                temp=readLinTable(f,int(data['n_x']))
+                temp = readOP(f, data['n_x'], defaultDerivOrder=2)
                 data['xdot_op']=temp['x_op']
                 data['xdot_desc']=temp['x_desc']
 
-                if data['x_DerivOrder'][1] == 0: # this is an older file without derivOrder columns
-                    # (these are second-order states)
-                    data['x_DerivOrder']=2.0
-                    data['n_x2'] = data['n_x'] 
-                else:
-                    #(number of second-order states)
-                    data['n_x2'] = sum(1 for i in data['x_DerivOrder'] if i == 2)
+                #(number of second-order states)
+                data['n_x2'] = sum(1 for i in data['x_DerivOrder'] if i == 2)
             else:
                 data['n_x2'] = 0;
             
             
             if data['n_xd'] > 0:
                 # skip next three lines
-                for line in islice(f,4):
+                for line in islice(f,2):
                     pass
-                temp=readLinTable(f,int(data['n_xd']))
+                temp = readOP(f, data['n_xd'], defaultDerivOrder=2)
                 data['xd_op']=temp['x_op']
                 data['xd_desc']=temp['x_desc']
             if data['n_z'] > 0:
                 # skip next three lines
-                for line in islice(f,4):
+                for line in islice(f,2):
                     pass
-                temp=readLinTable(f,int(data['n_z']))
+                temp = readOP(f, data['n_z'], defaultDerivOrder=0)
                 data['z_op']=temp['x_op']
                 data['z_desc']=temp['x_desc']
             if data['n_u'] > 0:
                 # skip next three lines
-                for line in islice(f,4):
+                for line in islice(f,2):
                     pass
-                temp=readLinTable(f,int(data['n_u']))
+                temp = readOP(f, data['n_u'], defaultDerivOrder=0)
                 data['u_op']=temp['x_op']
                 data['u_desc']=temp['x_desc']
                 data['u_rotFrame']=temp['x_rotFrame']
             if data['n_y'] > 0:
                 # skip next three lines
-                for line in islice(f,4):
+                for line in islice(f,2):
                     pass
-                temp=readLinTable(f,int(data['n_y']))
+                temp = readOP(f, data['n_y'], defaultDerivOrder=0)
                 data['y_op']=temp['x_op']
                 data['y_desc']=temp['x_desc']
                 data['y_rotFrame']=temp['x_rotFrame']
@@ -372,7 +423,7 @@ def ReadFASTLinear(filename):
             raise
 
 
-def get_Mats(FileNames):
+def get_Mats(FileNames, verbose=True):
     matData={}
     matData['NAzimStep']= len(FileNames);
     data=[None]*matData['NAzimStep']
@@ -526,27 +577,27 @@ def get_Mats(FileNames):
         if checkEDstates:
             matData['RotTripletIndicesStates2'], matData['n_RotTripletStates2'] = findBladeTriplets_EDstate(x_rotFrame[0:matData['ndof2']],matData['DescStates'][0:matData['ndof2']])
         else:
-            matData['RotTripletIndicesStates2'], matData['n_RotTripletStates2'] = findBladeTriplets(x_rotFrame[0:matData['ndof2']],matData['DescStates'][0:matData['ndof2']])
+            matData['RotTripletIndicesStates2'], matData['n_RotTripletStates2'] = findBladeTriplets(x_rotFrame[0:matData['ndof2']],matData['DescStates'][0:matData['ndof2']], verbose=verbose)
     else:
         matData['RotTripletIndicesStates2'] = [];
         matData['n_RotTripletStates2'] = 0;
 
     if matData['ndof1'] > 0:
-        matData['RotTripletIndicesStates1'], matData['n_RotTripletStates1'] = findBladeTriplets( x_rotFrame[matData['NumStates2']:] ,matData['DescStates'][matData['NumStates2']:] );
+        matData['RotTripletIndicesStates1'], matData['n_RotTripletStates1'] = findBladeTriplets( x_rotFrame[matData['NumStates2']:] ,matData['DescStates'][matData['NumStates2']:] , verbose=verbose);
     else:
         matData['RotTripletIndicesStates1'] = [];
         matData['n_RotTripletStates1'] = 0;
 
     # Find the indices for control input triplets in the rotating frame:
     if matData['NumInputs'] > 0:
-        matData['RotTripletIndicesCntrlInpt'], matData['n_RotTripletInputs'] = findBladeTriplets(data[0]['u_rotFrame'],matData['DescCntrlInpt'] );
+        matData['RotTripletIndicesCntrlInpt'], matData['n_RotTripletInputs'] = findBladeTriplets(data[0]['u_rotFrame'],matData['DescCntrlInpt'], verbose=verbose );
     else:
         matData['RotTripletIndicesCntrlInpt'] = [];
         matData['n_RotTripletInputs'] = 0;
 
     # Find the indices for output measurement triplets in the rotating frame:
     if (matData['NumOutputs'] > 0 ):
-        matData['RotTripletIndicesOutput'], matData['n_RotTripletOutputs'] = findBladeTriplets(data[0]['y_rotFrame'],matData['DescOutput'] );
+        matData['RotTripletIndicesOutput'], matData['n_RotTripletOutputs'] = findBladeTriplets(data[0]['y_rotFrame'],matData['DescOutput'], verbose=verbose );
     else:
         matData['RotTripletIndicesOutput'] = [];
         matData['n_RotTripletOutputs'] = 0;
