@@ -15,14 +15,6 @@ import re,os
 import pandas as pd
 # import plotCampbellData as pCD
 
-FileNames=['5MW_Land_ModeShapes-1.fst', '5MW_Land_ModeShapes-2.fst', '5MW_Land_ModeShapes-3.fst', '5MW_Land_ModeShapes-6.fst', '5MW_Land_ModeShapes-7.fst'];
-#FileNames=['5MW_Land_BD_Linear-1.fst', '5MW_Land_BD_Linear-2.fst', '5MW_Land_BD_Linear-3.fst', '5MW_Land_BD_Linear-6.fst', '5MW_Land_BD_Linear-7.fst'];
-
-#FileNames=['5MW_Land_BD_Linear-1.fst'];
-
-#FileNames=['DLC-1.1/5MW_Land_BD_Linear-7.1.lin', 'DLC-1.1/5MW_Land_BD_Linear-7.2.lin']
-#FileNames=['/Users/sramiset/Desktop/OpenFAST/5MW_Land_BD_Linear/5MW_Land_BD_Linear-1.1.lin','/Users/sramiset/Desktop/OpenFAST/5MW_Land_BD_Linear/5MW_Land_BD_Linear-1.2.lin']
-
 def getScaleFactors(DescStates, TowerLen, BladeLen):
     
     ScalingFactor = np.ones(len(DescStates))    
@@ -137,7 +129,7 @@ def IdentifyModes(CampbellData):
                             if re.search(modesDesc[modeID][iExp],maxDesc[j-1],re.IGNORECASE)!=None:
                                 modesIdentified[i][m-1] = True;
                                 #print(' GGG1 ',i,j,m, modeID, iExp, tryNumber, maxDesc[j-1], len(maxDesc))
-                                modeID_table[modeID,i] = m-1
+                                modeID_table[modeID,i] = m # Using Matlab Indexing
                                 found = True;
                                 break;
                 tryNumber = tryNumber + 1;
@@ -193,9 +185,9 @@ def campbell_diagram_data(mbc_data, BladeLen, TowerLen):
 
     for i in range(nModes):
         CData={}
-        CData['NaturalFreq_Hz'] = mbc_data['eigSol']['NaturalFreqs_Hz'][SortedFreqIndx[i]]
-        CData['DampedFreq_Hz']  = mbc_data['eigSol']['DampedFreqs_Hz'][SortedFreqIndx[i]];
-        CData['DampingRatio']   = mbc_data['eigSol']['DampRatios'][SortedFreqIndx[i]];
+        CData['NaturalFreq_Hz'] = mbc_data['eigSol']['NaturalFreqs_Hz'][SortedFreqIndx[i]][0]
+        CData['DampedFreq_Hz']  = mbc_data['eigSol']['DampedFreqs_Hz'][SortedFreqIndx[i]][0];
+        CData['DampingRatio']   = mbc_data['eigSol']['DampRatios'][SortedFreqIndx[i]][0];
 
         
         #print(np.argsort(ModesMagnitude[:,SortedFreqIndx[0]])[::-1])
@@ -232,7 +224,7 @@ def campbell_diagram_data(mbc_data, BladeLen, TowerLen):
         CData['StateHasMaxAtThisMode']=tmp
                     
         #print(CData['StateHasMaxAtThisMode'])
-        print(CData['NaturalFreq_Hz'])
+        #print(CData['NaturalFreq_Hz'])
         CampbellData['Modes'].append(CData)
 
     #print(CampbellData[0]['MagnitudePhase'])
@@ -272,6 +264,56 @@ def campbell_diagram_data(mbc_data, BladeLen, TowerLen):
     #print(CampbellData['ModesTable'])
     return CampbellData
     
+
+
+def extractShortModeDescription(Mode):
+    """ 
+    Look at which modes have max, append these description, perform shortening substitution
+    The escription starts with noMax if no maximum exsits in this mode
+    """
+    Desc = np.array(Mode['DescStates'])[Mode['StateHasMaxAtThisMode']]
+    DescCat = ''
+    DescCatED = ''
+    if len(Desc) == 0:
+        DescCat = ''
+        DescCatED = 'NoMax -'
+        Desc = Mode['DescStates'][:5]
+    nBD = 0
+    for iD, s in enumerate(Desc):
+        s = replaceModeDescription(s)
+        if Desc[iD].startswith('BD'):
+            nBD = nBD + 1
+        elif Desc[iD].startswith('ED'):
+                DescCatED = s +' - '+DescCatED
+        else:
+            DescCat += ' - '+s
+    DescCat =DescCatED+DescCat
+    return DescCat
+
+
+def replaceModeDescription(s):
+    """ Perform substitutions to make the mode description shorter"""
+    s = s.replace('First time derivative of','d/dt of')
+    s = s.replace('fore-aft bending mode DOF, m','FA')
+    s = s.replace('side-to-side bending mode DOF, m','SS')
+    s = s.replace('bending-mode DOF of blade ','')
+    s = s.replace(' rotational-flexibility DOF, rad','-rot')
+    s = s.replace('rotational displacement in ','rot')
+    s = s.replace('translational displacement in ','trans')
+    s = s.replace(', rad','')
+    s = s.replace(', m','')
+    s = s.replace('finite element node ','N')
+    s = s.replace('cosine','cos')
+    s = s.replace('sine','sin')
+    s = s.replace('collective','coll.')
+    s = s.replace('Blade','Bld')
+    s = s.replace('rotZ','TORS-ROT')
+    s = s.replace('transX','FLAP-DISP')
+    s = s.replace('transY','EDGE-DISP')
+    s = s.replace('rotX','EDGE')
+    s = s.replace('rotY','FLAP')
+    return s
+
 
 def PrettyStateDescriptions(DescStates, ndof2, performedTransformation):
     idx=np.array(list(range(0,ndof2))+list(range(ndof2*2+1,len(DescStates))))    
@@ -435,9 +477,9 @@ def eiganalysis(A, ndof2, ndof1):
     
     return mbc,EigenVects_save[:,:,0]
 
-def fx_mbc3(FileNames):
+def fx_mbc3(FileNames, verbose=True):
     MBC={}
-    matData, FAST_linData = gm.get_Mats(FileNames)
+    matData, FAST_linData = gm.get_Mats(FileNames, verbose=verbose)
 
     # print('matData[Omega] ', matData['Omega'])
     # print('matData[OmegaDot] ', matData['OmegaDot'])
@@ -446,9 +488,7 @@ def fx_mbc3(FileNames):
     MBC['ndof2'] = matData['ndof2']
     MBC['ndof1'] = matData['ndof1']
     MBC['RotSpeed_rpm'] = np.mean(matData['Omega'])*(30/np.pi); #rad/s to rpm
-    
-    if 'WindSpeed' in matData:
-        MBC['WindSpeed'] = np.mean(matData['WindSpeed'])
+    MBC['WindSpeed'] = np.mean(matData['WindSpeed']) # NOTE: might be NaN for old files
         
     # print('RotSpeed_rpm ',MBC['RotSpeed_rpm'])
     # print('ndof1 ', MBC['ndof1'])
@@ -501,10 +541,17 @@ def fx_mbc3(FileNames):
             print('**ERROR: the size of OmegaDot vector must equal matData.NAzimStep, the num of azimuth steps');
 
 
-        MBC['A']=np.zeros(matData['A'].shape)
-        MBC['B']=np.zeros((len(new_seq_states),len(new_seq_inp),matData['NAzimStep']))
-        MBC['C']=np.zeros(matData['C'].shape)
-        MBC['D']=np.zeros(matData['D'].shape)
+        nLin = matData['A'].shape[-1]
+        MBC['A'] = np.zeros(matData['A'].shape)
+        MBC['B'] = np.zeros((len(new_seq_states),len(new_seq_inp),matData['NAzimStep']))
+        if 'C' in matData.keys():
+            MBC['C']=np.zeros(matData['C'].shape)
+        else:
+            MBC['C']=np.zeros((0,0,nLin))
+        if 'D' in matData.keys():
+            MBC['D']=np.zeros(matData['D'].shape)
+        else:
+            MBC['D']=np.zeros((0,0,nLin))
         
         # print('new_seq_inp ',new_seq_inp)
         # print('new_seq_out ',new_seq_out)
@@ -741,64 +788,72 @@ def runMBC(FileNames,NLinTimes=None):
 
     return CampbellData
 
-# CampbellData=runMBC(FileNames)
-# print('Preparing campbell diagram data!');
-# # TO DO read x-axis for wind speed or rotor speed from csv file
-# #op_csv=pd.read_csv('input.csv', sep=',')
-# OP=[2,4,6,8,10]
 
-# modeID_table,modesDesc=IdentifyModes(CampbellData)
 
-# #print(modesDesc)
+if __name__=='__main__':
+    pass
 
-# nModes=modeID_table.shape[0]
-# nRuns=modeID_table.shape[1]
-# cols=[item[0] for item in list(modesDesc.values())]
-# #cols.append('1P');cols.append('3P');cols.append('6P')
-# #cols.append('9P');cols.append('12P')
-# frequency=pd.DataFrame(np.nan, index=np.arange(nRuns), columns=cols)
-# dampratio=pd.DataFrame(np.nan, index=np.arange(nRuns), columns=cols)
-# FreqPlotData=np.zeros((nRuns,nModes))
-# DampPlotData=np.zeros((nRuns,nModes))
-# for i in range(nRuns):
-#     for modeID in range(len(modesDesc)): # list of modes we want to identify
-#         idx=int(modeID_table[modeID,i])
-#         FreqPlotData[i,modeID]=CampbellData[i]['Modes'][idx]['NaturalFreq_Hz']
-#         DampPlotData[i,modeID]=CampbellData[i]['Modes'][idx]['DampingRatio']
-#         #print(i,modeID,modesDesc[modeID][0],FreqPlotData[i,modeID])
-#     frequency.iloc[i,:]=FreqPlotData[i,:]
-#     dampratio.iloc[i,:]=DampPlotData[i,:]
-    
-# for i in range(len(OP)):
-#     # for 15 DOF
-#     frequency.index.values[i]=OP[i]
-#     dampratio.index.values[i]=OP[i]
+    # FileNames=['5MW_Land_ModeShapes-1.fst', '5MW_Land_ModeShapes-2.fst', '5MW_Land_ModeShapes-3.fst', '5MW_Land_ModeShapes-6.fst', '5MW_Land_ModeShapes-7.fst'];
+    #FileNames=['5MW_Land_BD_Linear-1.fst', '5MW_Land_BD_Linear-2.fst', '5MW_Land_BD_Linear-3.fst', '5MW_Land_BD_Linear-6.fst', '5MW_Land_BD_Linear-7.fst'];
 
-# # import openpyxl
-# # xfile = openpyxl.load_workbook('/Users/sramiset/Desktop/OpenFAST/mbc3_py/CampbellDiagram_Template.xlsx')
+    #FileNames=['5MW_Land_BD_Linear-1.fst'];
 
-# # sheet = xfile['CampbellDiagram']
-# # sheet['A1'] = 'hello world'
-# # xfile.save('text2.xlsx')
-    
-# pCD.plotCampbellData(OP,frequency,dampratio)
+    #FileNames=['DLC-1.1/5MW_Land_BD_Linear-7.1.lin', 'DLC-1.1/5MW_Land_BD_Linear-7.2.lin']
+    #FileNames=['/Users/sramiset/Desktop/OpenFAST/5MW_Land_BD_Linear/5MW_Land_BD_Linear-1.1.lin','/Users/sramiset/Desktop/OpenFAST/5MW_Land_BD_Linear/5MW_Land_BD_Linear-1.2.lin']
+    # CampbellData=runMBC(FileNames)
+    # print('Preparing campbell diagram data!');
+    # # TO DO read x-axis for wind speed or rotor speed from csv file
+    # #op_csv=pd.read_csv('input.csv', sep=',')
+    # OP=[2,4,6,8,10]
 
-# frequency['1P']=np.nan
-# frequency['3P']=np.nan
-# frequency['6P']=np.nan
-# frequency['9P']=np.nan
-# frequency['12P']=np.nan
+    # modeID_table,modesDesc=IdentifyModes(CampbellData)
 
-# print(nRuns)
-# for i in range(nRuns):
-#     # for 1P,3P,6P,9P,and 12P harmonics
-#     tmp=OP[i]/60.0
-#     print(i,tmp)
-#     LZ=15
-#     frequency.iloc[i,LZ]=tmp
-#     frequency.iloc[i,LZ+1]=3*tmp
-#     frequency.iloc[i,LZ+2]=6*tmp
-#     frequency.iloc[i,LZ+3]=9*tmp
-#     frequency.iloc[i,LZ+4]=12*tmp
-# print(frequency)
-# frequency.transpose().to_excel(r'CampbellData.xlsx')
+    # #print(modesDesc)
+
+    # nModes=modeID_table.shape[0]
+    # nRuns=modeID_table.shape[1]
+    # cols=[item[0] for item in list(modesDesc.values())]
+    # #cols.append('1P');cols.append('3P');cols.append('6P')
+    # #cols.append('9P');cols.append('12P')
+    # frequency=pd.DataFrame(np.nan, index=np.arange(nRuns), columns=cols)
+    # dampratio=pd.DataFrame(np.nan, index=np.arange(nRuns), columns=cols)
+    # FreqPlotData=np.zeros((nRuns,nModes))
+    # DampPlotData=np.zeros((nRuns,nModes))
+    # for i in range(nRuns):
+    #     for modeID in range(len(modesDesc)): # list of modes we want to identify
+    #         idx=int(modeID_table[modeID,i])
+    #         FreqPlotData[i,modeID]=CampbellData[i]['Modes'][idx]['NaturalFreq_Hz']
+    #         DampPlotData[i,modeID]=CampbellData[i]['Modes'][idx]['DampingRatio']
+    #         #print(i,modeID,modesDesc[modeID][0],FreqPlotData[i,modeID])
+    #     frequency.iloc[i,:]=FreqPlotData[i,:]
+    #     dampratio.iloc[i,:]=DampPlotData[i,:]
+        
+    # for i in range(len(OP)):
+    #     # for 15 DOF
+    #     frequency.index.values[i]=OP[i]
+    #     dampratio.index.values[i]=OP[i]
+
+    # # import openpyxl
+    # # xfile = openpyxl.load_workbook('/Users/sramiset/Desktop/OpenFAST/mbc3_py/CampbellDiagram_Template.xlsx')
+        
+    # pCD.plotCampbellData(OP,frequency,dampratio)
+
+    # frequency['1P']=np.nan
+    # frequency['3P']=np.nan
+    # frequency['6P']=np.nan
+    # frequency['9P']=np.nan
+    # frequency['12P']=np.nan
+
+    # print(nRuns)
+    # for i in range(nRuns):
+    #     # for 1P,3P,6P,9P,and 12P harmonics
+    #     tmp=OP[i]/60.0
+    #     print(i,tmp)
+    #     LZ=15
+    #     frequency.iloc[i,LZ]=tmp
+    #     frequency.iloc[i,LZ+1]=3*tmp
+    #     frequency.iloc[i,LZ+2]=6*tmp
+    #     frequency.iloc[i,LZ+3]=9*tmp
+    #     frequency.iloc[i,LZ+4]=12*tmp
+    # print(frequency)
+    # frequency.transpose().to_excel(r'CampbellData.xlsx')
