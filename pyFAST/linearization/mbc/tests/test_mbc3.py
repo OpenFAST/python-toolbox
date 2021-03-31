@@ -23,8 +23,8 @@ class Test(unittest.TestCase):
         CD = mbc.campbell_diagram_data(mbc_data,BladeLen,TowerLen)
 
         nModesMax = np.min([len(CD['Modes']),10])
-        Freq = np.array([CD['Modes'][i]['NaturalFreq_Hz'][0] for i in np.arange(nModesMax)])
-        Damp = np.array([CD['Modes'][i]['DampingRatio'][0]   for i in np.arange(nModesMax)])
+        Freq = np.array([CD['Modes'][i]['NaturalFreq_Hz'] for i in np.arange(nModesMax)])
+        Damp = np.array([CD['Modes'][i]['DampingRatio']   for i in np.arange(nModesMax)])
         LogDec = Damp*100*2*np.pi
         return Freq, Damp, LogDec
 

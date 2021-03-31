@@ -323,11 +323,11 @@ def ReadFASTLinear(filename):
         try:
             data['RotSpeed'] = float(extractVal(header,'Rotor Speed:')) # rad/s
         except:
-            data['RotSpeed'] = None
+            data['RotSpeed'] = np.nan
         try:
             data['WindSpeed'] = float(extractVal(header,'Wind Speed:'))
         except:
-            data['WindSpeed'] = None
+            data['WindSpeed'] = np.nan
 
         # --- Old method for reading
         #  header = [f.readline() for _ in range(17)]
@@ -449,7 +449,7 @@ def get_Mats(FileNames, verbose=True):
     matData['Omega']     = np.zeros(NAzimStep);
     matData['OmegaDot']  = np.zeros(NAzimStep);
 
-    matData['WindSpeed'] = np.zeros(NAzimStep);
+    matData['WindSpeed'] = np.zeros(NAzimStep)*np.nan;
 
     if matData['NumStates'] > 0:
         matData['DescStates']      = data[NAzimStep-1]['x_desc'];
@@ -492,11 +492,7 @@ def get_Mats(FileNames, verbose=True):
         matData['Omega'][iFile]   = data[iFile]['RotSpeed'];
         matData['Azimuth'][iFile] = data[iFile]['Azimuth']*180/np.pi;
 
-        if 'WindSpeed' in matData:
-            if 'WindSpeed' in data[iFile]:
-                matData['WindSpeed'][iFile] = data[iFile]['WindSpeed']
-            else:
-                del matData['WindSpeed'];
+        matData['WindSpeed'][iFile] = data[iFile]['WindSpeed']
     
         if 'A' in data[iFile]:
             matData['A'][:,:,iFile]=reOrderByIdx_2D(data[iFile]['A'],sortedIndx,sortedIndx)
