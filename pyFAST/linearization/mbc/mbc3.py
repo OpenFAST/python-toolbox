@@ -275,9 +275,12 @@ def extractShortModeDescription(Mode):
     DescCat = ''
     DescCatED = ''
     if len(Desc) == 0:
+        noMax=True
         DescCat = ''
-        DescCatED = 'NoMax -'
+        DescCatED = ''
         Desc = Mode['DescStates'][:5]
+    else:
+        noMax=False
     nBD = 0
     for iD, s in enumerate(Desc):
         s = replaceModeDescription(s)
@@ -288,15 +291,19 @@ def extractShortModeDescription(Mode):
         else:
             DescCat += ' - '+s
     DescCat =DescCatED+DescCat
+    if noMax:
+        DescCat = 'NoMax - ' + DescCat
     return DescCat
 
 
 def replaceModeDescription(s):
     """ Perform substitutions to make the mode description shorter"""
+    s = s.replace('Blade','Bld')
+    s = s.replace('blade','Bld')
     s = s.replace('First time derivative of','d/dt of')
     s = s.replace('fore-aft bending mode DOF, m','FA')
     s = s.replace('side-to-side bending mode DOF, m','SS')
-    s = s.replace('bending-mode DOF of blade ','')
+    s = s.replace('bending-mode DOF of Bld ','')
     s = s.replace(' rotational-flexibility DOF, rad','-rot')
     s = s.replace('rotational displacement in ','rot')
     s = s.replace('translational displacement in ','trans')
@@ -305,8 +312,9 @@ def replaceModeDescription(s):
     s = s.replace('finite element node ','N')
     s = s.replace('cosine','cos')
     s = s.replace('sine','sin')
+    s = s.replace('flapwise','FLAP')
+    s = s.replace('edgewise','EDGE')
     s = s.replace('collective','coll.')
-    s = s.replace('Blade','Bld')
     s = s.replace('rotZ','TORS-ROT')
     s = s.replace('transX','FLAP-DISP')
     s = s.replace('transY','EDGE-DISP')

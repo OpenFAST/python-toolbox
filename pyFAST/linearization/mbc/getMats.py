@@ -61,22 +61,19 @@ def findBladeTriplets(rotFrame,Desc, verbose=True):
     NTriplets = 0;              # first initialize to zero
     Triplets = [];
     for i in range(len(rotFrame)):  # loop through inputs/outputs
-    #for i in range(7):
-        #if(i>=67):
-            #print(rotFrame[i])
-        if rotFrame[i]:          # this is in the rotating frame
-            Tmp = -1*np.ones(3);
-            foundTriplet = False;
-            foundIt = False;
+        if rotFrame[i] == 'T':          # this is in the rotating frame
+            Tmp = -1*np.ones(3)
+            foundTriplet = False
+            foundIt = False
             for chk in chkStr:
-                BldNoCol = re.search(chk,Desc[i]);
+                BldNoCol = re.search(chk,Desc[i])
                 if BldNoCol!=None:
-                    foundIt = True;
+                    foundIt = True
 
                     Bldstr=BldNoCol.group()
                     # create another regular expression to find the
                     # exact match on a different blade:
-                    strng = re.split(Bldstr,Desc[i],1); #this should return the strings before and after the match
+                    strng = re.split(Bldstr,Desc[i],1)  #this should return the strings before and after the match
                     #print(strng[1])
 
                     
@@ -89,7 +86,7 @@ def findBladeTriplets(rotFrame,Desc, verbose=True):
 
                     k = int(Bldstr[len(Bldstr)-1])
                     #print(Bldstr[len(Bldstr)-1], checkThisStr)
-                    Tmp[k-1] = int(i);
+                    Tmp[k-1] = int(i)
                     #print(Tmp,k,i,len(rotFrame),foundIt)
                     #exit()
                     break

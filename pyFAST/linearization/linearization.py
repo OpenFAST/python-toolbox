@@ -100,7 +100,7 @@ def readOperatingPoints(OP_file):
     OP=pd.read_csv(OP_file);
     OP.rename(columns=lambda x: x.strip().lower().replace(' ','').replace('_','').replace('(','[').split('[')[0], inplace=True)
     # Perform column replacements (tolerating small variations)
-    OP.rename(columns={'ws': 'windspeed'}, inplace=True)
+    OP.rename(columns={'wind':'windspeed','ws': 'windspeed'}, inplace=True)
     OP.rename(columns={'rotorspeed': 'rotorspeed', 'rpm': 'rotorspeed','omega':'rotorspeed'}, inplace=True)
     OP.rename(columns={'file': 'filename'}, inplace=True)
     OP.rename(columns={'pitch': 'pitchangle', 'bldpitch':'pitchangle'}, inplace=True)
@@ -278,7 +278,7 @@ def writeLinearizationFiles(main_fst, workDir, operatingPointsFile,
             linDict['CalcSteady'] = False
         linDict['NLinTimes']    = len(LinTimes)
         linDict['LinTimes']     = list(LinTimes)
-        linDict['OutFmt']       = '"ES20.12E3"'  # Important for decent resolution
+        linDict['OutFmt']       = '"ES20.11E3"'  # Important for decent resolution
         linDict['LinInputs']    = LinInputs     # 0: none, 1: standard, 2: to get full linearizations
         linDict['LinOutputs']   = LinOutputs    # 0: none, 1: based on outlist 
         # --- Mode shape vizualization options
