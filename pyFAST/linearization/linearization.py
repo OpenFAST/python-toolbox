@@ -138,7 +138,7 @@ def defaultFilenames(OP, rpmSweep=None):
     filenames=['']*nOP;
     for iOP, line in OP.iterrows():
         if rpmSweep:
-            filenames[iOP]='rpm{:05.2f}.fst'.format(line['RotSpeed_[rpm]'])
+            filenames[iOP]='rpm{:05.2f}.fst'.format(line['RotorSpeed_[rpm]'])
         else:
             filenames[iOP]='ws{:04.1f}.fst'.format(line['WindSpeed_[m/s]'])
     return filenames

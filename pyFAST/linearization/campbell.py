@@ -17,7 +17,7 @@ except ImportError:
     import weis.control.mbc.mbc3 as mbc
 
 
-def postproCampbell(out_or_fstfiles, BladeLen=None, TowerLen=None, verbose=True):
+def postproCampbell(out_or_fstfiles, BladeLen=None, TowerLen=None, verbose=True, nFreqOut=15):
     """ 
     Postprocess linearization files to extract Campbell diagram (linearization at different Operating points)
     - Run MBC
@@ -68,7 +68,7 @@ def postproCampbell(out_or_fstfiles, BladeLen=None, TowerLen=None, verbose=True)
     modeID_file = campbellData2CSV(baseName, CD, modeID_table, modesDesc)
     # Write summary txt file to help manual identification step..
     txtFileName = baseName+'_Summary.txt'
-    campbellData2TXT(CD, nFreqOut=15, txtFileName=txtFileName)
+    campbellData2TXT(CD, nFreqOut=nFreqOut, txtFileName=txtFileName)
 
     # --- Return nice dataframes (assuming the identification is correct)
     # TODO, for now we reread the files...
@@ -109,7 +109,6 @@ def campbellData2TXT(CD, nFreqOut=15, txtFileName=None):
     """
     txt=''
     for iOP,cd in enumerate(CD):
-        print(cd.keys())
         WS  = cd['WindSpeed']
         RPM = cd['RotSpeed_rpm']
         nFreqOut_loc = np.min([len(cd['Modes']),nFreqOut])
@@ -293,7 +292,7 @@ def postproMBC(xlsFile=None, csvModesIDFile=None, xlssheet=None, verbose=True, W
         ModeData.append(opData)
 
     # ---Dealing with missing WS
-    if np.all(np.isnan(np.array(WS).astype(float))):
+    if np.all(np.isnan(np.array(WS).astype(float))) or np.all(np.array(WS).astype(float)==0):
         print('[WARN] WS were not provided in linearization (all NaN), likely old OpenFAST version ')
         if WS_legacy is not None:
             print('    > Using WS_legacy provided.')
