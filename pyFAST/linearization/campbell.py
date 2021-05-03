@@ -164,7 +164,7 @@ def campbellData2CSV(baseName, CD, modeID_table, modesDesc):
             f.write('Rotor Speed (rpm),' +','.join([str(cd['RotSpeed_rpm']) for cd in CD]) +'\n')
         else:
             f.write('Wind Speed (mps),' +','.join([str(cd['WindSpeed']) for cd in CD]) +'\n')
-        for im, (k,v) in enumerate(modesDesc.items()):
+        for im, v in enumerate(modesDesc):
             f.write(v[0]+',' +','.join([str(ID) for ID in modeID_table[im,:]]) +'\n')
 
     # --- Write OP using Matlab format
