@@ -83,13 +83,26 @@ def run_pyMBC(out_or_fstfiles, verbose=True):
     INPUTS:
       - out_or_fstfiles
     """
+    import re
+    def glob_re(pattern, strings):
+        return list(filter(re.compile(pattern).match, strings))
+
     if verbose:
         print('run_pyMBC:')
     MBC = [None]*len(out_or_fstfiles)
     for i_lin, fstfile in enumerate(out_or_fstfiles):
         filebase, ext = os.path.splitext(fstfile)
+        # NOTE: the code below is problematic for module lin files ED.1.lin 
+        # So we do a re search to filter these out
+        # First use glob
         lin_file_fmt    = '{}.*.lin'.format(filebase)
         lin_files       = glob.glob(lin_file_fmt)
+        #print(lin_files)
+        # Then use re for stricter search
+        lin_file_fmt_re    = r'.*\.[0-9]+\.lin'
+        lin_files = glob_re(lin_file_fmt_re, lin_files)
+        #print(lin_files)
+
         # --- run MBC3 and campbell post_pro on lin files 
         if len(lin_files)>0:
             if verbose:
@@ -107,20 +120,19 @@ def campbellData2TXT(CD, nFreqOut=15, txtFileName=None):
     """ Write frequencies, damping, and mode contents for each operating points to a string
     Write to file if filename provided
     """
+    if not isinstance(CD, list):
+        CD=[CD]
     txt=''
     for iOP,cd in enumerate(CD):
         WS  = cd['WindSpeed']
         RPM = cd['RotSpeed_rpm']
         nFreqOut_loc = np.min([len(cd['Modes']),nFreqOut])
-        Freq = np.array([cd['Modes'][i]['NaturalFreq_Hz'] for i in np.arange(nFreqOut_loc)])
-        Damp = np.array([cd['Modes'][i]['DampingRatio']   for i in np.arange(nFreqOut_loc)])
         txt+='------------------------------------------------------------------------\n'
         txt+='--- OP {:d} - WS {:.1f} - RPM {:.2f} \n'.format(iOP+1, WS, RPM)
         txt+='------------------------------------------------------------------------\n'
         for im in np.arange(nFreqOut_loc):
             m = cd['Modes'][im]
-            # Extracting description the best we can
-            Desc = mbc.extractShortModeDescription(m)
+            Desc = cd['ShortModeDescr'][im]
             txt+='{:02d} ; {:8.3f} ; {:7.4f} ; {:s}\n'.format(im+1,m['NaturalFreq_Hz'],m['DampingRatio'],Desc)
 
     if txtFileName is not None:
@@ -461,8 +473,9 @@ def plotCampbell(OP, Freq, Damp, sx='WS_[m/s]', UnMapped=None, fig=None, axes=No
         axes=axes_
 
     # Estimating figure range
-    FreqRange = [0                         , np.nanmax(Freq.iloc[:,:])*1.01]
-    DampRange = [np.nanmin(Damp.iloc[:,2:]), np.nanmax(Damp.iloc[:,:])*1.01]
+    FreqRange = [0                         , np.nanmax(Freq.values)*1.01]
+    DampRange = [np.nanmin(Damp.iloc[:,2:]), np.nanmax(Damp.values)*1.01]
+
     if ylim is not None:
         FreqRange=ylim
     if DampRange[0]>0:
@@ -477,8 +490,8 @@ def plotCampbell(OP, Freq, Damp, sx='WS_[m/s]', UnMapped=None, fig=None, axes=No
     axes[0].plot(OP[sx].values,6*freq_1p, ':',color=(0.7,0.7,0.7), lw=1.0)
     axes[0].plot(OP[sx].values,9*freq_1p, ':',color=(0.7,0.7,0.7), lw=1.0)
 
-
     # Plot mapped modes
+    Markers = ['', '+', 'o', '^', 's', 'd', 'x', '.']
     iModeValid=0
     xPlot=[]; yPlot=[]
     for iMode,lbl in enumerate(Freq.columns.values):
@@ -487,6 +500,9 @@ def plotCampbell(OP, Freq, Damp, sx='WS_[m/s]', UnMapped=None, fig=None, axes=No
             continue
         iModeValid+=1
         c, ls, ms, mk = campbellModeStyles(iModeValid, lbl)
+        if len(RPM)==1 and len(mk)==0:
+            mk = Markers[np.mod(iMode,len(Markers))]
+            ms=5
         axes[0].plot(OP[sx].values, Freq[lbl].values, ls, marker=mk, label=lbl.replace('_',' '), markersize=ms, color=c)
         axes[1].plot(OP[sx].values, Damp[lbl].values, ls, marker=mk                            , markersize=ms, color=c)
         xPlot=np.concatenate((xPlot, OP[sx].values))
@@ -507,15 +523,14 @@ def plotCampbell(OP, Freq, Damp, sx='WS_[m/s]', UnMapped=None, fig=None, axes=No
     axes[0].set_ylabel('Frequencies [Hz]')
     axes[1].set_ylabel('Damping ratios [-]')
     axes[0].legend(bbox_to_anchor=(0., 1.02, 2.16, .802), loc='lower left', ncol=4, mode="expand", borderaxespad=0.)
-    axes[0].set_ylim(FreqRange)
-
-
-
+    if not np.any(np.isnan(FreqRange)):
+        axes[0].set_ylim(FreqRange)
     
     XLIM=axes[1].get_xlim()
     axes[1].plot(XLIM, [0,0],'-', color='k', lw=0.5)
     axes[1].set_xlim(XLIM)
-    axes[1].set_ylim(DampRange)
+    if not np.any(np.isnan(DampRange)):
+        axes[1].set_ylim(DampRange)
     return fig, axes
 
 
