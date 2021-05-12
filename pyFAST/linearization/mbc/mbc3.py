@@ -50,7 +50,7 @@ def IdentifyModes(CampbellData):
     hasHeave    = any(['heave' in s.lower() for s in DescStates])
     hasSurge    = any(['surge' in s.lower() for s in DescStates])
     hasSway     = any(['sway' in s.lower() for s in DescStates])
-    hasYaw      = any(['platform yaw' in s.lower() for s in DescStates]) # TODO
+    hasYaw      = any(['platform yaw' in s.lower() for s in DescStates])
     hasRoll     = any(['platform roll tilt' in s.lower() for s in DescStates])
     hasPitch    = any(['platform pitch tilt' in s.lower() for s in DescStates])
     hasEdge1Col = any(['1st edgewise bending-mode dof of blade collective' in s.lower() for s in DescStates])
@@ -103,24 +103,23 @@ def IdentifyModes(CampbellData):
         modesConfidence = [0 for i in range(nModes)]
 
         # --- TODO: find well-defined modes first. Increasing order might be problematic at times
-        for im, mode in enumerate(Modes):
-            m=im+1
-            stateMax=np.argwhere((mode['StateHasMaxAtThisMode']==1))
-            if len(stateMax.flatten())==1:
-                maxDesc=mode['DescStates'][stateMax.flatten()[0]]
-#                 print('>>> maxdesc',maxDesc)
-#                 j = 0;
-#                 for modeID in range(1,len(modesDesc)): 
-#                     found = False
-#                     for iExp in range(1,len(modesDesc[modeID])):
-#                         if re.search(modesDesc[modeID][iExp],maxDesc,re.IGNORECASE)!=None:
-#                             modesIdentified[m-1] = True;
-#                             #print(' GGG1 ',i,j,m, modeID, iExp, tryNumber, maxDesc[j-1], len(maxDesc))
-#                             modeID_table[modeID,i] = m # Using Matlab Indexing
-#                             found = True;
-#                             break;
-
-            #for modeID in range(1,len(modesDesc)): 
+        #for im, mode in enumerate(Modes):
+        #    m=im+1
+        #    stateMax=np.argwhere((mode['StateHasMaxAtThisMode']==1))
+        #    if len(stateMax.flatten())==1:
+        #        maxDesc=mode['DescStates'][stateMax.flatten()[0]]
+        #        print('>>> maxdesc',maxDesc)
+        #        for modeID, modeIDdescList in enumerate(modesDesc):
+        #            modeIDName     = modeIDdescList[0]
+        #            modeIDdescList = modeIDdescList[1:]
+        #            found = False
+        #            for tartgetDesc in modeIDdescList:
+        #                # Looking for targetDesc into list of descriptions
+        #                if re.search(tartgetDesc ,maxDesc,re.IGNORECASE)!=None:
+        #                    modesIdentified[m-1] = True;
+        #                    modeID_table[modeID,i] = m # Using Matlab Indexing
+        #                    found = True;
+        #                    break;
     
         # Loop on modes to be identified
         for modeID, modeIDdescList in enumerate(modesDesc):
@@ -184,10 +183,12 @@ def IdentifiedModesDict(CampbellData,modeID_table,modesDesc):
             if ID==0:
                 freq=np.nan
                 damp=np.nan
+                cont=''
             else:
                 freq = np.around(CampbellData[iOP]['Modes'][ID-1]['NaturalFreq_Hz'],5)
                 damp = np.around(CampbellData[iOP]['Modes'][ID-1]['DampingRatio'],5)
-            modesInfo[desc]={'ID':ID,'f0':freq,'zeta':damp}
+                cont = CampbellData[iOP]['ShortModeDescr'][ID-1]
+            modesInfo[desc]={'ID':ID,'f0':freq,'zeta':damp,'cont':cont}
         modesInfoPerOP.append(modesInfo)
     return modesInfoPerOP
 
@@ -290,9 +291,9 @@ def campbell_diagram_data(mbc_data, BladeLen, TowerLen):
         CampbellData['Modes'].append(CData)
 
     #print(CampbellData[0]['MagnitudePhase'])
+    # Adding short description to summary
     CampbellData['ShortModeDescr'] =[extractShortModeDescription(CampbellData['Modes'][i]) for i in range(nModes)]
 
-    # Adding short description to summary
 
     CampbellData['nColsPerMode'] = 5;
     CampbellData['ModesTable'] = {}
@@ -303,13 +304,13 @@ def campbell_diagram_data(mbc_data, BladeLen, TowerLen):
         CampbellData['ModesTable'][1, colStart+2 ] = i;
 
         CampbellData['ModesTable'][2, colStart+1 ] = 'Natural (undamped) frequency (Hz):';
-        CampbellData['ModesTable'][2, colStart+2 ] = np.asscalar(CampbellData['Modes'][i]['NaturalFreq_Hz'])
+        CampbellData['ModesTable'][2, colStart+2 ] = CampbellData['Modes'][i]['NaturalFreq_Hz']
 
         CampbellData['ModesTable'][3, colStart+1 ] = 'Damped frequency (Hz):';
-        CampbellData['ModesTable'][3, colStart+2 ] = np.asscalar(CampbellData['Modes'][i]['DampedFreq_Hz'])
+        CampbellData['ModesTable'][3, colStart+2 ] = CampbellData['Modes'][i]['DampedFreq_Hz']
 
         CampbellData['ModesTable'][4, colStart+1 ] = 'Damping ratio (-):';
-        CampbellData['ModesTable'][4, colStart+2 ] = np.asscalar(CampbellData['Modes'][i]['DampingRatio'])
+        CampbellData['ModesTable'][4, colStart+2 ] = CampbellData['Modes'][i]['DampingRatio']
         
         CampbellData['ModesTable'][5, colStart+1 ] = 'Mode ' + str(i) + ' state description';
         CampbellData['ModesTable'][5, colStart+2 ] = 'State has max at mode ' + str(i);
