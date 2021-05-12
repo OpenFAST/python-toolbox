@@ -56,6 +56,15 @@ class CSVFile(File):
         # NOTE: done by parent class method
         
         # --- Subfunctions
+        def readFirstLines(nLines):
+            lines=[]
+            with open(self.filename, 'r', encoding=self.encoding, errors="surrogateescape") as fid:
+                for i, line in enumerate(fid):
+                    lines.append(line.strip())
+                    if i==nLines:
+                        break
+            return lines
+
         def readline(iLine):
             with open(self.filename,'r') as f: #,encoding=self.encoding) as f:
                 for i, line in enumerate(f):
@@ -69,7 +78,7 @@ class CSVFile(File):
             if self.sep==r'\s+':
                 return s.strip().split()
             else:
-                return s.strip().split(self.sep)
+                return [c.strip() for c in s.strip().split(self.sep)]
         def strIsFloat(s):
             try:
                 float(s)
@@ -133,8 +142,10 @@ class CSVFile(File):
                     self.sep=','
                 elif head[1].find(';')>0:
                     self.sep=';'
+                elif head[1].find('\t')>0:
+                    self.sep='\t'
                 else:
-                    self.sep=r'\s+'
+                    self.sep='\s+'
             except:
                 # most likely an empty file
                 pass
@@ -202,7 +213,9 @@ class CSVFile(File):
         if (self.commentLines is not None) and len(self.commentLines)>0:
             skiprows = skiprows + self.commentLines
         skiprows =list(sorted(set(skiprows)))
-        #print(self)
+        if self.sep is not None:
+            if self.sep=='\t':
+                self.sep='\s+'
         #print(skiprows)
         try:
 #             self.data = pd.read_csv(self.filename,sep=self.sep,skiprows=skiprows,header=None,comment=self.commentChar,encoding=self.encoding)
