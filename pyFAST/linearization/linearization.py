@@ -220,10 +220,10 @@ def writeLinearizationFiles(main_fst, workDir, operatingPointsFile,
         # TODO gen trq or Tower top displacement
 
         # Main Flags
-        noAero=abs(ws)<0.001
+        noAero=abs(ws)<0.001 
 
         nLinTimes = nPerPeriod
-        if noAero:
+        if abs(rpm)<0.001:
             nLinTimes=1
             ws=1e-4
 
@@ -290,12 +290,14 @@ def writeLinearizationFiles(main_fst, workDir, operatingPointsFile,
         else:
             linDict['WrVTK']        = 0
         # --- Aero options
-        linDict['AeroFile|WakeMod']   = 1 # Needed for linearization
-        linDict['AeroFile|AFAeroMod'] = 1 # Needed for linearization
-        linDict['AeroFile|FrozenWake'] = True # Needed for linearization
+        if fst['CompAero']>0:
+            linDict['AeroFile|WakeMod']   = 1 # Needed for linearization
+            linDict['AeroFile|AFAeroMod'] = 1 # Needed for linearization
+            linDict['AeroFile|FrozenWake'] = True # Needed for linearization
         # --- Inflow options
-        linDict['InflowFile|WindType'] = 1
-        linDict['InflowFile|HWindSpeed'] = ws
+        if fst['CompInflow']>0:
+            linDict['InflowFile|WindType'] = 1
+            linDict['InflowFile|HWindSpeed'] = ws
         # --- ElastoDyn options
         linDict['EDFile|BlPitch(1)'] = pitch
         linDict['EDFile|BlPitch(2)'] = pitch
