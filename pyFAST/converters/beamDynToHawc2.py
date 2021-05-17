@@ -8,6 +8,7 @@ import os
 from pyFAST.input_output.hawc2_htc_file import HAWC2HTCFile
 from pyFAST.input_output.csv_file import CSVFile
 from pyFAST.input_output.fast_input_file import FASTInputFile
+from pyFAST.converters.rototranslate import ComputeStiffnessProps, TransformCrossSectionMatrix
 
 from .beam import *
 
@@ -197,11 +198,17 @@ def beamDyn2Hawc2FPM_raw(r_bar, kp_x, kp_y, kp_z, twist,
     r_p= np.concatenate(([0],np.cumsum(dr)))
     r=r_bar * r_p[-1]
 
-    RotMat=np.array([  # From Hawc2 to BeamDyn
-            [0 ,1,0],
-            [-1,0,0],
-            [0,0,1]])
-    RR= scipy.linalg.block_diag(RotMat,RotMat)
+    # From Hawc2/ANBA4 to BeamDyn
+    RotMat_H2_BD=np.array([  
+            [ 0, 1, 0],
+            [-1, 0, 0],
+            [ 0, 0, 1]])
+    RR_H2_BD = scipy.linalg.block_diag(RotMat_H2_BD,RotMat_H2_BD)
+    # From BeamDyn to Hawc2/ANBA4
+    RR_BD_H2 = RR_H2_BD.T
+
+    stiff = ComputeStiffnessProps()
+    transform = TransformCrossSectionMatrix()
 
     nSpan = len(K[0,0])
     KH2=np.zeros((6,6,nSpan))
@@ -210,7 +217,18 @@ def beamDyn2Hawc2FPM_raw(r_bar, kp_x, kp_y, kp_z, twist,
         for i in np.arange(6):
             for j in np.arange(6):
                 Kbd[i,j] = K[i,j][iSpan]
-        Kh2 = (RR.T).dot(Kbd).dot(RR)
+        
+        # Rotate BD stiffness matrix to Hawc2 reference system
+        Kbd_h2 = (RR_BD_H2).dot(Kbd).dot(RR_BD_H2.T)
+        # Compute coordinates of elastic center (m)
+        xe , ye = stiff.ComputeShearCenter(Kbd_h2)
+        # Compute stiffness matrix with decoupled forces and moments        
+        Kdec = stiff.DecoupleStiffness(Kbd_h2)
+        # Compute Delta, the rotation angle of principal axes (rad)   
+        Delta = stiff.PrincipalAxesRotationAngle(Kdec)
+        # Translate K matrix into EC and rotate it by Delta
+        Kh2 = transform.CrossSectionRotoTranslationMatrix(Kbd_h2, xe, ye, Delta)
+        
         for i in np.arange(6):
             for j in np.arange(6):
                 KH2[i,j][iSpan]=Kh2[i,j]

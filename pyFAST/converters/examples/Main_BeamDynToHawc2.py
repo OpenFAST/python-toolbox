@@ -18,7 +18,7 @@ import pyFAST.converters.beamdyn as bd
 MyDir=os.path.dirname(__file__)
 
 # --- Parameters
-FPM                 = False # Use fully populated matrix or regular st file
+FPM                 = True # Use fully populated matrix or regular st file
 ConvertBackAndForth = True # True to check how the model is converted back and forth between hawc2 and beamdyn
 # Optional give some values for those, otherwise inferred by minimization...
 E       = None

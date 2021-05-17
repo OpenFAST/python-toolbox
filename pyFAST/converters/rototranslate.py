@@ -43,14 +43,12 @@ class TransformCrossSectionMatrix(object):
         
         # Translation
         T = self.CrossSectionTranslationMatrix(x, y)
-        M2 = np.matmul(T.T, M1)
-        M3 = np.matmul(M2, T) 
+        M2 = T.T @ M1 @ T 
 
         # Rotation 
         R = self.CrossSectionRotationMatrix(alpha)
-        M4 = np.matmul(np.matmul(R, M3), R.T)
-
-        return M4
+        M3 = R @ M2 @ R.T
+        return M3
         
     def trsf_sixbysix(M, T):
         """
@@ -151,6 +149,9 @@ if __name__ == "__main__":
     # Approach ANBA4
     Kdec = stiff.DecoupleStiffness(K)
     DeltaANBA4 = stiff.PrincipalAxesRotationAngle(Kdec)
+
+    print(np.rad2deg(DeltaBecas))
+    print(np.rad2deg(DeltaANBA4))
 
 if __name__ == '__test__':
 
