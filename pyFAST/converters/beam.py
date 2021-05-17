@@ -101,3 +101,84 @@ def MM(m,I_x,I_y,I_p,x_G=0,y_G=0,theta_i=0):
         [-m*y_G , m*x_G , 0*m      , 0*m                , 0*m                , I_p + m*x_G**2 + m*y_G**2]
         ])
 
+class TransformCrossSectionMatrix(object):
+
+    def CrossSectionTranslationMatrix(self, x, y):
+        T = np.eye(6)
+        T[0,5] = y
+        T[1,5] = -x
+        T[2,3] = -y
+        T[2,4] = x
+        return T
+
+    def CrossSectionRotationMatrix(self, alpha):
+        c=np.cos(alpha)
+        s=np.sin(alpha)
+        R1=[[c,s,0],
+            [-s,c,0],
+            [0,0,1]]
+        R=np.vstack((np.hstack((R1, np.zeros((3,3)))),
+           np.hstack((np.zeros((3,3)), R1))))
+        return R
+
+    def CrossSectionRotoTranslationMatrix(self, M1, x, y, alpha):
+        # Translation
+        T = self.CrossSectionTranslationMatrix(x, y)
+        M2 = T.T @ M1 @ T 
+        # Rotation 
+        R = self.CrossSectionRotationMatrix(alpha)
+        M3 = R @ M2 @ R.T
+        return M3
+
+class ComputeStiffnessProps(object):
+
+    def ComputeShearCenter(self, K):   # shear center equiv. to elastic axes
+        K1 = np.array([[K[i, j] for j in range(3)] for i in range(3)])
+        K3 = np.array([[K[i, j+3] for j in range(3)] for i in range(3)])
+        Y = np.linalg.solve(K1, -K3)
+        return [-Y[1,2], Y[0,2]]
+
+    def ComputeTensionCenter(self, K):  # tension center equiv. to neutral axes
+        K1 = np.array([[K[i, j] for j in range(3)] for i in range(3)])
+        K3 = np.array([[K[i, j+3] for j in range(3)] for i in range(3)])
+        Y = np.linalg.solve(K1, -K3)
+        return [Y[2,1], -Y[2,0]]
+
+    def OrientationPrincipalAxesBecas(self, K):
+        ksub=K[3:5,3:5]
+        [ val, mod ] = np.linalg.eig(ksub)
+        val = np.sort(np.diag(val))
+        ind = np.argsort(np.diag(val))
+        mod = mod[:,ind]
+        Delta = np.arctan(mod[1,0]/mod[0,0])
+        return Delta
+
+    def DecoupleStiffness(self, K):
+        K1 = np.array([[K[i, j] for j in range(3)] for i in range(3)])
+        K3 = np.array([[K[i, j+3] for j in range(3)] for i in range(3)])
+        Y = np.linalg.solve(K1, -K3)
+        I3 = np.eye(3)
+        Z3 = np.zeros((3,3))
+        TL = np.block([[I3, Z3], [Y.T, I3]])
+        TR = np.block([[I3, Y], [Z3, I3]])
+        return TL @ K @ TR
+
+    def PrincipalAxesRotationAngle(self, decoupledK):
+        K1 = np.array([[decoupledK[i, j] for j in range(3)] for i in range(3)])
+        K3 = np.array([[decoupledK[i+3, j+3] for j in range(3)] for i in range(3)])
+        (w1, v1) = np.linalg.eig(K1)
+        (w3, v3) = np.linalg.eig(K3)
+        if np.abs(v3[0,0]) < np.abs(v3[0,1]):
+            angle = np.arccos(v3[0,0])
+        else:
+            angle = -np.arcsin(v3[0,1])
+        return angle
+
+class ComputeInertiaProps(object):     
+    
+    def ComputeMassCenter(self, M):
+        M1 = np.array([[M[i, j] for j in range(3)] for i in range(3)])
+        M3 = np.array([[M[i, j+3] for j in range(3)] for i in range(3)])
+        Y = np.linalg.solve(M1, -M3)
+        return [Y[2,1], -Y[2,0]]
+
