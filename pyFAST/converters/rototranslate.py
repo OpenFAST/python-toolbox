@@ -17,66 +17,31 @@ I = np.array([[1439.88989372 ,    0.         ,    0.         ,    0.         ,  
 class TransformCrossSectionMatrix(object):
 
     def CrossSectionTranslationMatrix(self, x, y):
-
         T = np.eye(6)
         T[0,5] = y
         T[1,5] = -x
         T[2,3] = -y
         T[2,4] = x
-
         return T
 
     def CrossSectionRotationMatrix(self, alpha):
-
         c=np.cos(alpha)
         s=np.sin(alpha)
-
         R1=[[c,s,0],
             [-s,c,0],
             [0,0,1]]
         R=np.vstack((np.hstack((R1, np.zeros((3,3)))),
            np.hstack((np.zeros((3,3)), R1))))
-
         return R
 
     def CrossSectionRotoTranslationMatrix(self, M1, x, y, alpha):
-        
         # Translation
         T = self.CrossSectionTranslationMatrix(x, y)
         M2 = T.T @ M1 @ T 
-
         # Rotation 
         R = self.CrossSectionRotationMatrix(alpha)
         M3 = R @ M2 @ R.T
         return M3
-        
-    def trsf_sixbysix(M, T):
-        """
-        Transform six-by-six compliance/stiffness matrix. 
-        change of reference frame in engineering (or Voigt) notation.
-        
-        Parameters
-        ----------
-        M : np.ndarray
-            6x6 Siffness or Mass Matrix
-        T : np.ndarray
-            Transformation Matrix
-            
-        Returns
-        ----------
-        res : np.ndarray
-            Transformed 6x6 matrix
-        """
-
-        TS_1 = np.dot(np.dot(T.T, M[0:3, 0:3]), T)
-        TS_2 = np.dot(np.dot(T.T, M[3:6, 0:3]), T)
-        TS_3 = np.dot(np.dot(T.T, M[0:3, 3:6]), T)
-        TS_4 = np.dot(np.dot(T.T, M[3:6, 3:6]), T)
-
-        tmp_1 = np.vstack((TS_1, TS_2))
-        tmp_2 = np.vstack((TS_3, TS_4))
-        res = np.hstack((tmp_1, tmp_2))
-        return res
 
 class ComputeStiffnessProps(object):
 
@@ -93,14 +58,12 @@ class ComputeStiffnessProps(object):
         return [Y[2,1], -Y[2,0]]
 
     def OrientationPrincipalAxesBecas(self, K):
-        
         ksub=K[3:5,3:5]
         [ val, mod ] = np.linalg.eig(ksub)
         val = np.sort(np.diag(val))
         ind = np.argsort(np.diag(val))
         mod = mod[:,ind]
         Delta = np.arctan(mod[1,0]/mod[0,0])
-        
         return Delta
 
     def DecoupleStiffness(self, K):
@@ -118,7 +81,6 @@ class ComputeStiffnessProps(object):
         K3 = np.array([[decoupledK[i+3, j+3] for j in range(3)] for i in range(3)])
         (w1, v1) = np.linalg.eig(K1)
         (w3, v3) = np.linalg.eig(K3)
-        
         if np.abs(v3[0,0]) < np.abs(v3[0,1]):
             angle = np.arccos(v3[0,0])
         else:
