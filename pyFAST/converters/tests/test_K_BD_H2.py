@@ -26,25 +26,40 @@ class Test(unittest.TestCase):
         stiff = ComputeStiffnessProps()
         inertia = ComputeInertiaProps()
         transform = TransformCrossSectionMatrix()
-        xe , ye = stiff.ComputeShearCenter(K)
+        xs , ys = stiff.ComputeShearCenter(K)
         xt , yt = stiff.ComputeTensionCenter(K)
         xm , ym = inertia.ComputeMassCenter(I)
 
         # Approach BECAS
-        Kel = transform.CrossSectionRotoTranslationMatrix(K, xe, ye, 0.)
+        # Translate to tension (elastic) center
+        Kel = transform.CrossSectionRotoTranslationMatrix(K, xt, yt, 0.)
+        # Find delta
         DeltaBecas = stiff.OrientationPrincipalAxesBecas(Kel)
+        # Rotate by delta
+        Kel_DeltaBecas = transform.CrossSectionRotoTranslationMatrix(Kel, 0., 0., DeltaBecas)
 
         # Approach ANBA4
+        # Translate to tension (elastic) center
         Kdec = stiff.DecoupleStiffness(K)
+        # Find delta
         DeltaANBA4 = stiff.PrincipalAxesRotationAngle(Kdec)
+        # Rotate by delta
+        Kel_DeltaANBA4 = transform.CrossSectionRotoTranslationMatrix(Kdec, 0., 0., -DeltaANBA4)
 
-        np.testing.assert_almost_equal(xe,  0.015468467117843322, 6)
-        np.testing.assert_almost_equal(ye,  0.015668518364738194, 6)
+        print(stiff.ComputeTensionCenter(Kel_DeltaBecas))
+        print(stiff.ComputeTensionCenter(Kel_DeltaANBA4))
+        print(stiff.OrientationPrincipalAxesBecas(Kel_DeltaBecas))
+        print(stiff.OrientationPrincipalAxesBecas(Kel_DeltaANBA4))
+        print(stiff.PrincipalAxesRotationAngle(Kel_DeltaBecas))
+        print(stiff.PrincipalAxesRotationAngle(Kel_DeltaANBA4))
+
+        np.testing.assert_almost_equal(xs,  0.015468467117843322, 6)
+        np.testing.assert_almost_equal(ys,  0.015668518364738194, 6)
         np.testing.assert_almost_equal(xt, -0.07288883346195946, 6)
         np.testing.assert_almost_equal(yt,  0.0078053017185913485, 6)
         np.testing.assert_almost_equal(xm, -0.04766837274110846, 6)
         np.testing.assert_almost_equal(ym,  0.004116492716458095, 6)
-        np.testing.assert_almost_equal(DeltaBecas, -0.5780573896723843, 6)
+        np.testing.assert_almost_equal(DeltaBecas, -0.5874557755802033, 6)
         np.testing.assert_almost_equal(DeltaANBA4,  0.5874557755802033, 6)
 
 

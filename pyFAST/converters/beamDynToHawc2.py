@@ -8,7 +8,7 @@ import os
 from pyFAST.input_output.hawc2_htc_file import HAWC2HTCFile
 from pyFAST.input_output.csv_file import CSVFile
 from pyFAST.input_output.fast_input_file import FASTInputFile
-from pyFAST.converters.rototranslate import ComputeStiffnessProps, TransformCrossSectionMatrix
+from pyFAST.converters.beam import ComputeStiffnessProps, TransformCrossSectionMatrix
 
 from .beam import *
 
@@ -221,13 +221,13 @@ def beamDyn2Hawc2FPM_raw(r_bar, kp_x, kp_y, kp_z, twist,
         # Rotate BD stiffness matrix to Hawc2 reference system
         Kbd_h2 = (RR_BD_H2).dot(Kbd).dot(RR_BD_H2.T)
         # Compute coordinates of elastic center (m)
-        xe , ye = stiff.ComputeShearCenter(Kbd_h2)
+        xt , yt = stiff.ComputeTensionCenter(Kbd_h2)
         # Compute stiffness matrix with decoupled forces and moments        
         Kdec = stiff.DecoupleStiffness(Kbd_h2)
         # Compute Delta, the rotation angle of principal axes (rad)   
         Delta = stiff.PrincipalAxesRotationAngle(Kdec)
-        # Translate K matrix into EC and rotate it by Delta
-        Kh2 = transform.CrossSectionRotoTranslationMatrix(Kbd_h2, xe, ye, Delta)
+        # Translate K matrix into EC and rotate it by -Delta
+        Kh2 = transform.CrossSectionRotoTranslationMatrix(Kbd_h2, xt, yt, -Delta)
         
         for i in np.arange(6):
             for j in np.arange(6):
