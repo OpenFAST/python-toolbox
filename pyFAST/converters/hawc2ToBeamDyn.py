@@ -428,8 +428,10 @@ def hawc2ToBeamDyn(H2MeanLine, H2Structure, BDBldFileOut, BDMainFileOut=None, BD
         ax.set_xlabel('z [m]')
         ax.set_ylabel('Stiffness [Nm^2]')
         ax.legend(fontsize=8)
+    else:
+	fig=None
 
-        return fig 
+    return fig 
         #fig.savefig(BDMainFileOut.replace('.dat','.png'))
         #plt.show()
 

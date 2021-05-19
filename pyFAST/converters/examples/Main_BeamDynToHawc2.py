@@ -37,7 +37,7 @@ BD_bladefile   = os.path.join(MyDir,'../../../data/NREL5MW/5MW_Baseline/NRELOffs
 H2_htcfile_new = '_NREL5MW{}.htc'.format(suffix) # will be created
 H2_stfile      = '_blade_st{}.st'.format(suffix) # will be created
 copyfile(htc_template,  H2_htcfile_new) # Backup template
-bd.beamDynToHawc2(BD_mainfile, BD_bladefile, H2_htcfile_new, H2_stfile, 'blade1', A=A, E=E, G=G, theta_p_in = theta_p, FPM=FPM, verbose=True)
+df_c2, df_st = bd.beamDynToHawc2(BD_mainfile, BD_bladefile, H2_htcfile_new, H2_stfile, 'blade1', A=A, E=E, G=G, theta_p_in = theta_p, FPM=FPM, verbose=True)
 
 if ConvertBackAndForth:
     # NOTE: beamdyn uses stiffness proportional damping
@@ -59,3 +59,16 @@ if ConvertBackAndForth:
     bd.beamDynToHawc2(BD_mainfile, BD_bladefile, H2_htcfile_new2, H2_stfile2, 'blade1', A=A, E=E, G=G, FPM=False, verbose=True)
 
 
+if __name__ == '__test__':
+    # NOTE: NREL5MW is too simple of a test since straight
+    np.testing.assert_almost_equal(df_c2['z_[m]'].values[-1]      , 61.5              )
+    np.testing.assert_almost_equal(df_c2['twist_[deg]'].values[-1], 0                 )
+    np.testing.assert_almost_equal(df_c2['twist_[deg]'].values[0] , -13.308           )
+    np.testing.assert_almost_equal(df_st['x_cg_[m]'].values[10]   , 0.0               )
+    np.testing.assert_almost_equal(df_st['x_e_[m]'].values[10]    , 0.0               )
+    np.testing.assert_almost_equal(df_st['pitch_[deg]'].values[10], 0.0               )
+    np.testing.assert_almost_equal(df_st['K11'].values[10]        , 403729000.0       )
+    np.testing.assert_almost_equal(df_st['K44'].values[10]        , 4936840000.0      )
+    np.testing.assert_almost_equal(df_st['K55'].values[10]        , 7009180000.0      )
+    np.testing.assert_almost_equal(df_st['K66'].values[10]        , 1002120000.0      )
+    np.testing.assert_almost_equal(df_st['K11']                   , df_st['K22'].values)
