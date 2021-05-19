@@ -133,12 +133,20 @@ class TransformCrossSectionMatrix(object):
 class ComputeStiffnessProps(object):
 
     def ComputeShearCenter(self, K):   # shear center equiv. to elastic axes
+        """ 
+        Shear center location for a 6x6 cross section matrix of a beam oriented along "z"
+        NOTE: works for BeamDyn or Hawc2 convention
+        """
         K1 = np.array([[K[i, j] for j in range(3)] for i in range(3)])
         K3 = np.array([[K[i, j+3] for j in range(3)] for i in range(3)])
         Y = np.linalg.solve(K1, -K3)
         return [-Y[1,2], Y[0,2]]
 
     def ComputeTensionCenter(self, K):  # tension center equiv. to neutral axes
+        """ 
+        Tension center (also called elastic center) location for a 6x6 cross section matrix of a beam oriented along "z"
+        NOTE: works for BeamDyn or Hawc2 convention
+        """
         K1 = np.array([[K[i, j] for j in range(3)] for i in range(3)])
         K3 = np.array([[K[i, j+3] for j in range(3)] for i in range(3)])
         Y = np.linalg.solve(K1, -K3)
@@ -177,8 +185,290 @@ class ComputeStiffnessProps(object):
 class ComputeInertiaProps(object):     
     
     def ComputeMassCenter(self, M):
+        """ 
+        Mass center location for a 6x6 cross section matrix of a beam oriented along "z"
+        NOTE: works for BeamDyn or Hawc2 convention
+        """
         M1 = np.array([[M[i, j] for j in range(3)] for i in range(3)])
         M3 = np.array([[M[i, j+3] for j in range(3)] for i in range(3)])
         Y = np.linalg.solve(M1, -M3)
         return [Y[2,1], -Y[2,0]]
 
+
+def solvexytheta(Hxx,Hyy,Hxy):
+    """ 
+     Solve for a system of three unknown, used to get:
+       - EIy, EIx and thetap given Hxx,Hyy,Hxy
+       - kxs*GA, kys*GA and thetas given Kxx,Kyy,Kxy
+       - I_x, I_y and theta_is given Ixx,Iyy,Ixy
+    """
+    from scipy.optimize import fsolve
+    def residual(x):
+        EI_x, EI_y, theta_p =x
+        res=np.array([
+            Hxx - EI_x*np.cos(theta_p)**2 - EI_y*np.sin(theta_p)**2 ,
+            Hyy - EI_x*np.sin(theta_p)**2 - EI_y*np.cos(theta_p)**2,
+            Hxy - (EI_y-EI_x)*np.sin(theta_p)*np.cos(theta_p)]
+                ).astype(float)
+        return res
+    x0 = [Hxx,Hyy,0]
+    x_opt   = fsolve(residual, x0)
+    EI_x,EI_y,theta_p = x_opt
+    theta_p = np.mod(theta_p,2*np.pi)
+    return EI_x, EI_y, theta_p
+
+
+def M66toPropsDecoupled(M, convention='BeamDyn'):
+    """ 
+    Convert mass properties of a 6x6 section to beam properties
+    This assumes that the axial and bending loads are decoupled.
+    Has been tested for BeamDyn coordinate system
+
+    INPUTS:
+     - M : 6x6 array of mass elements. Each element may be an array (e.g. for all spanwise values)
+     OUTPUTS:
+      - m: section mass
+      - Ixx, Iyy, Ixy: area moment of inertia
+      - x_G, y_G
+    """
+    M11=M[0,0]
+    M44=M[3,3]
+    M55=M[4,4]
+    M66=M[5,5]
+    M16=M[0,5]
+    M26=M[1,5]
+    M45=M[3,4]
+
+    Mlist = flat2matlist(M)
+    inertia = ComputeInertiaProps()
+
+    m=M11
+    if convention=='BeamDyn':
+        if np.all(np.abs(m)<1e-16):
+            Ixi = Iyi = Ipp = x_G = y_G = theta_i = m*0
+            return m, Ixi, Iyi, Ipp, x_G, y_G, theta_i
+        y_G= -M16/m
+        x_G=  M26/m
+        # sanity
+        np.testing.assert_array_almost_equal([M[0,3],M[0,4]],[0*M[0,3],0*M[0,3]])
+        np.testing.assert_array_almost_equal([M[1,3],M[1,4]],[0*M[0,3],0*M[0,3]])
+        np.testing.assert_array_almost_equal([M[3,5],M[4,5]],[0*M[0,3],0*M[0,3]])
+        
+        Ixx =  M44-m*y_G**2
+        Iyy =  M55-m*x_G**2
+        Ixy = -M45-m*x_G*y_G
+        Ipp =  M66-m*(x_G**2 + y_G**2)
+
+        if np.all(np.abs(Ixy)<1e-16):
+            # NOTE: Assumes theta_i ==0
+            #print('>>> Assume theta_i 0')
+            Ixi     = Ixx
+            Iyi     = Iyy
+            theta_i = Ixx*0
+        else:
+            if len(Mlist)==1:
+                Ixi,Iyi,theta_i = solvexytheta(Ixx,Iyy,Ixy)
+            else:
+                #print('>>> Minimize theta_i')
+                Ixi = np.zeros(Ixx.shape)
+                Iyi = np.zeros(Ixx.shape)
+                theta_i = np.zeros(Ixx.shape)
+                for i, (hxx, hyy, hxy) in enumerate(zip(Ixx,Iyy,Ixy)):
+                    Ixi[i],Iyi[i],theta_i[i] = solvexytheta(hxx,hyy,hxy)
+
+                    MM2= MM(m[i],Ixi[i],Iyi[i],Ipp[i],x_G[i],y_G[i],theta_i[i])
+
+                    np.testing.assert_allclose(MM2[3,3], M[3,3][i], rtol=1e-3)
+                    np.testing.assert_allclose(MM2[4,4], M[4,4][i], rtol=1e-3)
+                    np.testing.assert_allclose(MM2[5,5], M[5,5][i], rtol=1e-3)
+                    np.testing.assert_allclose(MM2[3,4], M[3,4][i], rtol=1e-3)
+
+        np.testing.assert_array_almost_equal(Ipp, Ixx+Iyy, 2)
+        np.testing.assert_array_almost_equal(Ipp, Ixi+Iyi, 2)
+         
+    else:
+        raise NotImplementedError()
+
+    return m, Ixi, Iyi, Ipp, x_G, y_G, theta_i
+
+
+
+def K66toPropsDecoupled(K, theta_p_in=None, convention='BeamDyn'):
+    """ 
+    Convert stiffness properties of a 6x6 section to beam properties
+    This assumes that the axial and bending loads are decoupled.
+    Has been tested for BeamDyn coordinate system
+
+    INPUTS:
+     - K : 6x6 array of stiffness elements. Each element may be an array (e.g. for all spanwise values)
+    INPUTS OPTIONAL:
+     - theta_p_in : angle from section to principal axis [rad], positive around z
+     - convention : to change coordinate systems in the future
+    OUTPUTS:
+     - EA, EIx, EIy: axial and bending stiffnesses
+     - kxGA, kyGA, GKt: shear and torsional stiffness
+     - xC,yC : centroid
+     - xS,yS : shear center
+     - theta_p, theta_s: angle to principal axes and shear axes [rad]
+    """
+    K11=K[0,0]
+    K22=K[1,1]
+    K33=K[2,2]
+    K44=K[3,3]
+    K55=K[4,4]
+    K66=K[5,5]
+
+    K12=K[0,1]
+    K16=K[0,5]
+    K26=K[1,5]
+    K34=K[2,3]
+    K35=K[2,4]
+    K45=K[3,4]
+
+    Klist = flat2matlist(K)
+    stiff = ComputeStiffnessProps()
+
+    if convention=='BeamDyn':
+        # --------------------------------------------------------------------------------}
+        # --- Axial/bending problem
+        # --------------------------------------------------------------------------------{
+        # Find: EA, EI, position of axial strain centroid (tension center, elastic center), principal axes
+        EA =  K33
+        # xC yC - method 1
+        yC =  K34/EA
+        xC = -K35/EA
+        # xC yC - method 2, more general
+        if len(Klist)==1:
+            xC2, yC2 = stiff.ComputeTensionCenter(Klist[0])   # tension center
+        else:
+            xC2   = np.zeros(xC.shape)
+            yC2   = np.zeros(yC.shape)
+            for i,Kloc in enumerate(Klist):
+                xs, ys = stiff.ComputeTensionCenter(Kloc)   # tension center
+                xC2[i] = xs
+                yC2[i] = ys
+        # Sanity checks, comment in future
+        np.testing.assert_allclose(xC2, xC, rtol=1e-3)
+        np.testing.assert_allclose(yC2, yC, rtol=1e-3)
+
+        # --- Find EI and theta_p (principal axes)
+        Hxx=  K44-EA*yC**2
+        Hyy=  K55-EA*xC**2 
+        Hxy= -K45-EA*xC*yC
+        if theta_p_in is not None:
+            theta_p=theta_p_in
+            print('>>> theta_p given')
+            C2=np.cos(theta_p)**2
+            S2=np.sin(theta_p)**2
+            C4=np.cos(theta_p)**4
+            S4=np.sin(theta_p)**4
+            EIxp = (Hxx*C2 - Hyy*S2)/(C4-S4)
+            EIyp = (Hxx*S2 - Hyy*C2)/(S4-C4)
+            Hxyb = (EIyp-EIxp)*np.sin(theta_p)*np.cos(theta_p)
+
+            bNZ=np.logical_and(Hxy!=0, Hxyb!=0)
+            np.testing.assert_allclose(Hxy[bNZ], Hxyb[bNZ], rtol=1e-3)
+            np.testing.assert_allclose(EIxp+EIyp, Hxx+Hyy, rtol=1e-3)
+
+        else:
+            if np.all(np.abs(Hxy)<1e-16):
+                #print('>>>> assume theta_p=0')
+                # NOTE: Assumes theta_p ==0
+                EIxp = Hxx
+                EIyp = Hyy
+                theta_p=0*EA
+            else:
+                #print('>>> Minimization for theta_p')
+                if len(Klist)==1:
+                    EIxp,EIyp,theta_p = solvexytheta(Hxx,Hyy,Hxy)
+                    theta_p=np.asarray(theta_p)
+                    if theta_p>np.pi:
+                        theta_p-=2*np.pi
+                else:
+                    EIxp= np.zeros(Hxx.shape)
+                    EIyp= np.zeros(Hxx.shape)
+                    theta_p = np.zeros(Hxx.shape)
+                    for i, (hxx, hyy, hxy) in enumerate(zip(Hxx,Hyy,Hxy)):
+                        EIxp[i],EIyp[i],theta_p[i] = solvexytheta(hxx,hyy,hxy)
+
+                    theta_p[theta_p>np.pi]=theta_p[theta_p>np.pi]-2*np.pi
+
+        # --------------------------------------------------------------------------------}
+        # ---Torsion/shear problem
+        # --------------------------------------------------------------------------------{
+        # Find: Torsion, shear terms, shear center
+        Kxx =  K11
+        Kxy = -K12
+        Kyy =  K22
+        # Method 1
+        yS  = (Kyy*K16+Kxy*K26)/(-Kyy*Kxx + Kxy**2)
+        xS  = (Kxy*K16+Kxx*K26)/( Kyy*Kxx - Kxy**2)
+        # Method 2, more general
+        if len(Klist)==1:
+            xS2, yS2 = stiff.ComputeShearCenter(Klist[0])  # shear center
+        else:
+            xS2 = np.zeros(xC.shape)
+            yS2 = np.zeros(yC.shape)
+            for i,Kloc in enumerate(Klist):
+                xS2[i], yS2[i] = stiff.ComputeShearCenter(Kloc)    # shear center
+        # Sanity check, comment in future
+        np.testing.assert_allclose(xS2, xS, rtol=1e-3)
+        np.testing.assert_allclose(yS2, yS, rtol=1e-3)
+
+        # --- Find shear coefficients and main direction
+        GKt = K66 - Kxx*yS**2 -2*Kxy*xS*yS - Kyy*xS**2
+        if np.all(np.abs(Kxy)<1e-16):
+            # Assumes theta_s=0
+            kxsGA = Kxx # Kxx = kxs*GA
+            kysGA = Kyy
+            theta_s=0*EA
+        else:
+            if len(Klist)==1:
+                kxsGA,kysGA,theta_s = solvexytheta(Kxx,Kyy,Kxy)
+                if theta_s>np.pi:
+                    theta_s-=2*np.pi
+            else:
+                kxsGA = np.zeros(Kxx.shape)
+                kysGA = np.zeros(Kxx.shape)
+                theta_s = np.zeros(Hxx.shape)
+                for i, (kxx, kyy, kxy) in enumerate(zip(Kxx,Kyy,Kxy)):
+                    kxsGA[i],kysGA[i],theta_s[i] = solvexytheta(kxx,kyy,kxy)
+
+                theta_s[theta_s>np.pi]=theta_s[theta_s>np.pi]-2*np.pi
+
+        # Sanity checks, comment in future
+        KK2= KK(EA, EIxp, EIyp, GKt, EA*0+1, kxsGA, kysGA, xC, yC, theta_p, xS, yS, theta_s)
+        np.testing.assert_allclose(KK2[0,0], K[0,0], rtol=1e-2)
+        np.testing.assert_allclose(KK2[1,1], K[1,1], rtol=1e-2)
+        np.testing.assert_allclose(KK2[2,2], K[2,2], rtol=1e-2)
+        np.testing.assert_allclose(KK2[3,3], K[3,3], rtol=1e-1)
+#         np.testing.assert_allclose(KK2[4,4], K[4,4], rtol=1e-2)
+        np.testing.assert_allclose(KK2[5,5], K[5,5], rtol=1e-1)
+        np.testing.assert_allclose(KK2[2,3], K[2,3], rtol=1e-2)
+        np.testing.assert_allclose(KK2[2,4], K[2,4], rtol=1e-2)
+
+        np.testing.assert_allclose(K16, -Kxx*yS-Kxy*xS)
+#         np.testing.assert_allclose(KK2[0,5], K[0,5],rtol=1e-3)
+#         np.testing.assert_allclose(KK2[1,5], K[1,5],rtol=5e-2) # Kxy harder to get
+        #np.testing.assert_allclose(KK2[3,4], K[3,4]) # <<< hard to match
+
+    else:
+        raise NotImplementedError()
+
+    return EA, EIxp, EIyp, kxsGA, kysGA, GKt, xC, yC, xS, yS, theta_p, theta_s
+
+def flat2matlist(M):
+    """
+    Convert a matrix of size 6x6 where each element is an array of size n
+    into a list of n 6x6 matrices
+    """
+    Mlist=[]
+    if not hasattr(M[0,0],'__len__'):
+        return [M]
+    for iSpan in np.arange(len(M[0,0])):
+        Mloc = np.zeros((6,6))
+        for i in np.arange(6):
+            for j in np.arange(6):
+                Mloc[i,j] = M[i,j][iSpan]
+        Mlist.append(Mloc)
+    return Mlist
