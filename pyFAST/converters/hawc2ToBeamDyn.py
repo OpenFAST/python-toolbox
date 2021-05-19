@@ -429,16 +429,16 @@ def hawc2ToBeamDyn(H2MeanLine, H2Structure, BDBldFileOut, BDMainFileOut=None, BD
         ax.set_ylabel('Stiffness [Nm^2]')
         ax.legend(fontsize=8)
     else:
-	fig=None
+        fig=None
+    #fig.savefig(BDMainFileOut.replace('.dat','.png'))
+    #plt.show()
 
-    return fig 
-        #fig.savefig(BDMainFileOut.replace('.dat','.png'))
-        #plt.show()
+    return fig  # TODO return some dataframes
 
 if __name__=='__main__':
     np.set_printoptions(linewidth=300)
 
-	# ---  Hawc2 to BeamDyn
+    # ---  Hawc2 to BeamDyn
     H2MeanLine     = '../../data/Hawc2/Blade_Planform_Hawc2.csv' # csv file with c2def columns: ['x_[m]','y_[m]','z_[m]','twist_[deg]']
     H2Structure    = '../../data/Hawc2/Blade_Structural_Hawc2.csv' # csv file with columns ['r_[m]','m_[kg/m]','x_cg_[m]','y_cg_[m]','ri_x_[m]',... ,'x_e_[m]','y_e_[m]']
     BDMainTemplate = '../../data/Hawc2/BD.dat'  # template file to write main BD file
