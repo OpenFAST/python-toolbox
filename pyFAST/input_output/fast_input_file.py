@@ -769,9 +769,9 @@ class FASTInputFile(File):
                             self.addKeyVal('nDOF',int(l.split(':')[1]))
                             nDOFCommon=self['nDOF']
                         elif l.find('!time increment')==0:
-                            self.addKeyVal('dt',np.float(l.split(':')[1]))
+                            self.addKeyVal('dt',float(l.split(':')[1]))
                         elif l.find('!total simulation time')==0:
-                            self.addKeyVal('T',np.float(l.split(':')[1]))
+                            self.addKeyVal('T',float(l.split(':')[1]))
                     elif len(l.strip())==0:
                         pass
                     else:
@@ -824,9 +824,9 @@ class FASTInputFile(File):
                 nTabLines=0
                 while 14+nTabLines<len(lines) and  len(lines[14+nTabLines].strip())>0 :
                     nTabLines +=1
-                #data = np.array([lines[i].strip().split() for i in range(14,len(lines)) if len(lines[i])>0]).astype(np.float)
-                #data = np.array([lines[i].strip().split() for i in takewhile(lambda x: len(lines[i].strip())>0, range(14,len(lines)-1))]).astype(np.float)
-                data = np.array([lines[i].strip().split() for i in range(14,nTabLines+14)]).astype(np.float)
+                #data = np.array([lines[i].strip().split() for i in range(14,len(lines)) if len(lines[i])>0]).astype(float)
+                #data = np.array([lines[i].strip().split() for i in takewhile(lambda x: len(lines[i].strip())>0, range(14,len(lines)-1))]).astype(float)
+                data = np.array([lines[i].strip().split() for i in range(14,nTabLines+14)]).astype(float)
                 #print(data)
                 d = getDict()
                 d['label']     = 'Polar'
@@ -856,10 +856,10 @@ class FASTInputFile(File):
                 # Read span location
                 span[j]=float(lines[i]); i+=1;
                 # Read stiffness matrix
-                K[j,:,:]=np.array((' '.join(lines[i:i+6])).split()).astype(np.float).reshape(6,6)
+                K[j,:,:]=np.array((' '.join(lines[i:i+6])).split()).astype(float).reshape(6,6)
                 i+=7
                 # Read mass matrix
-                M[j,:,:]=np.array((' '.join(lines[i:i+6])).split()).astype(np.float).reshape(6,6)
+                M[j,:,:]=np.array((' '.join(lines[i:i+6])).split()).astype(float).reshape(6,6)
                 i+=7
         except: 
             raise WrongFormatError('An error occured while reading section {}/{}'.format(j+1,nStations))
@@ -906,7 +906,7 @@ def strIsFloat(s):
         return False
 
 def strIsBool(s):
-    return (s.lower() is 'true') or (s.lower() is 'false')
+    return (s.lower()=='true') or (s.lower()=='false')
 
 def strIsInt(s):
     s = str(s)
@@ -1102,7 +1102,7 @@ def parseFASTNumTable(filename,lines,n,iStart,nHeaders=2,tableType='num',nOffset
     try:
         if nHeaders==0:
             # Extract number of values from number of numerical values on first line
-            numeric_const_pattern = '[-+]? (?: (?: \d* \. \d+ ) | (?: \d+ \.? ) )(?: [Ee] [+-]? \d+ ) ?'
+            numeric_const_pattern = r'[-+]? (?: (?: \d* \. \d+ ) | (?: \d+ \.? ) )(?: [Ee] [+-]? \d+ ) ?'
             rx = re.compile(numeric_const_pattern, re.VERBOSE)
             if tableType=='num':
                 dat= np.array(rx.findall(lines[nOffset])).astype(float)

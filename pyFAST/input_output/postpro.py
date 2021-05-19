@@ -51,8 +51,6 @@ def ED_TwrStations(ED):
     h_nodes      = twr_fract*(ED['TowerHt']-ED['TowerBsHt']) + ED['TowerBsHt']
     return twr_fract, h_nodes
 
-
-
 def ED_BldGag(ED):
     """ Returns the radial position of ElastoDyn blade gages 
     INPUTS:
@@ -872,8 +870,8 @@ def extractSpanTSReg(ts, col_pattern, colname, IR=None):
     """ Helper function to extract spanwise results, like B1N1Cl B1N2Cl etc. 
 
     Example
-        col_pattern: 'B1N(\d*)Cl_\[-\]'
-        colname    : 'B1Cl_[-]'
+        col_pattern: r'B1N(\\d*)Cl_\\[-\\]'
+        colname    : r'B1Cl_[-]'
     """
     # Extracting columns matching pattern
     cols, sIdx = find_matching_pattern(ts.keys(), col_pattern)

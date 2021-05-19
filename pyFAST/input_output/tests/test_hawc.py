@@ -36,6 +36,24 @@ class Test(unittest.TestCase):
         os.remove(os.path.join(MyDir,'HAWC2_out_ascii_TMP.sel'))
         os.remove(os.path.join(MyDir,'HAWC2_out_ascii_TMP2.sel'))
 
+    def test_HAWC2_st(self):
+        from pyFAST.input_output.hawc2_st_file import HAWC2StFile
+        # --- not FPM
+        F=HAWC2StFile(os.path.join(MyDir,'HAWC2_st.st'))
+        dfs=F.toDataFrame()
+        set11=dfs['1_1']
+        set22=dfs['2_2']
+        self.assertEqual(set11['m_[kg/m]'].values[-1], 2536.27)
+        self.assertEqual(set11['A_[m^2]'].values[-1], 0.298)
+        self.assertEqual(set22['r_[m]'].values[-1], 1.96256)
+        self.assertEqual(set22['ri_x_[m]'].values[-1], 1.36)
+        # --- FPM
+        F=HAWC2StFile(os.path.join(MyDir,'HAWC2_st_fpm.st'))
+        dfs=F.toDataFrame()
+        set11=dfs['1_1']
+        np.testing.assert_almost_equal(set11['m_[kg/m]'].values[-1], 5.6348074, 3)
+        np.testing.assert_almost_equal(set11['K66'].values[-1], 8.41526513e04, 3)
+
     def test_HAWC2_pc(self):
         F=HAWC2PCFile(os.path.join(MyDir,'HAWC2_pc.dat'))
         self.assertEqual(len(F.data.pc_sets),1)
