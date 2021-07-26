@@ -56,7 +56,7 @@ def findBladeTriplets_EDstate(rotFrame,Desc):
 def findBladeTriplets(rotFrame,Desc, verbose=True):
 
     # Find the number of, and indices for, triplets in the rotating frame:
-    chkStr = ['[Bb]lade \d', '[Bb]lade [Rr]oot \d', 'BD_\d', '[Bb]\d', '[Bb]lade\d', 'PitchBearing\d', '\d']
+    chkStr = [r'[Bb]lade \d', r'[Bb]lade [Rr]oot \d', r'BD_\d', r'[Bb]\d', r'[Bb]lade\d', r'PitchBearing\d', r'\d']
 
     NTriplets = 0;              # first initialize to zero
     Triplets = [];
@@ -82,7 +82,7 @@ def findBladeTriplets(rotFrame,Desc, verbose=True):
                     
                     #we need to get rid of the special characters that
                     #may exist in Desc{}:
-                    checkThisStr=checkThisStr.replace(')','\)').replace('(', '\(').replace('^','\^')
+                    checkThisStr=checkThisStr.replace(')',r'\)').replace('(', r'\(').replace('^',r'\^')
 
                     k = int(Bldstr[len(Bldstr)-1])
                     #print(Bldstr[len(Bldstr)-1], checkThisStr)
@@ -265,14 +265,14 @@ def readFASTMatrix(f):
         tmp_name=line.strip().split(':')[0]
         # get matrix dimensions if matrix exists
         if tmp_name != "":
-            m=np.int(line.strip().split(':')[1].split('x')[0])
-            n=np.int(line.strip().split(':')[1].split('x')[1])
+            m=int(line.strip().split(':')[1].split('x')[0])
+            n=int(line.strip().split(':')[1].split('x')[1])
 
     # copy matrix into tmp list
     if m!=0:
         name=tmp_name
         for line in islice(f,m):
-            tmp.append([np.float(num) for num in line.split()])
+            tmp.append([float(num) for num in line.split()])
         tmp=np.array(tmp)
 
     return name,tmp

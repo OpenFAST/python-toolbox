@@ -89,7 +89,7 @@ class FASTLinearizationFile(File):
 
         def readMat(fid, n, m):
             vals=[f.readline().strip().split() for i in np.arange(n)]
-            return np.array(vals).astype(np.float)
+            return np.array(vals).astype(float)
 
         # Reading 
         with open(self.filename, 'r', errors="surrogateescape") as f:
@@ -163,6 +163,7 @@ class FASTLinearizationFile(File):
             s = s.replace('(kN)'  , '_[kN]' );
             s = s.replace('(rpm)'   , '_[rpm]'  );
             s = s.replace('(m/s^2)' , '_[m/s^2]');
+            s = s.replace('(deg/s^2)','_[deg/s^2]');
             s = s.replace('(m)'     , '_[m]'    );
             s = s.replace(', m/s^2','_[m/s^2]');
             s = s.replace(', m/s','_[m/s]');
@@ -284,8 +285,14 @@ class FASTLinearizationFile(File):
             dfs['D'] = pd.DataFrame(data = self['D'], index=ydescr_short, columns=udescr_short)
         except:
             pass
-        dfs['x'] = pd.DataFrame(data = np.asarray(self['x']).reshape((1,-1)), columns=xdescr_short)
-        dfs['u'] = pd.DataFrame(data = np.asarray(self['u']).reshape((1,-1)), columns=udescr_short)
+        try:
+            dfs['x'] = pd.DataFrame(data = np.asarray(self['x']).reshape((1,-1)), columns=xdescr_short)
+        except:
+            pass
+        try:
+            dfs['u'] = pd.DataFrame(data = np.asarray(self['u']).reshape((1,-1)), columns=udescr_short)
+        except:
+            pass
         try:
             dfs['y'] = pd.DataFrame(data = np.asarray(self['y']).reshape((1,-1)), columns=ydescr_short)
         except:
