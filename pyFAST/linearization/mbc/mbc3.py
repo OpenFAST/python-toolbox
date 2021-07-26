@@ -677,7 +677,7 @@ def fx_mbc3(FileNames, verbose=True):
             #---    
             T1q = np.eye(n_FixFrameStates1);               # Eq. 11 for first-order states (eq. 8 in MBC3 Update document)
             for ii in range(matData['n_RotTripletStates1']):
-                T1q = blkdiag(T1, tt);
+                T1q = blkdiag(T1q, tt);
 
             T1qv = np.eye(n_FixFrameStates1);              # inverse of T1q
             for ii in range(matData['n_RotTripletStates1']):
