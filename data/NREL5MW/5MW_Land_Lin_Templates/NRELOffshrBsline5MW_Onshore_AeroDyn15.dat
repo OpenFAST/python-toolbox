@@ -6,7 +6,7 @@ False         Echo               - Echo the input to "<rootname>.AD.ech"?  (flag
           1   WakeMod            - Type of wake/induction model (switch) {0=none, 1=BEMT, 2=DBEMT} [WakeMod cannot be 2 when linearizing]
           1   AFAeroMod          - Type of blade airfoil aerodynamics model (switch) {1=steady model, 2=Beddoes-Leishman unsteady model} [AFAeroMod must be 1 when linearizing]
           1   TwrPotent          - Type tower influence on wind based on potential flow around the tower (switch) {0=none, 1=baseline potential flow, 2=potential flow with Bak correction}
-False         TwrShadow          - Calculate tower influence on wind based on downstream tower shadow? (flag)
+0             TwrShadow          - Calculate tower influence on wind based on downstream tower shadow? (flag)
 True          TwrAero            - Calculate tower aerodynamic loads? (flag)
 True          FrozenWake         - Assume frozen wake during linearization? (flag) [used only when WakeMod=1 and when linearizing]
 False         CavitCheck         - Perform cavitation check? (flag) [AFAeroMod must be 1 when CavitCheck=true]
