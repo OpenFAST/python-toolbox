@@ -27,6 +27,9 @@ Additional methods may be present depending on the file format.
 
 
 ## Examples
+Examples scripts are found in this [folder](examples). 
+Below are simple examples to get started:
+
 
 Read an AeroDyn file, modifies some values and write the modified file:
 ```python
