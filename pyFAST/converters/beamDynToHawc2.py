@@ -11,6 +11,48 @@ from pyFAST.input_output.fast_input_file import FASTInputFile
 
 from .beam import *
 
+
+def arc_length(points):
+    """
+    Compute the distances between points along a curve and return those
+    cumulative distances as a flat array.
+
+    This function works for 2D, 3D, and N-D arrays.
+
+    Parameters
+    ----------
+    points : numpy array[n_points, n_dimensions]
+        Array of coordinate points that we compute the arc distances for.
+
+    Returns
+    -------
+    arc_distances : numpy array[n_points]
+        Array, starting at 0, with the cumulative distance from the first
+        point in the points array along the arc.
+
+    See Also
+    --------
+    wisdem.commonse.utilities.arc_length_deriv : computes derivatives for
+    the arc_length function
+
+    Examples
+    --------
+    Here is a simple example of how to use this function to find the cumulative
+    distances between points on a 2D curve.
+
+    >>> x_values = numpy.linspace(0., 5., 10)
+    >>> y_values = numpy.linspace(2., 4., 10)
+    >>> points = numpy.vstack((x_values, y_values)).T
+    >>> arc_length(points)
+    array([0.        , 0.59835165, 1.19670329, 1.79505494, 2.39340658,
+           2.99175823, 3.59010987, 4.18846152, 4.78681316, 5.38516481])
+    """
+    cartesian_distances = np.sqrt(np.sum(np.diff(points, axis=0) ** 2, axis=1))
+    arc_distances = np.r_[0.0, np.cumsum(cartesian_distances)]
+
+    return arc_distances
+
+
 # --------------------------------------------------------------------------------}
 # ---beamDynToHawc2
 # --------------------------------------------------------------------------------{
@@ -29,11 +71,21 @@ def beamDynToHawc2(BD_mainfile, BD_bladefile, H2_htcfile=None, H2_stfile=None, b
 
     # --- Extract relevant info
     prop  = bd['BeamProperties']
-    kp_x  = bdLine['kp_xr_[m]'].values
-    kp_y  = bdLine['kp_yr_[m]'].values
-    kp_z  = bdLine['kp_zr_[m]'].values
-    twist = bdLine['initial_twist_[deg]'].values*np.pi/180 # BeamDyn convention
     r_bar = prop['Span'].values
+    
+    kp_x_raw  = bdLine['kp_xr_[m]'].values
+    kp_y_raw  = bdLine['kp_yr_[m]'].values
+    kp_z_raw  = bdLine['kp_zr_[m]'].values
+    twist_raw = bdLine['initial_twist_[deg]'].values*np.pi/180 # BeamDyn convention
+
+    myarc = arc_length(np.array([kp_x_raw, kp_y_raw, kp_z_raw]).T)
+    s_coord = myarc/myarc[-1]
+
+    kp_x = np.interp(r_bar, s_coord, kp_x_raw)
+    kp_y = np.interp(r_bar, s_coord, kp_y_raw)
+    kp_z = np.interp(r_bar, s_coord, kp_z_raw)
+    twist = np.interp(r_bar, s_coord, twist_raw)
+
 
     K = np.zeros((6,6),dtype='object')
     M = np.zeros((6,6),dtype='object')

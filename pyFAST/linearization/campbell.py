@@ -568,5 +568,10 @@ def plotCampbellDataFile(xls_or_csv, ws_or_rpm='rpm', sheetname=None, ylim=None,
     fig, axes = plotCampbell(OP, Freq, Damp, sx=sx, UnMapped=UnMapped, ylim=ylim)
     figName = os.path.join(baseDir,basename+'_'+ws_or_rpm)
 
+
+    Freq.to_csv(os.path.join(baseDir, 'freq.csv'), index=None, sep=' ')
+    Damp.to_csv(os.path.join(baseDir, 'damp.csv'), index=None, sep=' ')
+    OP.to_csv(os.path.join(baseDir, 'op.csv'), index=None, sep=' ')
+
     return fig, axes, figName
 
