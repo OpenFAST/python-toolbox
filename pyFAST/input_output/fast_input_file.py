@@ -942,7 +942,7 @@ def strIsFloat(s):
         return False
 
 def strIsBool(s):
-    return (s.lower() is 'true') or (s.lower() is 'false')
+    return (s.lower()=='true') or (s.lower()=='false')
 
 def strIsInt(s):
     s = str(s)

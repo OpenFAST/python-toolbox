@@ -8,6 +8,7 @@ import os
 from pyFAST.input_output.hawc2_htc_file import HAWC2HTCFile
 from pyFAST.input_output.csv_file import CSVFile
 from pyFAST.input_output.fast_input_file import FASTInputFile
+from pyFAST.converters.beam import ComputeStiffnessProps, TransformCrossSectionMatrix
 
 from .beam import *
 
@@ -44,8 +45,8 @@ def beamDynToHawc2(BD_mainfile, BD_bladefile, H2_htcfile=None, H2_stfile=None, b
 
     # Map 6x6 data to "beam" data
     # NOTE: theta_* are in [rad]
-    EA, EIx, EIy, kxsGA, kysGA, GKt, x_C, y_C, x_S, y_S, theta_p, theta_s = K66toProps(K, theta_p_in)
-    m, Ixi, Iyi, Ip, x_G, y_G, theta_i = M66toProps(M)
+    EA, EIx, EIy, kxsGA, kysGA, GKt, x_C, y_C, x_S, y_S, theta_p, theta_s = K66toPropsDecoupled(K, theta_p_in)
+    m, Ixi, Iyi, Ip, x_G, y_G, theta_i = M66toPropsDecoupled(M)
 #     print('kxGA    {:e}'.format(np.mean(kxsGA)))
 #     print('kyGA    {:e}'.format(np.mean(kysGA)))
 #     print('EA      {:e}'.format(np.mean(EA)))
@@ -71,7 +72,7 @@ def beamDynToHawc2(BD_mainfile, BD_bladefile, H2_htcfile=None, H2_stfile=None, b
         dfMeanLine , dfStructure = beamDyn2Hawc2FPM_raw(r_bar,
                 kp_x, kp_y, kp_z, twist,  # BeamDyn convention, twist around -z [in rad]
                 m, Ixi, Iyi, x_G, y_G, theta_i,  # theta_i/p around z (in rad)
-                x_C, y_C, theta_p, K)
+                x_C, y_C, theta_p, K, M)
 
     else:
 
@@ -94,7 +95,7 @@ def beamDynToHawc2(BD_mainfile, BD_bladefile, H2_htcfile=None, H2_stfile=None, b
             f.write('-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------\n')
             f.write('#%i ; set number\n' % 1)
             if FPM:
-                cols=['r','m_[kg/m]','x_cg_[m]','y_cg_[m]','ri_x_[m]','ri_y_[m]','pitch_[deg]','x_e_[m]','y_e_[m]','K11','K12','K13','K14','K15','K16','K22','K23','K24','K25','K26','K33','K34','K35','K36','K44','K45','K46','K55','K56','K66']
+                cols=['r_[m]','m_[kg/m]','x_cg_[m]','y_cg_[m]','ri_x_[m]','ri_y_[m]','pitch_[deg]','x_e_[m]','y_e_[m]','K11','K12','K13','K14','K15','K16','K22','K23','K24','K25','K26','K33','K34','K35','K36','K44','K45','K46','K55','K56','K66']
             else:
                 cols=['r_[m]','m_[kg/m]','x_cg_[m]','y_cg_[m]','ri_x_[m]','ri_y_[m]', 'x_sh_[m]','y_sh_[m]','E_[N/m^2]','G_[N/m^2]','I_x_[m^4]','I_y_[m^4]','I_p_[m^4]','k_x_[-]','k_y_[-]','A_[m^2]','pitch_[deg]','x_e_[m]','y_e_[m]']
             f.write('\t'.join(['{:20s}'.format(s) for s in cols])+'\n')
@@ -170,21 +171,24 @@ def beamDynToHawc2(BD_mainfile, BD_bladefile, H2_htcfile=None, H2_stfile=None, b
 
 
 def beamDyn2Hawc2FPM_raw(r_bar, kp_x, kp_y, kp_z, twist,
-        m, Ixi, Iyi, x_G, y_G, theta_i, 
-        x_C, y_C, theta_p,  
-        K):
+        m, Ixi, Iyi, x_G, y_G, theta_i,  # TODO remove in the future
+        x_C, y_C, theta_p,               # TODO remove in the future
+        K, M):
     """
+    Convert spanwise quantities from BeamDyn to Hawc2
+     - kp_x, kp_y, kp_z, twist: keypoints positions/orientation as defined in BeamDyn "main" file
+
     NOTE: all angles are in radians
     
     """
     import scipy.linalg
+    nSpan = len(K[0,0])
     # --- BeamDyn to Hawc2 Structural data
-#     import pdb; pdb.set_trace()
     # Hawc2 = BeamDyn
-    x_cg    = -y_G
-    y_cg    = x_G
+    x_g     = -y_G
+    y_g     =  x_G
     x_e     = -y_C
-    y_e     = x_C
+    y_e     =  x_C
     pitch   = theta_p*180/np.pi # [deg] NOTE: could use theta_p, theta_i or theta_s
     if np.all(np.abs(m)<1e-16):
         ri_y    = m*0
@@ -192,28 +196,94 @@ def beamDyn2Hawc2FPM_raw(r_bar, kp_x, kp_y, kp_z, twist,
     else:
         ri_y    = np.sqrt(Ixi/m)    # [m]
         ri_x    = np.sqrt(Iyi/m)    # [m]
+
     # Curvilinear position of keypoints (only used to get max radius...)
     dr= np.sqrt((kp_x[1:]-kp_x[0:-1])**2 +(kp_y[1:]-kp_y[0:-1])**2 +(kp_z[1:]-kp_z[0:-1])**2)
     r_p= np.concatenate(([0],np.cumsum(dr)))
     r=r_bar * r_p[-1]
 
-    RotMat=np.array([  # From Hawc2 to BeamDyn
-            [0 ,1,0],
-            [-1,0,0],
-            [0,0,1]])
-    RR= scipy.linalg.block_diag(RotMat,RotMat)
+    # From Hawc2/ANBA4 to BeamDyn
+    RotMat_H2_BD=np.array([  
+            [ 0, 1, 0],
+            [-1, 0, 0],
+            [ 0, 0, 1]])
+    RR_H2_BD = scipy.linalg.block_diag(RotMat_H2_BD,RotMat_H2_BD)
+    # From BeamDyn to Hawc2/ANBA4
+    RR_BD_H2 = RR_H2_BD.T
 
-    nSpan = len(K[0,0])
+    stiff = ComputeStiffnessProps()
+    inertia = ComputeInertiaProps()
+    transform = TransformCrossSectionMatrix()
+
+    # --- Spanwise quantities for HAWC2 input file
+    x_e_h2  = np.zeros(nSpan) # Point where radial force (z) does not contribute to beanding around x or y
+    y_e_h2  = np.zeros(nSpan)
+    x_g_h2  = np.zeros(nSpan)
+    y_g_h2  = np.zeros(nSpan)
+    m_h2    = np.zeros(nSpan)
+    ri_x_h2 = np.zeros(nSpan)
+    ri_y_h2 = np.zeros(nSpan)
+    pitch_h2 = np.zeros(nSpan) # angle between xc2 axis and principal axis xe
     KH2=np.zeros((6,6,nSpan))
     for iSpan in np.arange(nSpan):
-        Kbd = np.zeros((6,6))
+        K_bd = np.zeros((6,6))
+        M_bd = np.zeros((6,6))
         for i in np.arange(6):
             for j in np.arange(6):
-                Kbd[i,j] = K[i,j][iSpan]
-        Kh2 = (RR.T).dot(Kbd).dot(RR)
+                K_bd[i,j] = K[i,j][iSpan]
+                M_bd[i,j] = M[i,j][iSpan]
+        
+        # Rotate BD stiffness matrix to Hawc2 reference system
+        K_h2 = (RR_BD_H2).dot(K_bd).dot(RR_BD_H2.T)
+        M_h2 = (RR_BD_H2).dot(M_bd).dot(RR_BD_H2.T)
+        # Compute coordinates of main points 
+        xt , yt = stiff.ComputeTensionCenter(K_h2) # tension/elastic center
+        xs , ys = stiff.ComputeShearCenter(K_h2)   # shear center
+        xm , ym = inertia.ComputeMassCenter(M_h2)  # inertia
+        x_g_h2[iSpan] = xm
+        y_g_h2[iSpan] = ym
+        x_e_h2[iSpan] = xt
+        y_e_h2[iSpan] = yt
+        # Inertia properties
+        m_h2[iSpan]   = M_h2[0,0]
+        #ri_x_h2[iSpan] = TODO
+        #ri_x_h2[iSpan] = TODO
+
+        # Compute stiffness matrix with decoupled forces and moments        
+        Kdec = stiff.DecoupleStiffness(K_h2)
+        # Compute Delta, the rotation angle of principal axes (rad)   
+        #Delta =  stiff.PrincipalAxesRotationAngle(Kdec)
+        Delta = - stiff.OrientationPrincipalAxesBecas(Kdec) # appears more robust
+        pitch_h2[iSpan]=Delta
+        # Translate K matrix into EC and rotate it by -Delta
+        Kh2 = transform.CrossSectionRotoTranslationMatrix(K_h2, xt, yt, -Delta)
+        
         for i in np.arange(6):
             for j in np.arange(6):
                 KH2[i,j][iSpan]=Kh2[i,j]
+
+    pitch_h2 *=180/np.pi # [deg] 
+
+    # sanity checks between previous method and new (general) method
+    np.testing.assert_allclose(m  , m_h2, rtol=1e-3)
+    np.testing.assert_allclose(x_e, x_e_h2, rtol=1e-3)
+    np.testing.assert_allclose(y_e, y_e_h2, rtol=1e-3)
+    np.testing.assert_allclose(x_g, x_g_h2, rtol=1e-3)
+    np.testing.assert_allclose(y_g, y_g_h2, rtol=1e-3)
+    np.testing.assert_allclose(theta_p*180/np.pi, -pitch_h2, rtol=1e-3)
+
+    # Using new values (remove in the future)
+    pitch = -pitch_h2
+    x_e   = x_e_h2
+    y_e   = y_e_h2
+    x_g   = x_g_h2
+    y_g   = y_g_h2
+    m     = m_h2
+    if np.mean(pitch)>0:
+        print('Pitch (delta) is mostly positive')
+    else:
+        print('Pitch (delta) is mostly negative')
+
 
     K11 = KH2[0,0]
     K22 = KH2[1,1]
@@ -240,36 +310,16 @@ def beamDyn2Hawc2FPM_raw(r_bar, kp_x, kp_y, kp_z, twist,
     K55 = KH2[4,4]
     K56 = KH2[4,5]
 
-
+    # --- Create a data frame with spanwise beam data
     columns=['r_[m]','m_[kg/m]','x_cg_[m]','y_cg_[m]','ri_x_[m]','ri_y_[m]','pitch_[deg]','x_e_[m]','y_e_[m]','K11','K12','K13','K14','K15','K16','K22','K23','K24','K25','K26','K33','K34','K35','K36','K44','K45','K46','K55','K56','K66']
-    data = np.column_stack((r, m, x_cg, y_cg, ri_x, ri_y, pitch, x_e, y_e, K11,K12,K13,K14,K15,K16,K22,K23,K24,K25,K26,K33,K34,K35,K36,K44,K45,K46,K55,K56,K66))
+    data = np.column_stack((r, m, x_g, y_g, ri_x, ri_y, pitch, x_e, y_e, K11,K12,K13,K14,K15,K16,K22,K23,K24,K25,K26,K33,K34,K35,K36,K44,K45,K46,K55,K56,K66))
     dfStructure = pd.DataFrame(data=data, columns=columns)
-
-#     #      Siemens z ->  BeamDyn z
-#     #      Siemens x -> -BeamDyn y
-#     #      Siemens y ->  BeamDyn x
-#     KSiemens = np.zeros((nSpan,6,6))
-#     for i in np.arange(6):
-#         for j in np.arange(6):
-#             if j>=i:
-#                 key='d{}{}'.format(i+1,j+1)
-#             else:
-#                 key='d{}{}'.format(j+1,i+1)
-#             KSiemens[:,i,j] = sd[key]
-# 
-#     for i in np.arange(len(bp['span'])):
-#         K = bp['K'][i]*0
-#         Ks= KSiemens[i]
-#         K = RR.dot(Ks).dot(RR.T)
-#         bp['K'][i] = K
-
-
 
     # --- BeamDyn to Hawc2 Reference axis
     X_H2     = -kp_y
-    Y_H2     = kp_x
-    Z_H2     = kp_z
-    twist_H2 = - twist*180/np.pi # - [deg]
+    Y_H2     =  kp_x
+    Z_H2     =  kp_z
+    twist_H2 = - twist*180/np.pi # -negative of BeamDyn twist [deg]
     columns=['x_[m]', 'y_[m]', 'z_[m]', 'twist_[deg]']
     data = np.column_stack((X_H2, Y_H2, Z_H2, twist_H2))
     dfMeanLine = pd.DataFrame(data=data, columns=columns)
@@ -289,7 +339,6 @@ def beamDyn2Hawc2_raw(r_bar, kp_x, kp_y, kp_z, twist,
     if A is None: A = np.ones(x_G.shape)
     if E is None: E = EA/A
     if G is None: G = E/2/(1+0.3) # Young modulus
-#     import pdb; pdb.set_trace()
     # Hawc2 = BeamDyn
     x_cg    = -y_G
     y_cg    = x_G
@@ -331,216 +380,6 @@ def beamDyn2Hawc2_raw(r_bar, kp_x, kp_y, kp_z, twist,
 
 
 
-
-# --------------------------------------------------------------------------------}
-# --- Functions for 6x6 matrices 
-# --------------------------------------------------------------------------------{
-def M66toProps(M, convention='BeamDyn'):
-    """ 
-    Convert mass properties of a 6x6 section to beam properties
-    This assumes that the axial and bending loads are decoupled.
-
-    INPUTS:
-     - M : 6x6 array of mass elements. Each element may be an array (e.g. for all spanwise values)
-     OUTPUTS:
-      - m: section mass
-      - Ixx, Iyy, Ixy: area moment of inertia
-      - x_G, y_G
-    """
-    M11=M[0,0]
-    M44=M[3,3]
-    M55=M[4,4]
-    M66=M[5,5]
-    M16=M[0,5]
-    M26=M[1,5]
-    M45=M[3,4]
-
-    m=M11
-    if convention=='BeamDyn':
-        if np.all(np.abs(m)<1e-16):
-            Ixi = Iyi = Ipp = x_G = y_G = theta_i = m*0
-            return m, Ixi, Iyi, Ipp, x_G, y_G, theta_i
-        y_G= -M16/m
-        x_G=  M26/m
-        # sanity
-        np.testing.assert_array_almost_equal([M[0,3],M[0,4]],[0*M[0,3],0*M[0,3]])
-        np.testing.assert_array_almost_equal([M[1,3],M[1,4]],[0*M[0,3],0*M[0,3]])
-        np.testing.assert_array_almost_equal([M[3,5],M[4,5]],[0*M[0,3],0*M[0,3]])
-        
-        Ixx =  M44-m*y_G**2
-        Iyy =  M55-m*x_G**2
-        Ixy = -M45-m*x_G*y_G
-        Ipp =  M66 -m*(x_G**2 + y_G**2)
-
-        if np.all(np.abs(Ixy)<1e-16):
-            # NOTE: Assumes theta_i ==0
-            #print('>>> Assume theta_i 0')
-            Ixi     = Ixx
-            Iyi     = Iyy
-            theta_i = Ixx*0
-        else:
-            #print('>>> Minimize theta_i')
-            Ixi = np.zeros(Ixx.shape)
-            Iyi = np.zeros(Ixx.shape)
-            theta_i = np.zeros(Ixx.shape)
-            for i, (hxx, hyy, hxy) in enumerate(zip(Ixx,Iyy,Ixy)):
-                Ixi[i],Iyi[i],theta_i[i] = solvexytheta(hxx,hyy,hxy)
-
-                MM2= MM(m[i],Ixi[i],Iyi[i],Ipp[i],x_G[i],y_G[i],theta_i[i])
-
-                np.testing.assert_allclose(MM2[3,3], M[3,3][i], rtol=1e-3)
-                np.testing.assert_allclose(MM2[4,4], M[4,4][i], rtol=1e-3)
-                np.testing.assert_allclose(MM2[5,5], M[5,5][i], rtol=1e-3)
-                np.testing.assert_allclose(MM2[3,4], M[3,4][i], rtol=1e-3)
-
-        np.testing.assert_array_almost_equal(Ipp, Ixx+Iyy, 2)
-        np.testing.assert_array_almost_equal(Ipp, Ixi+Iyi, 2)
-         
-    else:
-        raise NotImplementedError()
-
-    return m, Ixi, Iyi, Ipp, x_G, y_G, theta_i
-
-def solvexytheta(Hxx,Hyy,Hxy):
-    """ 
-     Solve for a system of three unknown, used to get:
-       - EIy, EIx and thetap given Hxx,Hyy,Hxy
-       - kxs*GA, kys*GA and thetas given Kxx,Kyy,Kxy
-       - I_x, I_y and theta_is given Ixx,Iyy,Ixy
-    """
-    from scipy.optimize import fsolve
-    def residual(x):
-        EI_x, EI_y, theta_p =x
-        res=np.array([
-            Hxx - EI_x*np.cos(theta_p)**2 - EI_y*np.sin(theta_p)**2 ,
-            Hyy - EI_x*np.sin(theta_p)**2 - EI_y*np.cos(theta_p)**2,
-            Hxy - (EI_y-EI_x)*np.sin(theta_p)*np.cos(theta_p)]
-                ).astype(float)
-        return res
-    x0 = [Hxx,Hyy,0]
-    x_opt   = fsolve(residual, x0)
-    EI_x,EI_y,theta_p = x_opt
-    theta_p = np.mod(theta_p,2*np.pi)
-    return EI_x, EI_y, theta_p
-
-
-
-def K66toProps(K, theta_p_in=None, convention='BeamDyn'):
-    """ 
-    Convert stiffness properties of a 6x6 section to beam properties
-    This assumes that the axial and bending loads are decoupled.
-
-    INPUTS:
-     - K : 6x6 array of stiffness elements. Each element may be an array (e.g. for all spanwise values)
-    INPUTS OPTIONAL:
-     - theta_p_in : angle from section to principal axis [rad], positive around z
-     - convention : to change coordinate systems in the future
-    OUTPUTS:
-     - EA, EIx, EIy: axial and bending stiffnesses
-     - kxGA, kyGA, GKt: shear and torsional stiffness
-     - xC,yC : centroid
-     - xS,yS : shear center
-     - theta_p, theta_s: angle to principal axes and shear axes [rad]
-    """
-    K11=K[0,0]
-    K22=K[1,1]
-    K33=K[2,2]
-    K44=K[3,3]
-    K55=K[4,4]
-    K66=K[5,5]
-
-    K12=K[0,1]
-    K16=K[0,5]
-    K26=K[1,5]
-    K34=K[2,3]
-    K35=K[2,4]
-    K45=K[3,4]
-
-    if convention=='BeamDyn':
-        # --- EA, EI, centroid, principal axes
-        EA =  K33
-        yC =  K34/EA
-        xC = -K35/EA
-        Hxx=  K44-EA*yC**2
-        Hyy=  K55-EA*xC**2 # NOTE: xC fixed
-        Hxy= -K45-EA*xC*yC # NOTE: sign changed
-
-        if theta_p_in is not None:
-            theta_p=theta_p_in
-            print('>>> theta_p given')
-            C2=np.cos(theta_p)**2
-            S2=np.sin(theta_p)**2
-            C4=np.cos(theta_p)**4
-            S4=np.sin(theta_p)**4
-            EIxp = (Hxx*C2 - Hyy*S2)/(C4-S4)
-            EIyp = (Hxx*S2 - Hyy*C2)/(S4-C4)
-            Hxyb = (EIyp-EIxp)*np.sin(theta_p)*np.cos(theta_p)
-
-            bNZ=np.logical_and(Hxy!=0, Hxyb!=0)
-            np.testing.assert_allclose(Hxy[bNZ], Hxyb[bNZ], rtol=1e-3)
-            np.testing.assert_allclose(EIxp+EIyp, Hxx+Hyy, rtol=1e-3)
-
-        else:
-            if np.all(np.abs(Hxy)<1e-16):
-                #print('>>>> assume theta_p=0')
-                # NOTE: Assumes theta_p ==0
-                EIxp = Hxx
-                EIyp = Hyy
-                theta_p=0*EA
-            else:
-                #print('>>> Minimization for theta_p')
-                EIxp= np.zeros(Hxx.shape)
-                EIyp= np.zeros(Hxx.shape)
-                theta_p = np.zeros(Hxx.shape)
-                for i, (hxx, hyy, hxy) in enumerate(zip(Hxx,Hyy,Hxy)):
-                    EIxp[i],EIyp[i],theta_p[i] = solvexytheta(hxx,hyy,hxy)
-
-            theta_p[theta_p>np.pi]=theta_p[theta_p>np.pi]-2*np.pi
-
-        # --- Torsion, shear terms, shear center
-        Kxx =  K11
-        Kxy = -K12
-        Kyy =  K22
-        yS  = (Kyy*K16+Kxy*K26)/(-Kyy*Kxx + Kxy**2)
-        xS  = (Kxy*K16+Kxx*K26)/( Kyy*Kxx - Kxy**2)
-        GKt = K66 - Kxx*yS**2 -2*Kxy*xS*yS - Kyy*xS**2
-        if np.all(np.abs(Kxy)<1e-16):
-            # Assumes theta_s=0
-            kxsGA = Kxx # Kxx = kxs*GA
-            kysGA = Kyy
-            theta_s=0*EA
-        else:
-            kxsGA = np.zeros(Kxx.shape)
-            kysGA = np.zeros(Kxx.shape)
-            theta_s = np.zeros(Hxx.shape)
-            for i, (kxx, kyy, kxy) in enumerate(zip(Kxx,Kyy,Kxy)):
-                kxsGA[i],kysGA[i],theta_s[i] = solvexytheta(kxx,kyy,kxy)
-
-        theta_s[theta_s>np.pi]=theta_s[theta_s>np.pi]-2*np.pi
-
-
-        # sanity checks
-        KK2= KK(EA, EIxp, EIyp, GKt, EA*0+1, kxsGA, kysGA, xC, yC, theta_p, xS, yS, theta_s)
-        np.testing.assert_allclose(KK2[0,0], K[0,0], rtol=1e-2)
-        np.testing.assert_allclose(KK2[1,1], K[1,1], rtol=1e-2)
-        np.testing.assert_allclose(KK2[2,2], K[2,2], rtol=1e-2)
-        np.testing.assert_allclose(KK2[3,3], K[3,3], rtol=1e-1)
-#         np.testing.assert_allclose(KK2[4,4], K[4,4], rtol=1e-2)
-        np.testing.assert_allclose(KK2[5,5], K[5,5], rtol=1e-1)
-        np.testing.assert_allclose(KK2[2,3], K[2,3], rtol=1e-2)
-        np.testing.assert_allclose(KK2[2,4], K[2,4], rtol=1e-2)
-
-        np.testing.assert_allclose(K16, -Kxx*yS-Kxy*xS)
-#         np.testing.assert_allclose(KK2[0,5], K[0,5],rtol=1e-3)
-#         np.testing.assert_allclose(KK2[1,5], K[1,5],rtol=5e-2) # Kxy harder to get
-        #np.testing.assert_allclose(KK2[3,4], K[3,4]) # <<< hard to match
-
-    else:
-        raise NotImplementedError()
-
-    return EA, EIxp, EIyp, kxsGA, kysGA, GKt, xC, yC, xS, yS, theta_p, theta_s
-
-
 if __name__=='__main__':
     np.set_printoptions(linewidth=300)
 
@@ -555,5 +394,6 @@ if __name__=='__main__':
     copyfile(H2_htcfile_old, H2_htcfile_new)
 
     beamDyn2Hawc2(BD_mainfile, BD_bladefile, H2_htcfile_new, H2_stfile, 'beam_1', A=None, E=None, G=None)
+
 
 

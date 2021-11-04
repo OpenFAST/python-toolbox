@@ -51,6 +51,7 @@ def copyTree(src, dst):
             if not os.access(dfile, os.W_OK):
                 os.chmod(dfile, stat.S_IWUSR)
         #print(sfile, ' > ', dfile)
+        #if not os.path.samefile(sfile,dfile):
         shutil.copy2(sfile, dfile)
 
     def isAFlatDir(sDir):

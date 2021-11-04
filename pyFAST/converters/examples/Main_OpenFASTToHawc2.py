@@ -20,7 +20,7 @@ MyDir=os.path.dirname(__file__)
 
 htcTemplate = os.path.join(MyDir,'../../../data/templates/hawc2_template.htc')
 fstIn       = os.path.join(MyDir,'../../../data/NREL5MW/Main_Onshore_OF2_BD.fst')
-htcOut      = '_NREL5MW_from_OF.htc' # will be created
+htcOut      = os.path.join(MyDir,'_NREL5MW_from_OF.htc') # will be created
 OPfile      = None
 
 # htcTemplate = 'data/templates/hawc2_template.htc'

@@ -51,8 +51,6 @@ def ED_TwrStations(ED):
     h_nodes      = twr_fract*(ED['TowerHt']-ED['TowerBsHt']) + ED['TowerBsHt']
     return twr_fract, h_nodes
 
-
-
 def ED_BldGag(ED):
     """ Returns the radial position of ElastoDyn blade gages 
     INPUTS:
