@@ -10,6 +10,7 @@ import pyFAST
 from pyFAST.input_output.hawc2_dat_file import HAWC2DatFile
 from pyFAST.input_output.hawc2_ae_file import HAWC2AEFile
 from pyFAST.input_output.hawc2_pc_file import HAWC2PCFile
+from pyFAST.input_output.hawc2_st_file import HAWC2StFile
 from pyFAST.input_output.hawcstab2_ind_file import HAWCStab2IndFile
 from pyFAST.input_output.hawcstab2_pwr_file import HAWCStab2PwrFile
 
@@ -35,6 +36,23 @@ class Test(unittest.TestCase):
         F.test_ascii(bCompareWritesOnly=True,bDelete=True)
         os.remove(os.path.join(MyDir,'HAWC2_out_ascii_TMP.sel'))
         os.remove(os.path.join(MyDir,'HAWC2_out_ascii_TMP2.sel'))
+
+    def test_HAWC2_st(self):
+        # --- not FPM
+        F=HAWC2StFile(os.path.join(MyDir,'HAWC2_st.st'))
+        dfs=F.toDataFrame()
+        set11=dfs['1_1']
+        set22=dfs['2_2']
+        self.assertEqual(set11['m_[kg/m]'].values[-1], 2536.27)
+        self.assertEqual(set11['A_[m^2]'].values[-1], 0.298)
+        self.assertEqual(set22['r_[m]'].values[-1], 1.96256)
+        self.assertEqual(set22['ri_x_[m]'].values[-1], 1.36)
+        # --- FPM
+        F=HAWC2StFile(os.path.join(MyDir,'HAWC2_st_fpm.st'))
+        dfs=F.toDataFrame()
+        set11=dfs['1_1']
+        np.testing.assert_almost_equal(set11['m_[kg/m]'].values[-1], 5.6348074, 3)
+        np.testing.assert_almost_equal(set11['K66'].values[-1], 8.41526513e04, 3)
 
     def test_HAWC2_pc(self):
         F=HAWC2PCFile(os.path.join(MyDir,'HAWC2_pc.dat'))
@@ -93,5 +111,5 @@ class Test(unittest.TestCase):
         self.assertEqual(DF.columns[1], 'Node_[-]')
 
 if __name__ == '__main__':
-    Test().test_HAWC2_pc()
+    #Test().test_HAWC2_pc()
     unittest.main()

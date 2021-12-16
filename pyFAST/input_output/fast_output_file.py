@@ -16,7 +16,8 @@ from .file import File, WrongFormatError, BrokenReaderError
 from .csv_file import CSVFile
 import numpy as np
 import pandas as pd
-import struct
+import struct 
+from struct import pack
 import os
 import re
 
@@ -335,6 +336,236 @@ def load_binary_output(filename, use_buffer=True):
             'attribute_units': ChanUnit}
     return data, info
 
+
+# import numpy as np
+# from array import *
+
+def writeBinary(fileName, channels, chanName, chanUnit, fileID, descStr):
+    """
+    WriteFASTbinary(FileName, Channels, ChanName, ChanUnit, FileID, DescStr)
+    Author: Hugo Castro, David Schlipf, Hochschule Flensburg, based on ReadFASTbinary from 
+        Bonnie Jonkman, National Renewable Energy Laboratory
+    
+    Input:
+     FileName      - string: contains file name to open
+     Channels      - 2-D array: dimension 1 is time, dimension 2 is channel 
+     ChanName      - cell array containing names of output channels
+     ChanUnit      - cell array containing unit names of output channels
+     FileID        - constant that determines if the time is stored in the
+                     output, indicating possible non-constant time step
+     DescStr       - String describing the file
+    """
+    channels = np.asarray(channels)
+    nT, numOutWithTime = np.shape(channels)
+    numOutChans = numOutWithTime - 1
+
+    #time for FileID 2
+    for i in range(numOutWithTime):
+        if ("Time" in chanName[i]):
+            time = channels[:][i]
+    timeOut1 = time[0]
+    timeIncr = time[1]-time[0]
+        
+    #scaling
+    # To best use the int16 range, the max float is matched to 2^15-1 and the
+    # the min float is matched to -2^15. Thus, we have the to equations we need
+    # to solve to get scaling and offset, see line 120 of ReadFASTbinary:
+    # Int16Max = FloatMax * Scaling + Offset 
+    # Int16Min = FloatMin * Scaling + Offset
+    dataWithOutTime = channels[:,1:]
+    int16Max = 2**15 - 1
+    int16Min = -2**15
+    colScl = []
+    colOff = []
+    for iChan in range(numOutChans):
+        floatData = dataWithOutTime[iChan,:]
+        floatMax = max(floatData)
+        floatMin = min(floatData)
+        vrange = floatMax-floatMin
+        if floatMax==floatMin:
+            vrange=1
+        scaling = np.single((int16Max - int16Min)/(vrange))
+        offset = np.single( int16Min-floatMin*scaling)
+        colScl.append(scaling)
+        colOff.append(offset)
+    #Description
+    lenDesc = len(descStr)
+    descStrASCII = [ord(char) for char in descStr]
+    
+    #Just available for fileID 
+    if fileID != 2:
+        print("current version just works with FileID = 2")
+
+    else:
+        #openfile. wb for Writing right and b for writing binary
+        fid = open(fileName,'wb')
+
+        #Used for packing arrays.
+        ##fid.write(pack('@{}f'.format(len((colScl))), *colScl))
+        ##fid.write(pack('@{}f'.format(len((colOff))), *colOff))
+        ##fid.write(pack('@{}B'.format(len((descStrASCII))), *descStrASCII))
+
+        #Used for packing, @ is used for packing in native byte order
+        #B - unsigned integer 8 bits
+        #h - integer 16 bits
+        #i - integer 32 bits
+        #f - float 32 bits
+        #d - float 64 bits
+
+        fid.write(pack('@h',fileID))
+        fid.write(pack('@i',numOutChans))
+        fid.write(pack('@i',nT))
+        fid.write(pack('@d',timeOut1))
+        fid.write(pack('@d',timeIncr))
+        fid.write(pack('@{}f'.format(len((colScl))), *colScl))
+        fid.write(pack('@{}f'.format(len((colOff))), *colOff))
+        fid.write(pack('@i',lenDesc))
+        fid.write(pack('@{}B'.format(len((descStrASCII))), *descStrASCII))
+
+
+        # Write channel names
+        for iChan in chanName:
+            iChan = [ord(char) for char in iChan]
+            if len(iChan) < 10:
+                aux = 10-len(iChan)
+                for i in range(aux):
+                    iChan.append(32)
+            fid.write(pack('@{}B'.format(len((iChan))), *iChan))
+
+        # Write channel units
+        for iChan in chanUnit:
+            iChan =[ord(char) for char in iChan]
+            if len(iChan) < 10:
+                aux = 10-len(iChan)
+                for i in range(aux):
+                    iChan.append(32)
+            fid.write(pack('@{}B'.format(len((iChan))), *iChan))
+
+        # Pack data
+        packedDataMatrix = [[None]*100 for i in range(numOutChans)]
+        for iChan in range(numOutChans):
+            floatData = dataWithOutTime[iChan,:]
+            scaling = colScl[iChan]
+            offset = colOff[iChan]
+            int16Data = [x*scaling+offset for x in floatData]
+            packedDataMatrix[iChan] = int16Data
+
+        packedData = []
+        for i in range(len(channels[0])):
+            for j in range(len(channels)-1):
+                packedData.append(np.short((packedDataMatrix[j][i])))
+
+
+        # Write data
+        fid.write(pack('@{}h'.format(len((packedData))), *packedData))
+        fid.close()
+
+
+def writeBinary2(fileName, channels, chanName,chanUnit,fileID,descStr):
+    numOutWithTime = len(channels)
+    numOutChans = numOutWithTime - 1
+    nT = len(channels[0])
+    test = [0] * numOutWithTime
+
+    #time for FileID 2
+    for i in range(len(channels)):
+        if ("Time" in chanName[i]):
+            time = channels[:][i]
+    timeOut1 = time[0]
+    timeIncr = time[1]-time[0]
+        
+    #scaling
+    # To best use the int16 range, the max float is matched to 2^15-1 and the
+    # the min float is matched to -2^15. Thus, we have the to equations we need
+    # to solve to get scaling and offset, see line 120 of ReadFASTbinary:
+    # Int16Max = FloatMax * Scaling + Offset 
+    # Int16Min = FloatMin * Scaling + Offset
+    dataWithOutTime = channels[:][1:]
+    int16Max = 2**15 - 1
+    int16Min = -2**15
+    colScl = []
+    colOff = []
+    for iChan in range(numOutChans):
+        floatData = dataWithOutTime[iChan][:]
+        floatMax = max(floatData)
+        floatMin = min(floatData)
+        vrange = floatMax-floatMin
+        if floatMax==floatMin:
+            vrange=1
+        scaling = np.single((int16Max - int16Min)/vrange)
+        offset = np.single( int16Min-floatMin*scaling)
+        colScl.append(scaling)
+        colOff.append(offset)
+    #Description
+    lenDesc = len(descStr)
+    descStrASCII = [ord(char) for char in descStr]
+    
+    #Just available for fileID 
+    if fileID != 2:
+        print("current version just works with FileID = 2")
+
+    else:
+        #openfile. wb for Writing right and b for writing binary
+        fid = open(fileName,'wb')
+
+        #Used for packing arrays.
+        ##fid.write(pack('@{}f'.format(len((colScl))), *colScl))
+        ##fid.write(pack('@{}f'.format(len((colOff))), *colOff))
+        ##fid.write(pack('@{}B'.format(len((descStrASCII))), *descStrASCII))
+
+        #Used for packing, @ is used for packing in native byte order
+        #B - unsigned integer 8 bits
+        #h - integer 16 bits
+        #i - integer 32 bits
+        #f - float 32 bits
+        #d - float 64 bits
+
+        fid.write(pack('@h',fileID))
+        fid.write(pack('@i',numOutChans))
+        fid.write(pack('@i',nT))
+        fid.write(pack('@d',timeOut1))
+        fid.write(pack('@d',timeIncr))
+        fid.write(pack('@{}f'.format(len((colScl))), *colScl))
+        fid.write(pack('@{}f'.format(len((colOff))), *colOff))
+        fid.write(pack('@i',lenDesc))
+        fid.write(pack('@{}B'.format(len((descStrASCII))), *descStrASCII))
+
+
+        for iChan in chanName:
+            iChan = [ord(char) for char in iChan]
+            if len(iChan) < 10:
+                aux = 10-len(iChan)
+                for i in range(aux):
+                    iChan.append(32)
+            fid.write(pack('@{}B'.format(len((iChan))), *iChan))
+
+        for iChan in chanUnit:
+            iChan =[ord(char) for char in iChan]
+            print('>>>',iChan)
+            if len(iChan) < 10:
+                aux = 10-len(iChan)
+                for i in range(aux):
+                    iChan.append(32)
+            fid.write(pack('@{}B'.format(len((iChan))), *iChan))
+
+        packedDataMatrix = [[None]*100 for i in range(numOutChans)]
+        for iChan in range(numOutChans):
+            floatData = dataWithOutTime[iChan][:]
+            scaling = colScl[iChan]
+            offset = colOff[iChan]
+            int16Data = [x*scaling+offset for x in floatData]
+            packedDataMatrix[iChan] = int16Data
+
+        packedData = []
+        for i in range(len(channels[0])):
+            for j in range(len(channels)-1):
+                packedData.append(np.short((packedDataMatrix[j][i])))
+
+
+        fid.write(pack('@{}h'.format(len((packedData))), *packedData))
+         
+        fid.close()
+        print("file succesfully generated")
 
 
 if __name__ == "__main__":
