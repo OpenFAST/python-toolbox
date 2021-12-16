@@ -4,7 +4,7 @@ from pyFAST.input_output import TurbSimFile
 import pandas as pd
 
 def main():
-    """Modify TrubSim parameters and write"""
+    """Modify TurbSim parameters and write"""
     filename = '../tests/example_files/FASTIn_TurbSim.inp' # Name of TurbSim's input file
     f = FASTInputFile(filename)
     f['WrBLFF'] = False
@@ -20,7 +20,7 @@ def main():
     Turbsim_EXE = 'TurbSim_x64.exe'  # Change to the path of the TurbSim executable
     runner.run_cmd(TurbSim_FILE, Turbsim_EXE, wait=True, showOutputs=False, showCommand=True)
 
-    """Reads the speed of three directions"""
+    """Open the turbulence box, containing the wind speed in 3 directions"""
     ts = TurbSimFile('../tests/example_files/FASTIn_TurbSim_change.bts')  # Output file
     print(ts.keys())
     print(ts['info'])
