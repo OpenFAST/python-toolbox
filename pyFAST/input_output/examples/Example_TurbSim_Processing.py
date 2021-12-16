@@ -17,7 +17,7 @@ def main():
 
     """Run TurbSim"""
     TurbSim_FILE = '../tests/example_files/FASTIn_TurbSim_change.inp'  # Input file
-    Turbsim_EXE = 'C:\\Users\\tate\\OneDrive\\文档\\GitHub\\python-toolbox\\pyFAST\\input_output\\examples\\Example_TurbSim\\TurbSim_x64.exe'  # Change to the path of the TurbSim executable
+    Turbsim_EXE = 'TurbSim_x64.exe'  # Change to the path of the TurbSim executable
     runner.run_cmd(TurbSim_FILE, Turbsim_EXE, wait=True, showOutputs=False, showCommand=True)
 
     """Reads the speed of three directions"""
