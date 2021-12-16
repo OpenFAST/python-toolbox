@@ -17,7 +17,7 @@ except ImportError:
     import weis.control.mbc.mbc3 as mbc
 
 
-def postproCampbell(out_or_fstfiles, BladeLen=None, TowerLen=None, verbose=True, nFreqOut=15):
+def postproCampbell(out_or_fstfiles, BladeLen=None, TowerLen=None, verbose=True, nFreqOut=15, WS_legacy=None):
     """ 
     Postprocess linearization files to extract Campbell diagram (linearization at different Operating points)
     - Run MBC
@@ -72,7 +72,7 @@ def postproCampbell(out_or_fstfiles, BladeLen=None, TowerLen=None, verbose=True,
 
     # --- Return nice dataframes (assuming the identification is correct)
     # TODO, for now we reread the files...
-    OP, Freq, Damp, UnMapped, ModeData = postproMBC(csvModesIDFile=modeID_file, verbose=False)
+    OP, Freq, Damp, UnMapped, ModeData = postproMBC(csvModesIDFile=modeID_file, verbose=False, WS_legacy=WS_legacy)
     
     return OP, Freq, Damp, UnMapped, ModeData, modeID_file
 
@@ -285,7 +285,7 @@ def postproMBC(xlsFile=None, csvModesIDFile=None, xlssheet=None, verbose=True, W
     ID.iloc[:,0].fillna('Unknown', inplace=True) # replace nan
     ModeNames = ID.iloc[2: ,0].values
     ModeIDs   = ID.iloc[2: ,1:].values
-    nModesIDd = len(ModeNames) 
+    nModesIDd = len(ModeNames)  # Number of modes identified in the ID file
 
     if ModeIDs.shape[1]!=len(WS):
         print('OP Windspeed:',WS)
@@ -304,7 +304,7 @@ def postproMBC(xlsFile=None, csvModesIDFile=None, xlssheet=None, verbose=True, W
         ModeData.append(opData)
 
     # ---Dealing with missing WS
-    if np.all(np.isnan(np.array(WS).astype(float))) or np.all(np.array(WS).astype(float)==0):
+    if np.any(np.isnan(np.array(WS).astype(float))) or np.all(np.array(WS).astype(float)==0):
         print('[WARN] WS were not provided in linearization (all NaN), likely old OpenFAST version ')
         if WS_legacy is not None:
             print('    > Using WS_legacy provided.')
@@ -312,16 +312,13 @@ def postproMBC(xlsFile=None, csvModesIDFile=None, xlssheet=None, verbose=True, W
                 raise Exception('WS_legacy should have length {} instead of {}'.format(len(WS),len(WS_legacy)))
             WS = WS_legacy
         else:
-            print('[WARN] Replacing WS with index!')
+            print('[WARN] WS was replaced with index!')
             WS = np.arange(0,len(WS))
 
     # --- Creating a cleaner table of operating points
     OP = pd.DataFrame(np.nan, index=np.arange(len(WS)), columns=['WS_[m/s]', 'RotSpeed_[rpm]'])
     OP['WS_[m/s]']        = WS
     OP['RotSpeed_[rpm]'] = RPM
-    #print(WS)
-    #print(RPM)
-    #print(OP.shape)
 
     UnMapped_WS   = []
     UnMapped_RPM  = []
@@ -331,9 +328,9 @@ def postproMBC(xlsFile=None, csvModesIDFile=None, xlssheet=None, verbose=True, W
     for iOP,(ws,rpm) in enumerate(zip(WS,RPM)):
         m = ModeData[iOP]
         nModesMax = len(m['Fnat'])
-        nModes = min(nModesMax, nModesIDd) # somehow sometimes we have 15 modes IDd but only 14 in the ModeData..
+        #nModes = min(nModesMax, nModesIDd) # somehow sometimes we have 15 modes IDd but only 14 in the ModeData..
         Indices = (np.asarray(ModeIDs[:,iOP])-1).astype(int)
-        IndicesMissing = [i for i in np.arange(nModes) if i not in Indices]
+        IndicesMissing = [i for i in np.arange(nModesMax) if i not in Indices]
         f   = np.asarray([m['Fnat'] [iiMode] for iiMode in IndicesMissing])
         d   = np.asarray([m['Damps'][iiMode] for iiMode in IndicesMissing])
         ws  = np.asarray([ws]*len(f))
@@ -342,16 +339,16 @@ def postproMBC(xlsFile=None, csvModesIDFile=None, xlssheet=None, verbose=True, W
         UnMapped_Damp = np.concatenate((UnMapped_Damp, d))
         UnMapped_WS   = np.concatenate((UnMapped_WS, ws))
         UnMapped_RPM  = np.concatenate((UnMapped_RPM, rpm))
-    # --- Unidentified modes, beyond "nModes"
-    for m,ws,rpm in zip(ModeData,WS,RPM):
-        f   = m['Fnat'][nModesIDd:]
-        d   = m['Damps'][nModesIDd:]
-        ws  = np.asarray([ws]*len(f))
-        rpm = np.asarray([rpm]*len(f))
-        UnMapped_Freq = np.concatenate((UnMapped_Freq, f))
-        UnMapped_Damp = np.concatenate((UnMapped_Damp, d))
-        UnMapped_WS   = np.concatenate((UnMapped_WS, ws))
-        UnMapped_RPM  = np.concatenate((UnMapped_RPM, rpm))
+    ## --- Unidentified modes, beyond "nModes"
+    #for m,ws,rpm in zip(ModeData,WS,RPM):
+    #   f   = m['Fnat'][nModesIDd:]
+    #   d   = m['Damps'][nModesIDd:]
+    #   ws  = np.asarray([ws]*len(f))
+    #   rpm = np.asarray([rpm]*len(f))
+    #   UnMapped_Freq = np.concatenate((UnMapped_Freq, f))
+    #   UnMapped_Damp = np.concatenate((UnMapped_Damp, d))
+    #   UnMapped_WS   = np.concatenate((UnMapped_WS, ws))
+    #   UnMapped_RPM  = np.concatenate((UnMapped_RPM, rpm))
 
     # --- Put identified modes into a more convenient form
     cols=[ m.split('-')[0].strip().replace(' ','_') for m in ModeNames]
@@ -435,14 +432,14 @@ def campbellModeStyles(i, lbl):
     elif any([s in lbl for s in ['2nd blade edge']]):
         c=MW_Light_Red
     # Line style
-    if any([s in lbl for s in ['tower fa','collective','drivetrain']]):
+    if any([s in lbl for s in ['tower fa','collective','drivetrain','coll']]):
         ls='-'
-    elif any([s in lbl for s in ['tower ss','regressive']]):
+    elif any([s in lbl for s in ['tower ss','regressive','bw']]):
         ls='--'
-    elif any([s in lbl for s in ['tower ss','progressive']]):
+    elif any([s in lbl for s in ['tower ss','progressive','fw']]):
         ls='-.'
     # Marker
-    if any([s in lbl for s in ['collective']]):
+    if any([s in lbl for s in ['collective','coll']]):
         mk='2'; ms=8
     elif any([s in lbl for s in ['blade','tower','drivetrain']]):
         mk=''; 

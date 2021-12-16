@@ -133,7 +133,12 @@ def defaultFilenames(OP, rpmSweep=None):
     """
 
     if rpmSweep is None:
-       rpmSweep = 'WindSpeed_[m/s]' not in OP.columns
+        if 'WindSpeed_[m/s]' not in OP.columns:
+            rpmSweep=True
+        elif len(np.unique(OP['WindSpeed_[m/s]']))==1:
+            rpmSweep=True
+        else:
+            rpmSweep=False
     nOP=len(OP['RotorSpeed_[rpm]']);
     filenames=['']*nOP;
     for iOP, line in OP.iterrows():
@@ -201,10 +206,10 @@ def writeLinearizationFiles(main_fst, workDir, operatingPointsFile,
 
     if trim and not hasTrim:
         trim=False
-        print('[WARN] Desactivating trim since not available in this version of OpenFAST')
+        print('[WARN] Deactivating trim since not available in this version of OpenFAST')
     if viz and not hasTrim:
         viz=False
-        print('[WARN] Desactivating VTK vizualization since not available in this version of OpenFAST')
+        print('[WARN] Deactivating VTK vizualization since not available in this version of OpenFAST')
 
     # --- Reading operating points
     OP = readOperatingPoints(operatingPointsFile)
