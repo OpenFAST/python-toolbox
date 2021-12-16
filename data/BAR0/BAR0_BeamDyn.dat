@@ -1,0 +1,210 @@
+--------- BEAMDYN with OpenFAST INPUT FILE -------------------------------------------
+BAR0 blade
+---------------------- SIMULATION CONTROL --------------------------------------
+True          Echo            - Echo input data to "<RootName>.ech" (flag)
+True          QuasiStaticInit - Use quasistatic pre-conditioning with centripetal accelerations in initialization (flag) [dynamic solve only]
+ 0            rhoinf          - Numerical damping parameter for generalized-alpha integrator
+ 2            quadrature      - Quadrature method: 1=Gaussian; 2=Trapezoidal (switch)
+"DEFAULT"     refine          - Refinement factor for trapezoidal quadrature (-). DEFAULT = 1 [used only when quadrature=2]
+"DEFAULT"     n_fact          - Factorization frequency (-). DEFAULT = 5
+"DEFAULT"     DTBeam          - Time step size (s).
+"DEFAULT"     load_retries    - Number of factored load retries before quitting the aimulation
+"DEFAULT"     NRMax           - Max number of iterations in Newton-Ralphson algorithm (-). DEFAULT = 10
+"DEFAULT"     stop_tol        - Tolerance for stopping criterion (-)
+"DEFAULT"     tngt_stf_fd     - Flag to use finite differenced tangent stiffness matrix (-)
+"DEFAULT"     tngt_stf_comp   - Flag to compare analytical finite differenced tangent stiffness matrix  (-)
+"DEFAULT"     tngt_stf_pert   - perturbation size for finite differencing (-)
+"DEFAULT"     tngt_stf_difftol- Maximum allowable relative difference between analytical and fd tangent stiffness (-)
+True          RotStates       - Orient states in the rotating frame during linearization? (flag) [used only when linearizing]
+---------------------- GEOMETRY PARAMETER --------------------------------------
+          1   member_total    - Total number of members (-)
+         50   kp_total        - Total number of key points (-) [must be at least 3]
+     1     50                 - Member number; Number of key points in this member
+		 kp_xr 			 kp_yr 			 kp_zr 		 initial_twist
+		  (m)  			  (m)  			  (m)  		   (deg)
+	 0.00000e+00 	 0.00000e+00 	 0.00000e+00 	 2.00020e+01 
+	 8.63467e-03 	 0.00000e+00 	 2.04074e+00 	 1.91564e+01 
+	 2.15019e-02 	 0.00000e+00 	 4.08148e+00 	 1.82967e+01 
+	 4.37747e-02 	 0.00000e+00 	 6.12222e+00 	 1.74058e+01 
+	 7.27647e-02 	 0.00000e+00 	 8.16296e+00 	 1.64885e+01 
+	 1.05859e-01 	 0.00000e+00 	 1.02037e+01 	 1.55552e+01 
+	 1.44569e-01 	 0.00000e+00 	 1.22444e+01 	 1.45850e+01 
+	 1.83806e-01 	 0.00000e+00 	 1.42852e+01 	 1.35694e+01 
+	 2.23391e-01 	 0.00000e+00 	 1.63259e+01 	 1.24193e+01 
+	 2.60385e-01 	 0.00000e+00 	 1.83667e+01 	 1.11478e+01 
+	 2.95273e-01 	 0.00000e+00 	 2.04074e+01 	 9.77762e+00 
+	 3.21803e-01 	 0.00000e+00 	 2.24481e+01 	 8.50445e+00 
+	 3.44403e-01 	 0.00000e+00 	 2.44889e+01 	 7.32442e+00 
+	 3.54565e-01 	 0.00000e+00 	 2.65296e+01 	 6.51697e+00 
+	 3.56325e-01 	 0.00000e+00 	 2.85704e+01 	 5.98306e+00 
+	 3.49085e-01 	 0.00000e+00 	 3.06111e+01 	 5.74223e+00 
+	 3.32060e-01 	 0.00000e+00 	 3.26518e+01 	 5.58666e+00 
+	 3.11591e-01 	 0.00000e+00 	 3.46926e+01 	 5.45698e+00 
+	 2.83390e-01 	 0.00000e+00 	 3.67333e+01 	 5.35879e+00 
+	 2.53147e-01 	 0.00000e+00 	 3.87741e+01 	 5.25768e+00 
+	 2.20011e-01 	 0.00000e+00 	 4.08148e+01 	 5.15245e+00 
+	 1.80702e-01 	 0.00000e+00 	 4.28555e+01 	 5.02080e+00 
+	 1.38387e-01 	 0.00000e+00 	 4.48963e+01 	 4.87880e+00 
+	 7.77649e-02 	 0.00000e+00 	 4.69370e+01 	 4.72874e+00 
+	 1.17613e-02 	 0.00000e+00 	 4.89778e+01 	 4.57369e+00 
+	 -6.44672e-02 	 0.00000e+00 	 5.10185e+01 	 4.40915e+00 
+	 -1.46733e-01 	 0.00000e+00 	 5.30592e+01 	 4.22703e+00 
+	 -2.32177e-01 	 0.00000e+00 	 5.51000e+01 	 4.03566e+00 
+	 -3.25989e-01 	 0.00000e+00 	 5.71407e+01 	 3.79891e+00 
+	 -4.25425e-01 	 0.00000e+00 	 5.91815e+01 	 3.53334e+00 
+	 -5.38845e-01 	 0.00000e+00 	 6.12222e+01 	 3.19640e+00 
+	 -6.61935e-01 	 0.00000e+00 	 6.32629e+01 	 2.82556e+00 
+	 -7.91852e-01 	 0.00000e+00 	 6.53037e+01 	 2.43080e+00 
+	 -9.31171e-01 	 0.00000e+00 	 6.73444e+01 	 2.03663e+00 
+	 -1.07298e+00 	 0.00000e+00 	 6.93852e+01 	 1.65408e+00 
+	 -1.22016e+00 	 0.00000e+00 	 7.14259e+01 	 1.31588e+00 
+	 -1.37464e+00 	 0.00000e+00 	 7.34666e+01 	 9.98479e-01 
+	 -1.53592e+00 	 0.00000e+00 	 7.55074e+01 	 7.00497e-01 
+	 -1.70837e+00 	 0.00000e+00 	 7.75481e+01 	 4.16424e-01 
+	 -1.88448e+00 	 0.00000e+00 	 7.95889e+01 	 1.36322e-01 
+	 -2.06891e+00 	 0.00000e+00 	 8.16296e+01 	 -1.37075e-01 
+	 -2.25762e+00 	 0.00000e+00 	 8.36703e+01 	 -4.10974e-01 
+	 -2.45156e+00 	 0.00000e+00 	 8.57111e+01 	 -6.85491e-01 
+	 -2.65327e+00 	 0.00000e+00 	 8.77518e+01 	 -9.60235e-01 
+	 -2.85830e+00 	 0.00000e+00 	 8.97926e+01 	 -1.23483e+00 
+	 -3.07501e+00 	 0.00000e+00 	 9.18333e+01 	 -1.50635e+00 
+	 -3.29647e+00 	 0.00000e+00 	 9.38740e+01 	 -1.77660e+00 
+	 -3.52570e+00 	 0.00000e+00 	 9.59148e+01 	 -2.04477e+00 
+	 -3.76140e+00 	 0.00000e+00 	 9.79555e+01 	 -2.31058e+00 
+	 -4.00000e+00 	 0.00000e+00 	 9.99963e+01 	 -2.57534e+00 
+---------------------- MESH PARAMETER ------------------------------------------
+          5   order_elem     - Order of interpolation (basis) function (-)
+---------------------- MATERIAL PARAMETER --------------------------------------
+"BAR0_BeamDyn_Blade.dat"    BldFile - Name of file containing properties for blade (quoted string)
+---------------------- PITCH ACTUATOR PARAMETERS -------------------------------
+False         UsePitchAct - Whether a pitch actuator should be used (flag)
+        200   PitchJ      - Pitch actuator inertia (kg-m^2) [used only when UsePitchAct is true]
+      2E+07   PitchK      - Pitch actuator stiffness (kg-m^2/s^2) [used only when UsePitchAct is true]
+     500000   PitchC      - Pitch actuator damping (kg-m^2/s) [used only when UsePitchAct is true]
+---------------------- OUTPUTS -------------------------------------------------
+True          SumPrint       - Print summary data to "<RootName>.sum" (flag)
+"ES10.3E2"    OutFmt         - Format used for text tabular output, excluding the time channel.
+          9   NNodeOuts      - Number of nodes to output to file [0 - 9] (-)
+3, 6, 9, 12, 15, 18, 21, 24, 27     OutNd          - Nodes whose values will be output  (-) OutNd       - Nodes whose values will be output  (-) OutNd       - Nodes whose values will be output  (-) OutNd       - Nodes whose values will be output  (-) OutNd       - Nodes whose values will be output  (-) OutNd       - Nodes whose values will be output  (-) OutNd       - Nodes whose values will be output  (-) OutNd       - Nodes whose values will be output  (-) OutNd       - Nodes whose values will be output  (-)
+          OutList            - The next line(s) contains a list of output parameters. See OutListParameters.xlsx for a listing of available output channels, (-)
+"N1Fxl"
+"N1Fyl"
+"N1Fzl"
+"N1Mxl"
+"N1Myl"
+"N1Mzl"
+"N1RDxr"
+"N1RDyr"
+"N1RDzr"
+"N1TDxr"
+"N1TDyr"
+"N1TDzr"
+"N2Fxl"
+"N2Fyl"
+"N2Fzl"
+"N2Mxl"
+"N2Myl"
+"N2Mzl"
+"N2RDxr"
+"N2RDyr"
+"N2RDzr"
+"N2TDxr"
+"N2TDyr"
+"N2TDzr"
+"N3Fxl"
+"N3Fyl"
+"N3Fzl"
+"N3Mxl"
+"N3Myl"
+"N3Mzl"
+"N3RDxr"
+"N3RDyr"
+"N3RDzr"
+"N3TDxr"
+"N3TDyr"
+"N3TDzr"
+"N4Fxl"
+"N4Fyl"
+"N4Fzl"
+"N4Mxl"
+"N4Myl"
+"N4Mzl"
+"N4RDxr"
+"N4RDyr"
+"N4RDzr"
+"N4TDxr"
+"N4TDyr"
+"N4TDzr"
+"N5Fxl"
+"N5Fyl"
+"N5Fzl"
+"N5Mxl"
+"N5Myl"
+"N5Mzl"
+"N5RDxr"
+"N5RDyr"
+"N5RDzr"
+"N5TDxr"
+"N5TDyr"
+"N5TDzr"
+"N6Fxl"
+"N6Fyl"
+"N6Fzl"
+"N6Mxl"
+"N6Myl"
+"N6Mzl"
+"N6RDxr"
+"N6RDyr"
+"N6RDzr"
+"N6TDxr"
+"N6TDyr"
+"N6TDzr"
+"N7Fxl"
+"N7Fyl"
+"N7Fzl"
+"N7Mxl"
+"N7Myl"
+"N7Mzl"
+"N7RDxr"
+"N7RDyr"
+"N7RDzr"
+"N7TDxr"
+"N7TDyr"
+"N7TDzr"
+"N8Fxl"
+"N8Fyl"
+"N8Fzl"
+"N8Mxl"
+"N8Myl"
+"N8Mzl"
+"N8RDxr"
+"N8RDyr"
+"N8RDzr"
+"N8TDxr"
+"N8TDyr"
+"N8TDzr"
+"N9Fxl"
+"N9Fyl"
+"N9Fzl"
+"N9Mxl"
+"N9Myl"
+"N9Mzl"
+"N9RDxr"
+"N9RDyr"
+"N9RDzr"
+"N9TDxr"
+"N9TDyr"
+"N9TDzr"
+"RootFxr"
+"RootFyr"
+"RootFzr"
+"RootMxr"
+"RootMyr"
+"RootMzr"
+"TipRDxr"
+"TipRDyr"
+"TipRDzr"
+"TipTDxr"
+"TipTDyr"
+"TipTDzr"
+END of input file (the word "END" must appear in the first 3 columns of this last OutList line)---------------------------------------------------------------------------------------

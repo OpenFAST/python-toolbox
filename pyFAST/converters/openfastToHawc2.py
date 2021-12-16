@@ -140,11 +140,9 @@ def FAST2Hawc2(fstIn, htcTemplate, htcOut, OPfile=None, TwrFAFreq=0.1, TwrSSFreq
     # val[:,3] = np.linspace(0, ED['HubRad'], val.shape[0])
 
     if BD is not None:
-
         # TODO A, E, G, theta_p
-
         st_filefull  = os.path.join(outDataDir, 'blade_st.st')
-        dfMeanLine, dfStructure = bd.beamDynToHawc2(BD, BDbld, H2_stfile=st_filefull,  A=Bld_A, E=Bld_E, G=Bld_G, theta_p_in = Bld_theta_p, FPM=FPM)
+        dfMeanLine, dfStructure = bd.beamDynToHawc2(BD, BDbld, H2_stfile=st_filefull, A=Bld_A, E=Bld_E, G=Bld_G, theta_p_in = Bld_theta_p, FPM=FPM, verbose=True)
         st_file = os.path.relpath(st_filefull, outDir)
 
         bdy.nbodies = dfMeanLine.shape[0]-1 # One body per station -1
@@ -152,10 +150,21 @@ def FAST2Hawc2(fstIn, htcTemplate, htcOut, OPfile=None, TwrFAFreq=0.1, TwrSSFreq
         bdy.timoschenko_input.set.values = [1,1]
 
         if FPM:
-            bdy.timoschenko_input.FPM = FPM
+            bdy.timoschenko_input.fpm = 1
             # Damping
-            raise NotImplementedError('Damping for FPM')
+            #bdy['damping_aniso'] = bdy.damping_posdef.copy()
+            bdy.damping_posdef.name_='damping_aniso'
+            bdy.damping_posdef.name_='damping_aniso'
+            bdy.damping_posdef.values[0]=0 # no mass proportioanl damping
+            bdy.damping_posdef.values[1]=0 # no mass proportioanl damping
+            bdy.damping_posdef.values[2]=0 # no mass proportioanl damping
+            bdy.damping_posdef.values[3] = BDbld['DampingCoeffs'][0,1] # TODO  Check order
+            bdy.damping_posdef.values[4] = BDbld['DampingCoeffs'][0,0] # TODO 
+            bdy.damping_posdef.values[5] = BDbld['DampingCoeffs'][0,2] # TODO 
+            #raise NotImplementedError('Damping for FPM')
+            print('>>>> TODO TODO TODO DAMPING ')
         else:
+            bdy.timoschenko_input.fpm = 0
             # Damping
             bdy.damping_posdef.values[3] = BDbld['DampingCoeffs'][0,1]
             bdy.damping_posdef.values[4] = BDbld['DampingCoeffs'][0,0]

@@ -124,6 +124,7 @@ begin new_htc_structure;
     begin timoschenko_input ;
       filename bar_beam_st.st;
       set 1 1 ;
+      fpm 0 ;
     end timoschenko_input;
     begin c2_def;              Definition of centerline (main_body coordinates)
       nsec 50 ;
