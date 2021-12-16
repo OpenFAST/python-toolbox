@@ -17,7 +17,6 @@ from .csv_file import CSVFile
 import numpy as np
 import pandas as pd
 import struct 
-from struct import pack
 import os
 import re
 
@@ -90,15 +89,18 @@ class FASTOutputFile(File):
 
     def _write(self): 
         if self['binary']:
-            # TODO
-            raise NotImplementedError()
-
-        # ascii output
-        with open(self.filename,'w') as f:
-            f.write('\t'.join(['{:>10s}'.format(c)         for c in self.info['attribute_names']])+'\n')
-            f.write('\t'.join(['{:>10s}'.format('('+u+')') for u in self.info['attribute_units']])+'\n')
-            # TODO better..
-            f.write('\n'.join(['\t'.join(['{:10.4f}'.format(y[0])]+['{:10.3e}'.format(x) for x in y[1:]]) for y in self.data]))
+            channels = self.data
+            chanNames = self.info['attribute_names']
+            chanUnits = self.info['attribute_units']
+            descStr   = self.info['description']
+            writeBinary(self.filename, channels, chanNames, chanUnits, fileID=2, descStr=descStr)
+        else:
+            # ascii output
+            with open(self.filename,'w') as f:
+                f.write('\t'.join(['{:>10s}'.format(c)         for c in self.info['attribute_names']])+'\n')
+                f.write('\t'.join(['{:>10s}'.format('('+u+')') for u in self.info['attribute_units']])+'\n')
+                # TODO better..
+                f.write('\n'.join(['\t'.join(['{:10.4f}'.format(y[0])]+['{:10.3e}'.format(x) for x in y[1:]]) for y in self.data]))
 
     def _toDataFrame(self):
         if self.info['attribute_units'] is not None:
@@ -332,240 +334,108 @@ def load_binary_output(filename, use_buffer=True):
 
     info = {'name': os.path.splitext(os.path.basename(filename))[0],
             'description': DescStr,
+            'fileID': FileID,
             'attribute_names': ChanName,
             'attribute_units': ChanUnit}
     return data, info
 
-
-# import numpy as np
-# from array import *
-
-def writeBinary(fileName, channels, chanName, chanUnit, fileID, descStr):
+def writeBinary(fileName, channels, chanNames, chanUnits, fileID=2, descStr=''):
     """
-    WriteFASTbinary(FileName, Channels, ChanName, ChanUnit, FileID, DescStr)
-    Author: Hugo Castro, David Schlipf, Hochschule Flensburg, based on ReadFASTbinary from 
-        Bonnie Jonkman, National Renewable Energy Laboratory
+    Write an OpenFAST binary file.
+
+    Based on contributions from
+        Hugo Castro, David Schlipf, Hochschule Flensburg
     
     Input:
      FileName      - string: contains file name to open
      Channels      - 2-D array: dimension 1 is time, dimension 2 is channel 
      ChanName      - cell array containing names of output channels
-     ChanUnit      - cell array containing unit names of output channels
+     ChanUnit      - cell array containing unit names of output channels, preferably surrounded by parenthesis
      FileID        - constant that determines if the time is stored in the
                      output, indicating possible non-constant time step
      DescStr       - String describing the file
     """
-    channels = np.asarray(channels)
-    nT, numOutWithTime = np.shape(channels)
-    numOutChans = numOutWithTime - 1
+    # Data sanitization
+    chanNames = list(chanNames)
+    channels  = np.asarray(channels)
+    if chanUnits[0][0]!='(':
+        chanUnits = ['('+u+')' for u in chanUnits] # units surrounded by parenthesis to match OpenFAST convention
 
-    #time for FileID 2
-    for i in range(numOutWithTime):
-        if ("Time" in chanName[i]):
-            time = channels[:][i]
-    timeOut1 = time[0]
-    timeIncr = time[1]-time[0]
+    nT, nChannelsWithTime = np.shape(channels)
+    nChannels             = nChannelsWithTime - 1
+
+    # For FileID =2,  time needs to be present and at the first column
+    try:
+        iTime = chanNames.index('Time')
+    except ValueError:
+        raise Exception('`Time` needs to be present in channel names' )
+    if iTime!=0:
+        raise Exception('`Time` needs to be the first column of `chanName`' )
+
+    time = channels[:,iTime]
+    timeStart = time[0]
+    timeIncr  = time[1]-time[0]
+    dataWithoutTime = channels[:,1:]
         
-    #scaling
-    # To best use the int16 range, the max float is matched to 2^15-1 and the
-    # the min float is matched to -2^15. Thus, we have the to equations we need
-    # to solve to get scaling and offset, see line 120 of ReadFASTbinary:
-    # Int16Max = FloatMax * Scaling + Offset 
-    # Int16Min = FloatMin * Scaling + Offset
-    dataWithOutTime = channels[:,1:]
-    int16Max = 2**15 - 1
-    int16Min = -2**15
-    colScl = []
-    colOff = []
-    for iChan in range(numOutChans):
-        floatData = dataWithOutTime[iChan,:]
-        floatMax = max(floatData)
-        floatMin = min(floatData)
-        vrange = floatMax-floatMin
-        if floatMax==floatMin:
-            vrange=1
-        scaling = np.single((int16Max - int16Min)/(vrange))
-        offset = np.single( int16Min-floatMin*scaling)
-        colScl.append(scaling)
-        colOff.append(offset)
-    #Description
-    lenDesc = len(descStr)
-    descStrASCII = [ord(char) for char in descStr]
+    # Compute data range, scaling and offsets to convert to int16
+    #   To use the int16 range to its fullest, the max float is matched to 2^15-1 and the
+    #   the min float is matched to -2^15. Thus, we have the to equations we need
+    #   to solve to get scaling and offset, see line 120 of ReadFASTbinary:
+    #   Int16Max = FloatMax * Scaling + Offset 
+    #   Int16Min = FloatMin * Scaling + Offset
+    int16Max   = np.single( 32767.0)         # Largest integer represented in 2 bytes,  2**15 - 1
+    int16Min   = np.single(-32768.0)         # Smallest integer represented in 2 bytes -2**15
+    int16Rng   = np.single(int16Max - int16Min)  # Max Range of 2 byte integer
+    mins   = np.min(dataWithoutTime, axis=0)
+    ranges = np.single(np.max(dataWithoutTime, axis=0) - mins)
+    ranges[ranges==0]=1  # range set to 1 for constant channel. In OpenFAST: /sqrt(epsilon(1.0_SiKi))
+    ColScl  = np.single(int16Rng/ranges)
+    ColOff  = np.single(int16Min - np.single(mins)*ColScl)
     
     #Just available for fileID 
     if fileID != 2:
         print("current version just works with FileID = 2")
 
     else:
-        #openfile. wb for Writing right and b for writing binary
-        fid = open(fileName,'wb')
+        with open(fileName,'wb') as fid:
+            # Notes on struct:
+            # @ is used for packing in native byte order
+            #  B - unsigned integer 8 bits
+            #  h - integer 16 bits
+            #  i - integer 32 bits
+            #  f - float 32 bits
+            #  d - float 64 bits
 
-        #Used for packing arrays.
-        ##fid.write(pack('@{}f'.format(len((colScl))), *colScl))
-        ##fid.write(pack('@{}f'.format(len((colOff))), *colOff))
-        ##fid.write(pack('@{}B'.format(len((descStrASCII))), *descStrASCII))
+            # Write header informations
+            fid.write(struct.pack('@h',fileID))
+            fid.write(struct.pack('@i',nChannels))
+            fid.write(struct.pack('@i',nT))
+            fid.write(struct.pack('@d',timeStart))
+            fid.write(struct.pack('@d',timeIncr))
+            fid.write(struct.pack('@{}f'.format(nChannels), *ColScl))
+            fid.write(struct.pack('@{}f'.format(nChannels), *ColOff))
+            descStrASCII = [ord(char) for char in descStr]
+            fid.write(struct.pack('@i',len(descStrASCII)))
+            fid.write(struct.pack('@{}B'.format(len((descStrASCII))), *descStrASCII))
 
-        #Used for packing, @ is used for packing in native byte order
-        #B - unsigned integer 8 bits
-        #h - integer 16 bits
-        #i - integer 32 bits
-        #f - float 32 bits
-        #d - float 64 bits
+            # Write channel names
+            for chan in chanNames:
+                ordchan = [ord(char) for char in chan]+ [32]*(10-len(chan))
+                fid.write(struct.pack('@10B', *ordchan))
 
-        fid.write(pack('@h',fileID))
-        fid.write(pack('@i',numOutChans))
-        fid.write(pack('@i',nT))
-        fid.write(pack('@d',timeOut1))
-        fid.write(pack('@d',timeIncr))
-        fid.write(pack('@{}f'.format(len((colScl))), *colScl))
-        fid.write(pack('@{}f'.format(len((colOff))), *colOff))
-        fid.write(pack('@i',lenDesc))
-        fid.write(pack('@{}B'.format(len((descStrASCII))), *descStrASCII))
+            # Write channel units
+            for unit in chanUnits:
+                ordunit = [ord(char) for char in unit]+ [32]*(10-len(unit))
+                fid.write(struct.pack('@10B', *ordunit))
 
+            # Pack data
+            packedData=np.zeros((nT, nChannels), dtype=np.int16)
+            for iChan in range(nChannels):
+                packedData[:,iChan] = np.clip( ColScl[iChan]*dataWithoutTime[:,iChan]+ColOff[iChan], int16Min, int16Max)
 
-        # Write channel names
-        for iChan in chanName:
-            iChan = [ord(char) for char in iChan]
-            if len(iChan) < 10:
-                aux = 10-len(iChan)
-                for i in range(aux):
-                    iChan.append(32)
-            fid.write(pack('@{}B'.format(len((iChan))), *iChan))
-
-        # Write channel units
-        for iChan in chanUnit:
-            iChan =[ord(char) for char in iChan]
-            if len(iChan) < 10:
-                aux = 10-len(iChan)
-                for i in range(aux):
-                    iChan.append(32)
-            fid.write(pack('@{}B'.format(len((iChan))), *iChan))
-
-        # Pack data
-        packedDataMatrix = [[None]*100 for i in range(numOutChans)]
-        for iChan in range(numOutChans):
-            floatData = dataWithOutTime[iChan,:]
-            scaling = colScl[iChan]
-            offset = colOff[iChan]
-            int16Data = [x*scaling+offset for x in floatData]
-            packedDataMatrix[iChan] = int16Data
-
-        packedData = []
-        for i in range(len(channels[0])):
-            for j in range(len(channels)-1):
-                packedData.append(np.short((packedDataMatrix[j][i])))
-
-
-        # Write data
-        fid.write(pack('@{}h'.format(len((packedData))), *packedData))
-        fid.close()
-
-
-def writeBinary2(fileName, channels, chanName,chanUnit,fileID,descStr):
-    numOutWithTime = len(channels)
-    numOutChans = numOutWithTime - 1
-    nT = len(channels[0])
-    test = [0] * numOutWithTime
-
-    #time for FileID 2
-    for i in range(len(channels)):
-        if ("Time" in chanName[i]):
-            time = channels[:][i]
-    timeOut1 = time[0]
-    timeIncr = time[1]-time[0]
-        
-    #scaling
-    # To best use the int16 range, the max float is matched to 2^15-1 and the
-    # the min float is matched to -2^15. Thus, we have the to equations we need
-    # to solve to get scaling and offset, see line 120 of ReadFASTbinary:
-    # Int16Max = FloatMax * Scaling + Offset 
-    # Int16Min = FloatMin * Scaling + Offset
-    dataWithOutTime = channels[:][1:]
-    int16Max = 2**15 - 1
-    int16Min = -2**15
-    colScl = []
-    colOff = []
-    for iChan in range(numOutChans):
-        floatData = dataWithOutTime[iChan][:]
-        floatMax = max(floatData)
-        floatMin = min(floatData)
-        vrange = floatMax-floatMin
-        if floatMax==floatMin:
-            vrange=1
-        scaling = np.single((int16Max - int16Min)/vrange)
-        offset = np.single( int16Min-floatMin*scaling)
-        colScl.append(scaling)
-        colOff.append(offset)
-    #Description
-    lenDesc = len(descStr)
-    descStrASCII = [ord(char) for char in descStr]
-    
-    #Just available for fileID 
-    if fileID != 2:
-        print("current version just works with FileID = 2")
-
-    else:
-        #openfile. wb for Writing right and b for writing binary
-        fid = open(fileName,'wb')
-
-        #Used for packing arrays.
-        ##fid.write(pack('@{}f'.format(len((colScl))), *colScl))
-        ##fid.write(pack('@{}f'.format(len((colOff))), *colOff))
-        ##fid.write(pack('@{}B'.format(len((descStrASCII))), *descStrASCII))
-
-        #Used for packing, @ is used for packing in native byte order
-        #B - unsigned integer 8 bits
-        #h - integer 16 bits
-        #i - integer 32 bits
-        #f - float 32 bits
-        #d - float 64 bits
-
-        fid.write(pack('@h',fileID))
-        fid.write(pack('@i',numOutChans))
-        fid.write(pack('@i',nT))
-        fid.write(pack('@d',timeOut1))
-        fid.write(pack('@d',timeIncr))
-        fid.write(pack('@{}f'.format(len((colScl))), *colScl))
-        fid.write(pack('@{}f'.format(len((colOff))), *colOff))
-        fid.write(pack('@i',lenDesc))
-        fid.write(pack('@{}B'.format(len((descStrASCII))), *descStrASCII))
-
-
-        for iChan in chanName:
-            iChan = [ord(char) for char in iChan]
-            if len(iChan) < 10:
-                aux = 10-len(iChan)
-                for i in range(aux):
-                    iChan.append(32)
-            fid.write(pack('@{}B'.format(len((iChan))), *iChan))
-
-        for iChan in chanUnit:
-            iChan =[ord(char) for char in iChan]
-            print('>>>',iChan)
-            if len(iChan) < 10:
-                aux = 10-len(iChan)
-                for i in range(aux):
-                    iChan.append(32)
-            fid.write(pack('@{}B'.format(len((iChan))), *iChan))
-
-        packedDataMatrix = [[None]*100 for i in range(numOutChans)]
-        for iChan in range(numOutChans):
-            floatData = dataWithOutTime[iChan][:]
-            scaling = colScl[iChan]
-            offset = colOff[iChan]
-            int16Data = [x*scaling+offset for x in floatData]
-            packedDataMatrix[iChan] = int16Data
-
-        packedData = []
-        for i in range(len(channels[0])):
-            for j in range(len(channels)-1):
-                packedData.append(np.short((packedDataMatrix[j][i])))
-
-
-        fid.write(pack('@{}h'.format(len((packedData))), *packedData))
-         
-        fid.close()
-        print("file succesfully generated")
+            # Write data
+            fid.write(struct.pack('@{}h'.format(packedData.size), *packedData.flatten()))
+            fid.close()
 
 
 if __name__ == "__main__":
