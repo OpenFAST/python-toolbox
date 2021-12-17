@@ -5,7 +5,7 @@ import pandas as pd
 
 def main():
     """Modify TurbSim parameters and write"""
-    filename = '../tests/example_files/FASTIn_TurbSim.inp' # Name of TurbSim's input file
+    filename = '../tests/example_files/FASTIn_TurbSim.dat' # Name of TurbSim's input file
     f = FASTInputFile(filename)
     f['WrBLFF'] = False
     f['WrADFF'] = True
@@ -13,11 +13,11 @@ def main():
     f['NumGrid_Z'] = 15
     f['NumGrid_Y'] = 15
     f['AnalysisTime'] = 600
-    f.write('../tests/example_files/FASTIn_TurbSim_change.inp')  # Modified file name
+    f.write('../tests/example_files/FASTIn_TurbSim_change.dat')  # Modified file name
 
     """Run TurbSim"""
-    TurbSim_FILE = '../tests/example_files/FASTIn_TurbSim_change.inp'  # Input file
-    Turbsim_EXE = 'TurbSim_x64.exe'  # Change to the path of the TurbSim executable
+    TurbSim_FILE = '../tests/example_files/FASTIn_TurbSim_change.dat'  # Input file
+    Turbsim_EXE = 'C:/Program Files/openfast/TurbSim_x64.exe'  # Change to the path of the TurbSim executable
     runner.run_cmd(TurbSim_FILE, Turbsim_EXE, wait=True, showOutputs=False, showCommand=True)
 
     """Open the turbulence box, containing the wind speed in 3 directions"""
