@@ -33,8 +33,10 @@ class CSVFile(File):
     def formatName():
         return 'CSV file'
 
-    def __init__(self, filename=None, sep=None, colNames=[], commentChar=None, commentLines=[],\
-                       colNamesLine=None, detectColumnNames=True, **kwargs):
+    def __init__(self, filename=None, sep=None, colNames=None, commentChar=None, commentLines=None,\
+                       colNamesLine=None, detectColumnNames=True, header=None, **kwargs):
+        colNames     = [] if colNames is None else colNames
+        commentLines = [] if commentLines is None else commentLines
         self.sep          = sep
         self.colNames     = colNames
         self.commentChar  = commentChar
@@ -42,7 +44,13 @@ class CSVFile(File):
         self.colNamesLine = colNamesLine
         self.detectColumnNames = detectColumnNames
         self.data=[]
-        self.header=[]
+        if header is None:
+            self.header=[]
+        else:
+            if not hasattr(header, '__len__'):
+                self.header=[header]
+            else:
+                self.header=header
         self.nHeader=0
         if (len(self.commentLines)>0) and (self.commentChar is not None):
             raise Exception('Provide either `commentChar` or `commentLines` for CSV file types')
@@ -56,6 +64,15 @@ class CSVFile(File):
         # NOTE: done by parent class method
         
         # --- Subfunctions
+        def readFirstLines(nLines):
+            lines=[]
+            with open(self.filename, 'r', encoding=self.encoding, errors="surrogateescape") as fid:
+                for i, line in enumerate(fid):
+                    lines.append(line.strip())
+                    if i==nLines:
+                        break
+            return lines
+
         def readline(iLine):
             with open(self.filename,'r') as f: #,encoding=self.encoding) as f:
                 for i, line in enumerate(f):
@@ -69,7 +86,7 @@ class CSVFile(File):
             if self.sep==r'\s+':
                 return s.strip().split()
             else:
-                return s.strip().split(self.sep)
+                return [c.strip() for c in s.strip().split(self.sep)]
         def strIsFloat(s):
             try:
                 float(s)
@@ -81,6 +98,19 @@ class CSVFile(File):
             self.sep=r'\s+'
 
         iStartLine=0
+        
+        # --- Exclude some files from the CSV reader ---
+        line=readline(iStartLine)
+        words=line.split()
+        if len(words)>1:
+            try:
+                int(words[0])
+                word0int = True
+            except:
+                word0int = False
+            if word0int and words[1].isalpha():
+                raise WrongFormatError('Input File {}: '.format(self.filename) + 'is not likely a CSV file' )
+                
         # --- Headers (i.e. comments)
         # TODO: read few headers lines instead of multiple read below..
 
@@ -133,6 +163,8 @@ class CSVFile(File):
                     self.sep=','
                 elif head[1].find(';')>0:
                     self.sep=';'
+                elif head[1].find('\t')>0:
+                    self.sep='\t'
                 else:
                     self.sep=r'\s+'
             except:
@@ -202,7 +234,9 @@ class CSVFile(File):
         if (self.commentLines is not None) and len(self.commentLines)>0:
             skiprows = skiprows + self.commentLines
         skiprows =list(sorted(set(skiprows)))
-        #print(self)
+        if self.sep is not None:
+            if self.sep=='\t':
+                self.sep=r'\s+'
         #print(skiprows)
         try:
 #             self.data = pd.read_csv(self.filename,sep=self.sep,skiprows=skiprows,header=None,comment=self.commentChar,encoding=self.encoding)
@@ -228,7 +262,7 @@ class CSVFile(File):
                 f.write('\n'.join(self.header)+'\n')
             with open(self.filename, 'a', encoding='utf-8') as f:
                 try:
-                    self.data.to_csv(f,   sep=self.sep,     index=False,header=False)
+                    self.data.to_csv(f,   sep=self.sep,     index=False,header=False, line_terminator='\n')
                 except TypeError:
                     print('[WARN] CSVFile: Pandas failed, likely encoding error. Attempting a quick and dirty fix.')
                     s=''

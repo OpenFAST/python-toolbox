@@ -100,7 +100,7 @@ def readOperatingPoints(OP_file):
     OP=pd.read_csv(OP_file);
     OP.rename(columns=lambda x: x.strip().lower().replace(' ','').replace('_','').replace('(','[').split('[')[0], inplace=True)
     # Perform column replacements (tolerating small variations)
-    OP.rename(columns={'ws': 'windspeed'}, inplace=True)
+    OP.rename(columns={'wind':'windspeed','ws': 'windspeed'}, inplace=True)
     OP.rename(columns={'rotorspeed': 'rotorspeed', 'rpm': 'rotorspeed','omega':'rotorspeed'}, inplace=True)
     OP.rename(columns={'file': 'filename'}, inplace=True)
     OP.rename(columns={'pitch': 'pitchangle', 'bldpitch':'pitchangle'}, inplace=True)
@@ -133,12 +133,17 @@ def defaultFilenames(OP, rpmSweep=None):
     """
 
     if rpmSweep is None:
-       rpmSweep = 'WindSpeed_[m/s]' not in OP.columns
+        if 'WindSpeed_[m/s]' not in OP.columns:
+            rpmSweep=True
+        elif len(np.unique(OP['WindSpeed_[m/s]']))==1:
+            rpmSweep=True
+        else:
+            rpmSweep=False
     nOP=len(OP['RotorSpeed_[rpm]']);
     filenames=['']*nOP;
     for iOP, line in OP.iterrows():
         if rpmSweep:
-            filenames[iOP]='rpm{:05.2f}.fst'.format(line['RotSpeed_[rpm]'])
+            filenames[iOP]='rpm{:05.2f}.fst'.format(line['RotorSpeed_[rpm]'])
         else:
             filenames[iOP]='ws{:04.1f}.fst'.format(line['WindSpeed_[m/s]'])
     return filenames
@@ -201,10 +206,10 @@ def writeLinearizationFiles(main_fst, workDir, operatingPointsFile,
 
     if trim and not hasTrim:
         trim=False
-        print('[WARN] Desactivating trim since not available in this version of OpenFAST')
+        print('[WARN] Deactivating trim since not available in this version of OpenFAST')
     if viz and not hasTrim:
         viz=False
-        print('[WARN] Desactivating VTK vizualization since not available in this version of OpenFAST')
+        print('[WARN] Deactivating VTK vizualization since not available in this version of OpenFAST')
 
     # --- Reading operating points
     OP = readOperatingPoints(operatingPointsFile)
@@ -220,10 +225,10 @@ def writeLinearizationFiles(main_fst, workDir, operatingPointsFile,
         # TODO gen trq or Tower top displacement
 
         # Main Flags
-        noAero=abs(ws)<0.001
+        noAero=abs(ws)<0.001 
 
         nLinTimes = nPerPeriod
-        if noAero:
+        if abs(rpm)<0.001:
             nLinTimes=1
             ws=1e-4
 
@@ -278,7 +283,7 @@ def writeLinearizationFiles(main_fst, workDir, operatingPointsFile,
             linDict['CalcSteady'] = False
         linDict['NLinTimes']    = len(LinTimes)
         linDict['LinTimes']     = list(LinTimes)
-        linDict['OutFmt']       = '"ES20.12E3"'  # Important for decent resolution
+        linDict['OutFmt']       = '"ES20.11E3"'  # Important for decent resolution
         linDict['LinInputs']    = LinInputs     # 0: none, 1: standard, 2: to get full linearizations
         linDict['LinOutputs']   = LinOutputs    # 0: none, 1: based on outlist 
         # --- Mode shape vizualization options
@@ -290,12 +295,14 @@ def writeLinearizationFiles(main_fst, workDir, operatingPointsFile,
         else:
             linDict['WrVTK']        = 0
         # --- Aero options
-        linDict['AeroFile|WakeMod']   = 1 # Needed for linearization
-        linDict['AeroFile|AFAeroMod'] = 1 # Needed for linearization
-        linDict['AeroFile|FrozenWake'] = True # Needed for linearization
+        if fst['CompAero']>0:
+            linDict['AeroFile|WakeMod']   = 1 # Needed for linearization
+            linDict['AeroFile|AFAeroMod'] = 1 # Needed for linearization
+            linDict['AeroFile|FrozenWake'] = True # Needed for linearization
         # --- Inflow options
-        linDict['InflowFile|WindType'] = 1
-        linDict['InflowFile|HWindSpeed'] = ws
+        if fst['CompInflow']>0:
+            linDict['InflowFile|WindType'] = 1
+            linDict['InflowFile|HWindSpeed'] = ws
         # --- ElastoDyn options
         linDict['EDFile|BlPitch(1)'] = pitch
         linDict['EDFile|BlPitch(2)'] = pitch

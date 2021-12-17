@@ -1,0 +1,487 @@
+; {WT_Name}
+begin simulation;
+  time_stop   15.00;
+  solvertype   2 ;    (newmark)
+  on_no_convergence continue ;
+  ;convergence_limits 1.0E-4 1.0E-3 1E-8 ;
+;  logfile ./logfiles/fdll.log ;
+  log_deltat 1;
+  ;animation ./sim_anim.dat;
+;
+  begin newmark;
+    deltat    0.02; 
+  end newmark;
+end simulation;
+;
+;---------------------------------------------------------------------------------------------------------------------------------------------------------------- 
+begin new_htc_structure;
+;-------------------------------------------------------------------------------------------------------------------------------
+;  beam_output_file_name sim_beam_outputs.dat;
+;  body_output_file_name sim_body_outputs.dat;
+;  body_eigenanalysis_file_name sim_body_eigenanalysis.dat;
+;  element_matrix_output             sim_element_matrix.dat;
+;  struct_inertia_output_file_name sim_struct_inertia.dat;
+;  structure_eigenanalysis_file_name sim_eigenanalysis.dat;
+;  system_eigenanalysis              sim_system_eigenanalysis.dat;
+;  constraint_output_file_name       sim_constraint.dat;
+  begin main_body;
+    name        tower ;            
+    type        timoschenko ;
+    nbodies     1 ;
+    node_distribution     c2_def ;
+    damping_posdef 0.0 0.0 0.0 {TwrBetaFA} {TwrBetaSS} {TwrBetaTor} ; Beta = 2 zeta / omega
+    begin timoschenko_input;
+      filename ./data/stiff.st ;
+      set 1 1 ;
+    end timoschenko_input;
+    begin c2_def;              Definition of centerline (main_body coordinates)
+      nsec 8;
+      sec 1 0.0 0.0   0.0  0.0 ;  x,y,z,twist
+      sec 2 0.0 0.0 -20.0  0.0 ;
+      sec 3 0.0 0.0 -40.0  0.0 ;
+      sec 4 0.0 0.0 -60.0  0.0 ;
+      sec 5 0.0 0.0 -80.0  0.0 ;
+      sec 6 0.0 0.0 -100.0 0.0 ;
+      sec 7 0.0 0.0 -120.0 0.0 ;
+      sec 8 0.0 0.0 -137.0 0.0 ; {mTowerHt}
+    end c2_def ;
+  end main_body;
+;
+  begin main_body;
+    name        towertop ;              
+    type        timoschenko ;
+    nbodies     1 ;
+    node_distribution     c2_def ;
+    damping_posdef      0.0  0.0  0.0  3.00E-05  3.00E-05  2.00E-04  ;
+    concentrated_mass 2 {NacCMyn} {NacCMxn} {Twr2ShftMNacCMzn} {NacMass} {~Jz} {~Jz/10_TODO} {NacYIner-NacMass*NacCMxn**2} ;  Nacelle mass and inertia    	
+    begin timoschenko_input;
+      filename ./data/stiff.st ;
+      set 1 1 ;                
+    end timoschenko_input;
+    begin c2_def;              Definition of centerline (main_body coordinates)
+      nsec 2;
+      sec 1 0.0 0.0  0.0  0.0 ; x,y,z,twist
+      sec 2 0.0 0.0 -100.0  0.0 ; -Twr2Shft
+    end c2_def ;
+  end main_body;
+;
+  begin main_body;
+    name        shaft ;              
+    type        timoschenko ;
+    nbodies     1 ;
+    node_distribution     c2_def ;
+    damping_posdef  0.0 0.0 0.0 {ShftBetaBend} {ShftBetaBend} {ShftBetaTors}; e.g. Beta 4.65E-04  4.65E-04  7.0725E-03 ; 
+    concentrated_mass 1 0.0 0.0 0.0 0.0 0.0 0.0 {GenLSS} ;generator equivalent slow shaft = {GenIner*GBRatio**2}
+    concentrated_mass 5 0.0 0.0 0.0 {HubMass} 0.0 0.0 {HubIner} ; hub mass and inertia;    
+    begin timoschenko_input;
+      filename ./data/stiff.st ;
+      set 1 1 ;                
+    end timoschenko_input;
+    begin c2_def;              Definition of centerline (main_body coordinates)
+      nsec 5;
+      sec 1 0.0 0.0 0.0     0.0 ; Tower top x,y,z,twist
+      sec 2 0.0 0.0 1.0     0.0 ; 
+      sec 3 0.0 0.0 2.0     0.0 ; 
+      sec 4 0.0 0.0 3.1071  0.0 ; 
+      sec 5 0.0 0.0 5.000  0.0 ; Rotor centre {OverHang}
+    end c2_def ;
+  end main_body;	
+;
+  begin main_body;
+    name        hub1 ;              
+    type        timoschenko ;
+    nbodies     1 ;
+    node_distribution     c2_def ;
+    damping_posdef  0.0  0.0  0.0  3.00E-06  3.00E-06  2.00E-05;   
+    begin timoschenko_input;
+      filename ./data/stiff.st ;
+      set 1 1 ;                
+    end timoschenko_input;
+    begin c2_def;              Definition of centerline (main_body coordinates)
+      nsec 2;
+      sec 1 0.0 0.0 0.0  0.0 ; x,y,z,twist
+      sec 2 0.0 0.0 1.5  0.0 ;   {HubRad}
+    end c2_def ;
+  end main_body;
+;
+  begin main_body;
+    name           hub2 ;
+    copy_main_body hub1;
+  end main_body;
+;
+  begin main_body;
+    name           hub3 ;
+    copy_main_body hub1 ;
+  end main_body;
+;
+  begin main_body;
+    name        blade1 ;        
+    type        timoschenko ;
+    nbodies     49 ;
+    node_distribution    c2_def;
+    damping_posdef   0.0 0.0 0.0 0.0275 0.0275 0.0218 ;
+     ;damping_posdef	0.0 0.0 0.0 0.012991535 0.020544812 0.012991535;	BeamDyn 0.021955    0.012818    0.012818    0.012818    0.021955    0.012818
+    begin timoschenko_input ;
+      filename bar_beam_st.st;
+      set 1 1 ;
+      fpm 0 ;
+    end timoschenko_input;
+    begin c2_def;              Definition of centerline (main_body coordinates)
+      nsec 50 ;
+      sec    1	-0.000000e+00	 0.000000e+00	 0.000000e+00	-2.000200e+01;
+      sec    2	-0.000000e+00	 8.634670e-03	 2.040740e+00	-1.916320e+01;
+      sec    3	-0.000000e+00	 2.150190e-02	 4.081480e+00	-1.831010e+01;
+      sec    4	-0.000000e+00	 4.377470e-02	 6.122220e+00	-1.742510e+01;
+      sec    5	-0.000000e+00	 7.276470e-02	 8.162960e+00	-1.651320e+01;
+      sec    6	-0.000000e+00	 1.058590e-01	 1.020370e+01	-1.558490e+01;
+      sec    7	-0.000000e+00	 1.445690e-01	 1.224440e+01	-1.461910e+01;
+      sec    8	-0.000000e+00	 1.838060e-01	 1.428520e+01	-1.360700e+01;
+      sec    9	-0.000000e+00	 2.233910e-01	 1.632590e+01	-1.245770e+01;
+      sec   10	-0.000000e+00	 2.603850e-01	 1.836670e+01	-1.118440e+01;
+      sec   11	-0.000000e+00	 2.952730e-01	 2.040740e+01	-9.810290e+00;
+      sec   12	-0.000000e+00	 3.218030e-01	 2.244810e+01	-8.535160e+00;
+      sec   13	-0.000000e+00	 3.444030e-01	 2.448890e+01	-7.355080e+00;
+      sec   14	-0.000000e+00	 3.545650e-01	 2.652960e+01	-6.555250e+00;
+      sec   15	-0.000000e+00	 3.563250e-01	 2.857040e+01	-6.035320e+00;
+      sec   16	-0.000000e+00	 3.490850e-01	 3.061110e+01	-5.815270e+00;
+      sec   17	-0.000000e+00	 3.320600e-01	 3.265180e+01	-5.683120e+00;
+      sec   18	-0.000000e+00	 3.115910e-01	 3.469260e+01	-5.576810e+00;
+      sec   19	-0.000000e+00	 2.833900e-01	 3.673330e+01	-5.495780e+00;
+      sec   20	-0.000000e+00	 2.531470e-01	 3.877410e+01	-5.404850e+00;
+      sec   21	-0.000000e+00	 2.200110e-01	 4.081480e+01	-5.299890e+00;
+      sec   22	-0.000000e+00	 1.807020e-01	 4.285550e+01	-5.131760e+00;
+      sec   23	-0.000000e+00	 1.383870e-01	 4.489630e+01	-4.934970e+00;
+      sec   24	-0.000000e+00	 7.776490e-02	 4.693700e+01	-4.609740e+00;
+      sec   25	-0.000000e+00	 1.176130e-02	 4.897780e+01	-4.265150e+00;
+      sec   26	-0.000000e+00	-6.446720e-02	 5.101850e+01	-3.883760e+00;
+      sec   27	-0.000000e+00	-1.467330e-01	 5.305920e+01	-3.522860e+00;
+      sec   28	-0.000000e+00	-2.321770e-01	 5.510000e+01	-3.172740e+00;
+      sec   29	-0.000000e+00	-3.259890e-01	 5.714070e+01	-2.927790e+00;
+      sec   30	-0.000000e+00	-4.254250e-01	 5.918150e+01	-2.706930e+00;
+      sec   31	-0.000000e+00	-5.388450e-01	 6.122220e+01	-2.539470e+00;
+      sec   32	-0.000000e+00	-6.619350e-01	 6.326290e+01	-2.385760e+00;
+      sec   33	-0.000000e+00	-7.918520e-01	 6.530370e+01	-2.241770e+00;
+      sec   34	-0.000000e+00	-9.311710e-01	 6.734440e+01	-2.083130e+00;
+      sec   35	-0.000000e+00	-1.072980e+00	 6.938520e+01	-1.910900e+00;
+      sec   36	-0.000000e+00	-1.220160e+00	 7.142590e+01	-1.693040e+00;
+      sec   37	-0.000000e+00	-1.374640e+00	 7.346660e+01	-1.424770e+00;
+      sec   38	-0.000000e+00	-1.535920e+00	 7.550740e+01	-1.109440e+00;
+      sec   39	-0.000000e+00	-1.708370e+00	 7.754810e+01	-7.384860e-01;
+      sec   40	-0.000000e+00	-1.884480e+00	 7.958890e+01	-3.530520e-01;
+      sec   41	-0.000000e+00	-2.068910e+00	 8.162960e+01	 5.046960e-02;
+      sec   42	-0.000000e+00	-2.257620e+00	 8.367030e+01	 4.429770e-01;
+      sec   43	-0.000000e+00	-2.451560e+00	 8.571110e+01	 8.219290e-01;
+      sec   44	-0.000000e+00	-2.653270e+00	 8.775180e+01	 1.186000e+00;
+      sec   45	-0.000000e+00	-2.858300e+00	 8.979260e+01	 1.545260e+00;
+      sec   46	-0.000000e+00	-3.075010e+00	 9.183330e+01	 1.903580e+00;
+      sec   47	-0.000000e+00	-3.296470e+00	 9.387400e+01	 2.261510e+00;
+      sec   48	-0.000000e+00	-3.525700e+00	 9.591480e+01	 2.618800e+00;
+      sec   49	-0.000000e+00	-3.761400e+00	 9.795550e+01	 2.975390e+00;
+      sec   50	-0.000000e+00	-4.000000e+00	 9.999630e+01	 3.331650e+00;
+   end c2_def ;
+  end main_body;
+;
+  begin main_body;
+    name           blade2 ;
+    copy_main_body blade1;
+  end main_body;
+;
+  begin main_body;
+    name           blade3 ;
+    copy_main_body blade1 ;
+  end main_body;
+;-------------------------------------------------------------------------------------------------------------------------------                   
+;
+  begin orientation;
+    begin base;
+      body   tower;
+      inipos        0.0 0.0 0.0 ;         initial position of node 1
+      body_eulerang 0.0 0.0 0.0;
+    end base;
+; 
+    begin relative;
+      body1  tower last;
+      body2  towertop 1;
+      body2_eulerang 0.0 0.0 0.0; 
+    end relative;
+;
+    begin relative;
+      body1  towertop last;
+      body2  shaft 1;
+      body2_eulerang 90.0 0.0 0.0; 
+      body2_eulerang {mShftTilt} 0.0 0.0;    -ShftTilt deg tilt angle
+      body2_ini_rotvec_d1 0.0 0.0 -1.0 {RotSpeedRadps} ; body initial rotation velocity x.y.z.angle velocity[rad/s]  (body 2 coordinates)
+    end relative;
+;
+    begin relative;
+      body1  shaft last;         
+      body2  hub1 1;
+      body2_eulerang -90.0 0.0 0.0;    
+      body2_eulerang 0.0 180.0 0.0;    
+      body2_eulerang {mPreCone(1)} 0.0 0.0;      -PreCone cone angle
+    end relative;
+;
+    begin relative;
+      body1  shaft last;         
+      body2  hub2 1;
+      body2_eulerang -90.0 0.0 0.0;    
+      body2_eulerang 0.0 60.0 0.0;   
+      body2_eulerang {mPreCone(2)} 0.0 0.0;      -PreCone deg cone angle
+    end relative;
+;
+    begin relative;
+      body1  shaft last;         
+      body2  hub3 1;
+      body2_eulerang -90.0 0.0 0.0;    
+      body2_eulerang 0.0 -60.0 0.0;    
+      body2_eulerang {mPreCone(3)} 0.0 0.0;      -PreCone deg cone angle
+    end relative;
+;
+    begin relative;
+      body1  hub1 last;         
+      body2  blade1 1;
+      body2_eulerang 0.0 0.0 0.0 ; {BlPitch(1)}
+    end relative;
+;
+    begin relative;
+      body1  hub2 last;         
+      body2  blade2 1;
+      body2_eulerang 0.0 0.0 0.0 ; {BlPitch(2)};    
+    end relative;
+;
+    begin relative;
+      body1  hub3 last;         
+      body2  blade3 1;
+      body2_eulerang 0.0 0.0 0.0 ; {BlPitch(3)};    
+    end relative;
+;
+  end orientation;
+;-------------------------------------------------------------------------------------------------------------------------------
+begin constraint;   
+;
+    begin fix0;  fixed to ground in translation and rotation of node 1
+      body tower;
+    end fix0;
+;
+    begin fix1;
+      body1 tower last ;
+      body2 towertop 1;
+    end fix1;
+;
+; -------------------------------------- Free bearing
+;     begin bearing1;                       free bearing
+;       name  shaft_rot;
+;       body1 towertop last;
+;       body2 shaft 1;
+;       bearing_vector 2 0.0 0.0 -1.0;        x=coo (0=global.1=body1.2=body2) vector in body2 coordinates where the free rotation is present
+;     end bearing1; 
+; -------------------------------------- Fixed RPM
+     begin bearing3;                       fixed rotation
+       name  shaft_rot;
+       body1 towertop last;
+       body2 shaft 1;
+       bearing_vector 2 0.0 0.0 -1.0;        x=coo (0=global.1=body1.2=body2) vector in body2 coordinates where the free rotation is present
+       omegas 0.5 ; rad/s
+     end bearing1; 
+;
+    begin fix1;
+      body1 shaft last ;
+      body2 hub1 1;
+    end fix1;
+;
+    begin fix1;
+      body1 shaft last ;
+      body2 hub2 1;
+    end fix1;
+;
+    begin fix1;
+      body1 shaft last ;
+      body2 hub3 1;
+    end fix1; 
+;
+; ----------------- No pitch actuation
+;
+    begin fix1;
+      body1 hub1 last ;
+      body2 blade1 1;
+    end fix1; 
+;
+    begin fix1;
+      body1 hub2 last ;
+      body2 blade2 1;
+    end fix1; 
+;
+    begin fix1;
+      body1 hub3 last ;
+      body2 blade3 1;
+    end fix1; 
+;    
+; ----------------- Pitch actuation
+;    begin bearing2;
+;      name pitch1;        
+;      body1 hub1 last;
+;      body2 blade1 1;
+;      bearing_vector 2 0.0 0.0 -1.0;
+;    end bearing2;
+;  ;
+;    begin bearing2;
+;      name pitch2;        
+;      body1 hub2 last;
+;      body2 blade2 1;
+;      bearing_vector 2 0.0 0.0 -1.0;
+;    end bearing2;
+;  ;
+;    begin bearing2;
+;      name pitch3;        
+;      body1 hub3 last;
+;      body2 blade3 1;
+;      bearing_vector 2 0.0 0.0 -1.0;
+;    end bearing2;
+;
+  end constraint;
+;
+end new_htc_structure;
+;---------------------------------------------------------------------------------------------------------------------------------------------------------------- 
+begin wind ;
+  density                 {AirDens} ;
+  wsp                     {HWindSpeed}  ;
+  tint                    0.0 ;
+  horizontal_input        1     ;            0=false, 1=true
+  windfield_rotations     0.0  0.0  0.0 ;    yaw, tilt, rotation
+  center_pos0             0.0 0.0  {mRefHt} ;    hub height # NOTE negative, global
+  shear_format            3  {PLexp}  ;0=none,1=constant,2=log,3=power,4=linear
+  turb_format             0     ;  0=none, 1=mann,2=flex
+  tower_shadow_method     {TwrPotent}     ;  0=none, 1=potential flow, 2=jet, 3=potential_2
+  begin tower_shadow_potential;
+    tower_offset 0.0;
+    nsec 2;
+    radius    0.0          {RadBase};
+    radius  {mTowerHeight} {RadTop};  NOTE: sign of tower coordinate
+  end tower_shadow_potential;
+  begin tower_shadow_potential_2;
+    tower_mbdy_link tower;
+    nsec  2;
+    radius      0.0   3.0 ;
+    radius      87.6  1.935 ;  NOTE: always z positive
+  end tower_shadow_potential_2;
+end wind;
+;
+begin aero ;
+  nblades  3;
+  hub_vec shaft -3 ;         rotor rotation vector (normally shaft composant directed from pressure to sustion side)
+  link 1 mbdy_c2_def blade1;
+  link 2 mbdy_c2_def blade2;
+  link 3 mbdy_c2_def blade3;
+  ae_filename        ./data/NREL_5MW_ae.txt;
+  pc_filename        ./data/NREL_5MW_pc.txt;
+  induction_method   {WakeMod} ;     0=none, 1=normal
+  aerocalc_method    1 ;     0=aerodynamics disabled, 1=with aerodynamics
+  aerosections       50 ;
+  ae_sets            1 1 1;
+  tiploss_method     {TipLoss} ;     0=none, 1=prandtl
+  dynstall_method    {UAMod} ;     0=none, 1=stig ?ye method,2=mhh method
+end aero ;
+;---------------------------------------------------------------------------------------------------------------------------------------------------------------- 
+begin output;
+  filename ./sim ;
+  ;deltat 0.01;
+  ;buffer 1;
+  ;data_format hawc_ascii;
+  ;time 0 50;
+  general time;
+  constraint bearing1 shaft_rot 2; angle and angle velocity 
+;  constraint bearing2 pitch1 5;    angle and angle velocity 
+;  constraint bearing2 pitch2 5;    angle and angle velocity 
+;  constraint bearing2 pitch3 5;    angle and angle velocity 
+  aero omega ;
+  aero torque;
+  aero power;
+  aero thrust;
+  wind free_wind 1 0.0 0.0 -90.0; local wind at fixed position: coo (1=global,2=non-rotation rotor coo.), pos x, pos y, pos z
+;
+  mbdy momentvec towertop 1 2 towertop # yaw bearing ;
+  mbdy forcevec  towertop 1 2 towertop # yaw bering ;
+  mbdy momentvec shaft 4 1  shaft # main bearing ;
+  mbdy momentvec blade1 3  1 blade1 # blade 1 root ;
+  mbdy momentvec blade1 10 1 local # blade 1 50% local e coo ;
+  mbdy momentvec hub1 1  2 hub1 # blade 1 root ;
+  mbdy momentvec hub2 1  2 hub2 # blade 2 root ;
+  mbdy momentvec hub3 1  2 hub3 # blade 3 root ;
+  mbdy state pos towertop   1 1.0 global # tower top flange position ;
+;
+  mbdy state pos blade1  18 1.0 blade1 # blade 1 tip pos ;
+  mbdy state pos blade2  18 1.0 blade2 # blade 2 tip pos ;
+  mbdy state pos blade3  18 1.0 blade3 # blade 3 tip pos ;
+  mbdy state pos blade1  18 1.0 global # blade 1 tip pos ;
+  aero windspeed 3 1 1 63.0;   wind seen from the blade: coo(1=local ae,2=blade,3=global,4=rotor polar), blade number, component xyz, blade radius
+  aero windspeed 3 1 2 63.0;  
+  aero windspeed 3 1 3 63.0;
+  aero alfa 1 45.0;
+  aero alfa 2 45.0;
+  aero alfa 3 45.0;
+  mbdy momentvec towertop 1 1 tower # tower top -1: below top mass ;
+  mbdy forcevec  towertop 1 1 tower # tower top -1: below top mass ;
+  mbdy momentvec tower  1 1 tower # tower base ;
+  mbdy forcevec  tower  1 1 tower # tower base ;
+;
+end output;
+;---------------------------------------------------------------------------------------------------------------------------------------------------------------- 
+; TODO TODO
+begin hawcstab2 ;
+  begin ground_fixed_substructure ;
+    main_body tower ;
+    main_body towertop ;
+  end ground_fixed_substructure ;
+  begin rotating_axissym_substructure ;
+    main_body shaft ;
+  end rotating_axissym_substructure ;
+  begin rotating_threebladed_substructure ;
+    main_body hub1 ;
+    main_body blade1 ;
+    ;second_order_actuator pitch1  100 0.7 ;
+  end rotating_threebladed_substructure ;
+  operational_data_filename ./data/operational_data.opt ;
+  ;begin operational_data ;
+  ;  windspeed 4.000 25.000 22 ; cut-in, cut-out, points
+  ;  genspeed 670.000 1173.700 ;
+  ;  gearratio 97.000 ;
+  ;  minpitch 0.000 ;
+  ;  opt_lambda 7.550 ;
+  ;  maxpow 5296.610 ;
+  ;  prvs_turbine 1 ;
+  ;  include_torsiondeform 1 ;
+  ;end operational_data ;
+  ; BASIC FULL LOAD PI PITCH CONTROLLER
+  ;                          1           2        3        4         5         6          7        8    9       10;
+  ;                    P_rated Omega_rated  Kp_full  Ki_full  K1_theta  K2_theta omega_filt csi_filt type K0_omega;
+  ;pi_pitch_controller 5296.610      1.2671 0.771100 0.319309 102.68665 754.18745        0.6      0.7    0;
+  ; simplified linearization of the Basic DTU Wind Energy controller (https://github.com/DTUWindEnergy/BasicDTUController)
+  ;                                  1            2            3            4            5        6          7          8        9      10   11;
+  ;                         Kp_partial   Ki_partial Kopt_partial      Kp_full      Ki_full K1_theta   K2_theta omega_filt csi_filt DT_freq type;
+  ; tuning parameters: constant Power, quadratic
+;  basic_dtu_we_controller 0.193143E+08 0.433412E+07 0.225518E+07 0.649668E+00 0.318795E+00 70.70296  808.79462        0.6      0.7    1.66    1;
+  ; tuning parameters: constant Torque, quadratic
+;  basic_dtu_we_controller 0.193143E+08 0.433412E+07 0.225518E+07 0.710330E+00 0.318795E+00 70.70296  808.79462        0.6      0.7    1.66    0;
+  ;begin controller_tuning ;
+  ;  partial_load 0.050 0.700; fn [hz], zeta [-]
+  ;  full_load 0.100 0.700 ; fn [hz], zeta [-]
+  ;  gain_scheduling 1 ; 1 linear, 2 quadratic
+  ;  constant_power 0;    
+  ;end controller_tuning ;
+  ;begin controller ;
+  ;  begin input ;
+  ;    constraint bearing1 shaft_rot ;
+  ;    constraint bearing2 pitch1 collective ;
+; ;     constraint bearing2 pitch1 cosine ;
+; ;     constraint bearing2 pitch1 sine ;
+  ;  end input ;
+  ;  begin output ;
+  ;    constraint bearing1 shaft_rot 1 only 2 ; 1
+  ;    constraint bearing2 pitch1 1 only 1 collective ; 2
+; ;     constraint bearing2 pitch1 1 only 1 cosine ; 3
+; ;     constraint bearing2 pitch1 1 only 1 sine ; 4
+  ;  end output ;
+  ;end controller ;
+end hawcstab2 ;
+;
+exit;

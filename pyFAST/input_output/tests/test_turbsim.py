@@ -1,7 +1,10 @@
 import unittest
 import os
 import numpy as np
-from .helpers_for_test import MyDir, reading_test 
+try:
+    from .helpers_for_test import MyDir, reading_test 
+except ImportError:
+    from helpers_for_test import MyDir, reading_test 
 import pyFAST
 from pyFAST.input_output import TurbSimFile
 

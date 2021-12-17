@@ -17,7 +17,7 @@ except ImportError:
     import weis.control.mbc.mbc3 as mbc
 
 
-def postproCampbell(out_or_fstfiles, BladeLen=None, TowerLen=None, verbose=True):
+def postproCampbell(out_or_fstfiles, BladeLen=None, TowerLen=None, verbose=True, nFreqOut=15, WS_legacy=None):
     """ 
     Postprocess linearization files to extract Campbell diagram (linearization at different Operating points)
     - Run MBC
@@ -28,10 +28,10 @@ def postproCampbell(out_or_fstfiles, BladeLen=None, TowerLen=None, verbose=True)
     if len(out_or_fstfiles)==0:
         raise Exception('postproCampbell requires a list of at least one .fst or .out file')
 
-    # --- Run MBC for all opearting points
+    # --- Run MBC for all operating points
     MBC = run_pyMBC(out_or_fstfiles, verbose)
 
-    # --- Attemps to extract Blade Length and TowerLen (TODO)
+    # --- Attemps to extract Blade Length and TowerLen from first file...
     filebase, ext = os.path.splitext(out_or_fstfiles[0])
     if BladeLen is None:
         fstFile = filebase+'.fst'
@@ -42,10 +42,12 @@ def postproCampbell(out_or_fstfiles, BladeLen=None, TowerLen=None, verbose=True)
             from pyFAST.input_output.fast_input_deck import FASTInputDeck
             fst = FASTInputDeck(fstFile, 'ED')
             ED = fst.fst_vt['ElastoDyn']
+            if ED is None:
+                raise Exception('Unable to infer BladeLen and TowerLen, ElastoDyn file not found.')
             BladeLen = ED['TipRad'] - ED['HubRad']
             TowerLen = ED['TowerHt']
         else:
-            raise Exception('Provide BladeLen and Tower Len, or existing fst files')
+            raise Exception('Provide BladeLen and TowerLen, or existing fst/ED file')
 
     # --- Transform data into "CampbellData" (similar to matlab)
     CD = [None]*len(MBC)
@@ -66,11 +68,11 @@ def postproCampbell(out_or_fstfiles, BladeLen=None, TowerLen=None, verbose=True)
     modeID_file = campbellData2CSV(baseName, CD, modeID_table, modesDesc)
     # Write summary txt file to help manual identification step..
     txtFileName = baseName+'_Summary.txt'
-    campbellData2TXT(CD, nFreqOut=15, txtFileName=txtFileName)
+    campbellData2TXT(CD, nFreqOut=nFreqOut, txtFileName=txtFileName)
 
     # --- Return nice dataframes (assuming the identification is correct)
     # TODO, for now we reread the files...
-    OP, Freq, Damp, UnMapped, ModeData = postproMBC(csvModesIDFile=modeID_file, verbose=False)
+    OP, Freq, Damp, UnMapped, ModeData = postproMBC(csvModesIDFile=modeID_file, verbose=False, WS_legacy=WS_legacy)
     
     return OP, Freq, Damp, UnMapped, ModeData, modeID_file
 
@@ -81,13 +83,26 @@ def run_pyMBC(out_or_fstfiles, verbose=True):
     INPUTS:
       - out_or_fstfiles
     """
+    import re
+    def glob_re(pattern, strings):
+        return list(filter(re.compile(pattern).match, strings))
+
     if verbose:
         print('run_pyMBC:')
     MBC = [None]*len(out_or_fstfiles)
     for i_lin, fstfile in enumerate(out_or_fstfiles):
         filebase, ext = os.path.splitext(fstfile)
+        # NOTE: the code below is problematic for module lin files ED.1.lin 
+        # So we do a re search to filter these out
+        # First use glob
         lin_file_fmt    = '{}.*.lin'.format(filebase)
         lin_files       = glob.glob(lin_file_fmt)
+        #print(lin_files)
+        # Then use re for stricter search
+        lin_file_fmt_re    = r'.*\.[0-9]+\.lin'
+        lin_files = glob_re(lin_file_fmt_re, lin_files)
+        #print(lin_files)
+
         # --- run MBC3 and campbell post_pro on lin files 
         if len(lin_files)>0:
             if verbose:
@@ -105,21 +120,20 @@ def campbellData2TXT(CD, nFreqOut=15, txtFileName=None):
     """ Write frequencies, damping, and mode contents for each operating points to a string
     Write to file if filename provided
     """
+    if not isinstance(CD, list):
+        CD=[CD]
     txt=''
     for iOP,cd in enumerate(CD):
         WS  = cd['WindSpeed']
-        RPM = cd['WindSpeed']
-        nFreqOut = np.min([len(cd['Modes']),nFreqOut])
-        Freq = np.array([cd['Modes'][i]['NaturalFreq_Hz'] for i in np.arange(nFreqOut)])
-        Damp = np.array([cd['Modes'][i]['DampingRatio']   for i in np.arange(nFreqOut)])
+        RPM = cd['RotSpeed_rpm']
+        nFreqOut_loc = np.min([len(cd['Modes']),nFreqOut])
         txt+='------------------------------------------------------------------------\n'
-        txt+='--- OP %d - WS %.1f - RPM %.2f \n'.format(iOP+1, WS, RPM)
+        txt+='--- OP {:d} - WS {:.1f} - RPM {:.2f} \n'.format(iOP+1, WS, RPM)
         txt+='------------------------------------------------------------------------\n'
-        for im in np.arange(nFreqOut):
+        for im in np.arange(nFreqOut_loc):
             m = cd['Modes'][im]
-            # Extracting description the best we can
-            Desc = mbc.extractShortModeDescription(m)
-            txt+='{:3d} ; {:8.3f} ; {:7.4f} ; {:s}\n'.format(im+1,m['NaturalFreq_Hz'],m['DampingRatio'],Desc)
+            Desc = cd['ShortModeDescr'][im]
+            txt+='{:02d} ; {:8.3f} ; {:7.4f} ; {:s}\n'.format(im+1,m['NaturalFreq_Hz'],m['DampingRatio'],Desc)
 
     if txtFileName is not None:
         with open(txtFileName, 'w') as f:
@@ -150,7 +164,7 @@ def campbellData2CSV(baseName, CD, modeID_table, modesDesc):
             f.write('Rotor Speed (rpm),' +','.join([str(cd['RotSpeed_rpm']) for cd in CD]) +'\n')
         else:
             f.write('Wind Speed (mps),' +','.join([str(cd['WindSpeed']) for cd in CD]) +'\n')
-        for im, (k,v) in enumerate(modesDesc.items()):
+        for im, v in enumerate(modesDesc):
             f.write(v[0]+',' +','.join([str(ID) for ID in modeID_table[im,:]]) +'\n')
 
     # --- Write OP using Matlab format
@@ -179,7 +193,7 @@ def campbellData2CSV(baseName, CD, modeID_table, modesDesc):
     return filenames[0]
 
 
-def postproMBC(xlsFile=None, csvModesIDFile=None, xlssheet=None, verbose=True):
+def postproMBC(xlsFile=None, csvModesIDFile=None, xlssheet=None, verbose=True, WS_legacy=None):
     """ 
     Generate Cambell diagram data from an xls file, or a set of csv files
     INPUTS:
@@ -190,6 +204,8 @@ def postproMBC(xlsFile=None, csvModesIDFile=None, xlssheet=None, verbose=True):
              - csvBase + 'Campbell_OP.csv'
              - csvBase + 'Campbell_PointI.csv' I=1..n_Op
              - (csvBase + 'Campbell_ModesID.csv')
+      - vebose: more outputs to screen
+      - WS_legacy: for OpenFAST 2.3, wind speed is unknown (NaN), a vector of operating point WS is needed
     OUTPUTS:
         - Freq: dataframe with columns [WS, RPM, Freq_Mode1,.., Freq_ModeN] for the N identified modes
         - Damp: dataframe with columns [WS, RPM, Damp_Mode1,.., Damp_ModeN] (damping ratios), for the N identified modes
@@ -269,7 +285,7 @@ def postproMBC(xlsFile=None, csvModesIDFile=None, xlssheet=None, verbose=True):
     ID.iloc[:,0].fillna('Unknown', inplace=True) # replace nan
     ModeNames = ID.iloc[2: ,0].values
     ModeIDs   = ID.iloc[2: ,1:].values
-    nModesIDd = len(ModeNames) 
+    nModesIDd = len(ModeNames)  # Number of modes identified in the ID file
 
     if ModeIDs.shape[1]!=len(WS):
         print('OP Windspeed:',WS)
@@ -287,13 +303,22 @@ def postproMBC(xlsFile=None, csvModesIDFile=None, xlssheet=None, verbose=True):
         opData['Damps'] = P.iloc[3+ioff, 1::5+coff].values[:].astype(float) # Damping values
         ModeData.append(opData)
 
+    # ---Dealing with missing WS
+    if np.any(np.isnan(np.array(WS).astype(float))) or np.all(np.array(WS).astype(float)==0):
+        print('[WARN] WS were not provided in linearization (all NaN), likely old OpenFAST version ')
+        if WS_legacy is not None:
+            print('    > Using WS_legacy provided.')
+            if len(WS_legacy)!=len(WS):
+                raise Exception('WS_legacy should have length {} instead of {}'.format(len(WS),len(WS_legacy)))
+            WS = WS_legacy
+        else:
+            print('[WARN] WS was replaced with index!')
+            WS = np.arange(0,len(WS))
+
     # --- Creating a cleaner table of operating points
     OP = pd.DataFrame(np.nan, index=np.arange(len(WS)), columns=['WS_[m/s]', 'RotSpeed_[rpm]'])
     OP['WS_[m/s]']        = WS
     OP['RotSpeed_[rpm]'] = RPM
-    #print(WS)
-    #print(RPM)
-    #print(OP.shape)
 
     UnMapped_WS   = []
     UnMapped_RPM  = []
@@ -303,9 +328,9 @@ def postproMBC(xlsFile=None, csvModesIDFile=None, xlssheet=None, verbose=True):
     for iOP,(ws,rpm) in enumerate(zip(WS,RPM)):
         m = ModeData[iOP]
         nModesMax = len(m['Fnat'])
-        nModes = min(nModesMax, nModesIDd) # somehow sometimes we have 15 modes IDd but only 14 in the ModeData..
+        #nModes = min(nModesMax, nModesIDd) # somehow sometimes we have 15 modes IDd but only 14 in the ModeData..
         Indices = (np.asarray(ModeIDs[:,iOP])-1).astype(int)
-        IndicesMissing = [i for i in np.arange(nModes) if i not in Indices]
+        IndicesMissing = [i for i in np.arange(nModesMax) if i not in Indices]
         f   = np.asarray([m['Fnat'] [iiMode] for iiMode in IndicesMissing])
         d   = np.asarray([m['Damps'][iiMode] for iiMode in IndicesMissing])
         ws  = np.asarray([ws]*len(f))
@@ -314,16 +339,16 @@ def postproMBC(xlsFile=None, csvModesIDFile=None, xlssheet=None, verbose=True):
         UnMapped_Damp = np.concatenate((UnMapped_Damp, d))
         UnMapped_WS   = np.concatenate((UnMapped_WS, ws))
         UnMapped_RPM  = np.concatenate((UnMapped_RPM, rpm))
-    # --- Unidentified modes, beyond "nModes"
-    for m,ws,rpm in zip(ModeData,WS,RPM):
-        f   = m['Fnat'][nModesIDd:]
-        d   = m['Damps'][nModesIDd:]
-        ws  = np.asarray([ws]*len(f))
-        rpm = np.asarray([rpm]*len(f))
-        UnMapped_Freq = np.concatenate((UnMapped_Freq, f))
-        UnMapped_Damp = np.concatenate((UnMapped_Damp, d))
-        UnMapped_WS   = np.concatenate((UnMapped_WS, ws))
-        UnMapped_RPM  = np.concatenate((UnMapped_RPM, rpm))
+    ## --- Unidentified modes, beyond "nModes"
+    #for m,ws,rpm in zip(ModeData,WS,RPM):
+    #   f   = m['Fnat'][nModesIDd:]
+    #   d   = m['Damps'][nModesIDd:]
+    #   ws  = np.asarray([ws]*len(f))
+    #   rpm = np.asarray([rpm]*len(f))
+    #   UnMapped_Freq = np.concatenate((UnMapped_Freq, f))
+    #   UnMapped_Damp = np.concatenate((UnMapped_Damp, d))
+    #   UnMapped_WS   = np.concatenate((UnMapped_WS, ws))
+    #   UnMapped_RPM  = np.concatenate((UnMapped_RPM, rpm))
 
     # --- Put identified modes into a more convenient form
     cols=[ m.split('-')[0].strip().replace(' ','_') for m in ModeNames]
@@ -363,8 +388,9 @@ def postproMBC(xlsFile=None, csvModesIDFile=None, xlssheet=None, verbose=True):
 
     return OP, Freq, Damp, UnMapped, ModeData
 
-def plotCampbell(OP, Freq, Damp, sx='WS_[m/s]', UnMapped=None, fig=None, axes=None, ylim=None):
-    """ Plot Campbell data as returned by postproMBC """
+
+def campbellModeStyles(i, lbl):
+    """ """
     import matplotlib.pyplot as plt
     FullLineStyles = [':', '-', '-+', '-o', '-^', '-s', '--x', '--d', '-.', '-v', '-+', ':o', ':^', ':s', ':x', ':d', ':.', '--','--+','--o','--^','--s','--x','--d','--.'];
     Markers    = ['', '+', 'o', '^', 's', 'd', 'x', '.']
@@ -387,38 +413,53 @@ def plotCampbell(OP, Freq, Damp, sx='WS_[m/s]', UnMapped=None, fig=None, axes=No
     MW_DarkRed  =     np.array([146,36,40])/255.
     MW_Kaki     =     np.array([148,139,61])/255.
 
-    def modeStyle(i, lbl):
-        lbl=lbl.lower().replace('_',' ')
-        ms = 4
-        c  = Colors[np.mod(i,len(Colors))]
-        ls = LineStyles[np.mod(int(i/len(Markers)),len(LineStyles))]
-        mk = Markers[np.mod(i,len(Markers))]
-        # Color
-        if any([s in lbl for s in ['1st tower']]):
-            c=MW_Blue
-        elif any([s in lbl for s in ['2nd tower']]):
-            c=MW_Light_Blue
-        elif any([s in lbl for s in ['1st blade edge','drivetrain']]):
-            c=MW_Red
-        elif any([s in lbl for s in ['1st blade flap']]):
-            c=MW_Green
-        elif any([s in lbl for s in ['2nd blade flap']]):
-            c=MW_Light_Green
-        elif any([s in lbl for s in ['2nd blade edge']]):
-            c=MW_Light_Red
-        # Line style
-        if any([s in lbl for s in ['tower fa','collective','drivetrain']]):
-            ls='-'
-        elif any([s in lbl for s in ['tower ss','regressive']]):
-            ls='--'
-        elif any([s in lbl for s in ['tower ss','progressive']]):
-            ls='-.'
-        # Marker
-        if any([s in lbl for s in ['collective']]):
-            mk='2'; ms=8
-        elif any([s in lbl for s in ['blade','tower','drivetrain']]):
-            mk=''; 
-        return c, ls, ms, mk
+    lbl=lbl.lower().replace('_',' ')
+    ms = 4
+    c  = Colors[np.mod(i,len(Colors))]
+    ls = LineStyles[np.mod(int(i/len(Markers)),len(LineStyles))]
+    mk = Markers[np.mod(i,len(Markers))]
+    # Color
+    if any([s in lbl for s in ['1st tower']]):
+        c=MW_Blue
+    elif any([s in lbl for s in ['2nd tower']]):
+        c=MW_Light_Blue
+    elif any([s in lbl for s in ['1st blade edge','drivetrain']]):
+        c=MW_Red
+    elif any([s in lbl for s in ['1st blade flap']]):
+        c=MW_Green
+    elif any([s in lbl for s in ['2nd blade flap']]):
+        c=MW_Light_Green
+    elif any([s in lbl for s in ['2nd blade edge']]):
+        c=MW_Light_Red
+    # Line style
+    if any([s in lbl for s in ['tower fa','collective','drivetrain','coll']]):
+        ls='-'
+    elif any([s in lbl for s in ['tower ss','regressive','bw']]):
+        ls='--'
+    elif any([s in lbl for s in ['tower ss','progressive','fw']]):
+        ls='-.'
+    # Marker
+    if any([s in lbl for s in ['collective','coll']]):
+        mk='2'; ms=8
+    elif any([s in lbl for s in ['blade','tower','drivetrain']]):
+        mk=''; 
+    return c, ls, ms, mk
+
+def plotCampbell(OP, Freq, Damp, sx='WS_[m/s]', UnMapped=None, fig=None, axes=None, ylim=None):
+    """ Plot Campbell data as returned by postproMBC 
+
+    INPUTS:
+      - OP : dataframe of operating points (as returned by postMBC)
+      - Freq : dataframe of Frequencies at each OP (as returned by postMBC)
+      - OP : dataframe of damping ratios at each OP points (as returned by postMBC)
+      - sx: label of the dataframes used for the "x" axis of the Campbell plot
+    OPTIONAL INPUTS:
+      - UnMapped: dataframe of UnMapped modes
+      - fig, axes: optional fig and axes used for plotting (freq and damp)
+      - ylim: limits for the frequency axis
+    """
+    import matplotlib.pyplot as plt
+
 
     # Init figure
     if fig is None:
@@ -429,17 +470,25 @@ def plotCampbell(OP, Freq, Damp, sx='WS_[m/s]', UnMapped=None, fig=None, axes=No
         axes=axes_
 
     # Estimating figure range
-    FreqRange = [0                         , np.nanmax(Freq.iloc[:,:])*1.01]
-    DampRange = [np.nanmin(Damp.iloc[:,2:]), np.nanmax(Damp.iloc[:,:])*1.01]
+    FreqRange = [0                         , np.nanmax(Freq.values)*1.01]
+    DampRange = [np.nanmin(Damp.iloc[:,2:]), np.nanmax(Damp.values)*1.01]
+
     if ylim is not None:
         FreqRange=ylim
     if DampRange[0]>0:
         DampRange[0]=0
 
-    # Plot "background"
-    # TODO rpms 1p 3p 6p 9p
+    # Plot "background" 1p 3p 6p 9p. Potentiallymake this an option
+    RPM     = OP['RotSpeed_[rpm]'].values
+    omega   = RPM/60*2*np.pi
+    freq_1p = omega/(2*np.pi)
+    axes[0].plot(OP[sx].values,  freq_1p, ':',color=(0.7,0.7,0.7), lw=1.0)
+    axes[0].plot(OP[sx].values,3*freq_1p, ':',color=(0.7,0.7,0.7), lw=1.0)
+    axes[0].plot(OP[sx].values,6*freq_1p, ':',color=(0.7,0.7,0.7), lw=1.0)
+    axes[0].plot(OP[sx].values,9*freq_1p, ':',color=(0.7,0.7,0.7), lw=1.0)
 
     # Plot mapped modes
+    Markers = ['', '+', 'o', '^', 's', 'd', 'x', '.']
     iModeValid=0
     xPlot=[]; yPlot=[]
     for iMode,lbl in enumerate(Freq.columns.values):
@@ -447,7 +496,10 @@ def plotCampbell(OP, Freq, Damp, sx='WS_[m/s]', UnMapped=None, fig=None, axes=No
             # TODO ADD TO UNMAPPED
             continue
         iModeValid+=1
-        c, ls, ms, mk = modeStyle(iModeValid, lbl)
+        c, ls, ms, mk = campbellModeStyles(iModeValid, lbl)
+        if len(RPM)==1 and len(mk)==0:
+            mk = Markers[np.mod(iMode,len(Markers))]
+            ms=5
         axes[0].plot(OP[sx].values, Freq[lbl].values, ls, marker=mk, label=lbl.replace('_',' '), markersize=ms, color=c)
         axes[1].plot(OP[sx].values, Damp[lbl].values, ls, marker=mk                            , markersize=ms, color=c)
         xPlot=np.concatenate((xPlot, OP[sx].values))
@@ -468,18 +520,25 @@ def plotCampbell(OP, Freq, Damp, sx='WS_[m/s]', UnMapped=None, fig=None, axes=No
     axes[0].set_ylabel('Frequencies [Hz]')
     axes[1].set_ylabel('Damping ratios [-]')
     axes[0].legend(bbox_to_anchor=(0., 1.02, 2.16, .802), loc='lower left', ncol=4, mode="expand", borderaxespad=0.)
-    axes[0].set_ylim(FreqRange)
+    if not np.any(np.isnan(FreqRange)):
+        axes[0].set_ylim(FreqRange)
     
     XLIM=axes[1].get_xlim()
     axes[1].plot(XLIM, [0,0],'-', color='k', lw=0.5)
     axes[1].set_xlim(XLIM)
-    axes[1].set_ylim(DampRange)
+    if not np.any(np.isnan(DampRange)):
+        axes[1].set_ylim(DampRange)
     return fig, axes
 
 
-def plotCampbellDataFile(xls_or_csv, ws_or_rpm='rpm', sheetname=None, ylim=None):
+def plotCampbellDataFile(xls_or_csv, ws_or_rpm='rpm', sheetname=None, ylim=None, WS_legacy=None, to_csv=False):
     """ 
     Wrapper for plotCampbell, takes an Excel or csv file as argument. Returns a figure.
+
+    INPUTS:
+
+
+      - WS_legacy: for OpenFAST 2.3, wind speed is unknown (NaN), a vector of operating point WS is needed
     """
     if ws_or_rpm.lower()=='ws':
         sx='WS_[m/s]'
@@ -492,10 +551,10 @@ def plotCampbellDataFile(xls_or_csv, ws_or_rpm='rpm', sheetname=None, ylim=None)
 
     # --- Read xlsx or csv filse
     if ext=='.xlsx':
-        OP, Freq, Damp, UnMapped, ModeData =  postproMBC(xlsFile=xls_or_csv,xlssheet=sheetname)
+        OP, Freq, Damp, UnMapped, ModeData =  postproMBC(xlsFile=xls_or_csv,xlssheet=sheetname, WS_legacy=WS_legacy)
 
     elif ext=='.csv':
-        OP, Freq, Damp, UnMapped, ModeData =  postproMBC(csvModesIDFile=xls_or_csv)
+        OP, Freq, Damp, UnMapped, ModeData =  postproMBC(csvModesIDFile=xls_or_csv, WS_legacy=WS_legacy)
 
         pass
 
@@ -503,8 +562,13 @@ def plotCampbellDataFile(xls_or_csv, ws_or_rpm='rpm', sheetname=None, ylim=None)
         raise Exception('Extension should be csv or xlsx, got {} instead.'.format(ext),)
 
     # --- Plot
-    fig, axes = plotCampbell(OP, Freq, Damp, sx=sx, UnMapped=UnMapped, ylim=None)
+    fig, axes = plotCampbell(OP, Freq, Damp, sx=sx, UnMapped=UnMapped, ylim=ylim)
     figName = os.path.join(baseDir,basename+'_'+ws_or_rpm)
+
+    if to_csv:
+        Freq.to_csv(os.path.join(baseDir, 'freq.csv'), index=None, sep=' ')
+        Damp.to_csv(os.path.join(baseDir, 'damp.csv'), index=None, sep=' ')
+        OP.to_csv(os.path.join(baseDir, 'op.csv'), index=None, sep=' ')
 
     return fig, axes, figName
 

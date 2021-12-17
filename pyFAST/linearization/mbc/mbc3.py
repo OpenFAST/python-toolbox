@@ -1,9 +1,5 @@
 #############################################################
 #	Perform MBC3 Analysis and plot Campbell Diagram     #
-#	Authors: Srinivasa B. Ramisetti    	            #
-#	Created:   18-July-2020		  	            #
-#	E-mail: ramisettisrinivas@yahoo.com		    #
-#	Web:	http://ramisetti.github.io		    #
 #############################################################
 #!/usr/bin/env python
 
@@ -42,92 +38,128 @@ def getScaleFactors(DescStates, TowerLen, BladeLen):
 
 
 def IdentifyModes(CampbellData):
-    modesDesc = {}
-    modesDesc[0]=['Generator DOF (not shown)'     , 'ED Variable speed generator DOF, rad']
-    modesDesc[1]=['1st Tower FA'                  , 'ED 1st tower fore-aft bending mode DOF, m']
-    modesDesc[2]=['1st Tower SS'                  , 'ED 1st tower side-to-side bending mode DOF, m']
-    modesDesc[3]=['1st Blade Flap (Regressive)'   , 'ED 1st flapwise bending-mode DOF of blade (sine|cosine), m', 'Blade (sine|cosine) finite element node \d rotational displacement in Y, rad']
-    modesDesc[4]=['1st Blade Flap (Collective)'   , 'ED 1st flapwise bending-mode DOF of blade collective, m', 'Blade collective finite element node \d rotational displacement in Y, rad']
-    modesDesc[5]=['1st Blade Flap (Progressive)'  , 'ED 1st flapwise bending-mode DOF of blade (sine|cosine), m'] # , ...# 'Blade (sine|cosine) finite element node \d rotational displacement in Y, rad']
-    modesDesc[6]=['1st Blade Edge (Regressive)'   , 'ED 1st edgewise bending-mode DOF of blade (sine|cosine), m', 'Blade (sine|cosine) finite element node \d rotational displacement in X, rad']
-    modesDesc[7]=['1st Blade Edge (Progressive)'  , 'ED 1st edgewise bending-mode DOF of blade (sine|cosine), m']
-    modesDesc[8]=['1st Drivetrain Torsion'        , 'ED Drivetrain rotational-flexibility DOF, rad']
-    modesDesc[9]=['2nd Tower FA'                  , 'ED 2nd tower fore-aft bending mode DOF, m']
-    modesDesc[10]=['2nd Tower SS'                  , 'ED 2nd tower side-to-side bending mode DOF, m']
-    modesDesc[11]=['2nd Blade Flap (Regressive)'   , 'ED 2nd flapwise bending-mode DOF of blade (sine|cosine), m']
-    modesDesc[12]=['2nd Blade Flap (Collective)'   , 'ED 2nd flapwise bending-mode DOF of blade collective, m', 'Blade collective finite element node \d rotational displacement in Y, rad']
-    modesDesc[13]=['2nd Blade Flap (Progressive)'  , 'ED 2nd flapwise bending-mode DOF of blade (sine|cosine), m'] 
-    modesDesc[14]=['Nacelle Yaw (not shown)'  , 'ED Nacelle yaw DOF, rad']
+    """ 
+    Attempts to perform an identification of the modes.
+    For now, the method is based on the energy content of the modes, and the state descriptions where the energy is maximum
+
+    Original contribution by: Srinivasa B. Ramisett, ramisettisrinivas@yahoo.com, http://ramisetti.github.io
+    """
+    # --- Looking at states descriptions (of first run, first mode), to see if we are offshore. 
+    # NOTE: DescStates is likely the same for all modes
+    DescStates  = CampbellData[0]['Modes'][0]['DescStates']
+    hasHeave    = any(['heave' in s.lower() for s in DescStates])
+    hasSurge    = any(['surge' in s.lower() for s in DescStates])
+    hasSway     = any(['sway' in s.lower() for s in DescStates])
+    hasYaw      = any(['platform yaw' in s.lower() for s in DescStates])
+    hasRoll     = any(['platform roll tilt' in s.lower() for s in DescStates])
+    hasPitch    = any(['platform pitch tilt' in s.lower() for s in DescStates])
+    hasEdge1Col = any(['1st edgewise bending-mode dof of blade collective' in s.lower() for s in DescStates])
+
+    # --- Setting up a list of modes with 
+    modesDesc = []
+    modesDesc.append( ['Generator DOF (not shown)'     , 'ED Variable speed generator DOF, rad'] )
+    # Platform DOFs
+    if hasSurge:
+        modesDesc.append( ['Platform surge', 'ED Platform horizontal surge translation DOF, m'] )
+    if hasSway:
+        modesDesc.append( ['Platform sway', 'ED Platform horizontal sway translation DOF, m'] )
+    if hasHeave:
+        modesDesc.append( ['Platform heave', 'ED Platform vertical heave translation DOF, m'] )
+    if hasRoll:
+        modesDesc.append( ['Platform roll', 'ED Platform roll tilt rotation DOF, rad'] )
+    if hasPitch:
+        modesDesc.append( ['Platform pitch', 'ED Platform pitch tilt rotation DOF, rad'] )
+    if hasYaw:
+        modesDesc.append( ['Platform yaw', 'ED Platform yaw rotation DOF, rad'] )
+
+    modesDesc.append( ['1st Tower FA'                  , 'ED 1st tower fore-aft bending mode DOF, m'] )
+    modesDesc.append( ['1st Tower SS'                  , 'ED 1st tower side-to-side bending mode DOF, m'] )
+    modesDesc.append( ['1st Blade Flap (Regressive)'   , 'ED 1st flapwise bending-mode DOF of blade (sine|cosine), m', r'Blade (sine|cosine) finite element node \d rotational displacement in Y, rad'] )
+    modesDesc.append( ['1st Blade Flap (Collective)'   , 'ED 1st flapwise bending-mode DOF of blade collective, m', r'Blade collective finite element node \d rotational displacement in Y, rad'] )
+    modesDesc.append( ['1st Blade Flap (Progressive)'  , 'ED 1st flapwise bending-mode DOF of blade (sine|cosine), m']                                                                          )      # , ... # 'Blade (sine|cosine) finite element node \d rotational displacement in Y, rad']
+    modesDesc.append( ['1st Blade Edge (Regressive)'   , 'ED 1st edgewise bending-mode DOF of blade (sine|cosine), m', r'Blade (sine|cosine) finite element node \d rotational displacement in X, rad'] )
+    if hasEdge1Col:
+        modesDesc.append(['1st Blade Edge (Collective)', 'ED 1st edgewise bending-mode DOF of blade collective, m']                                                                          )      # , ... # 'Blade (sine|cosine) finite element node \d rotational displacement in Y, rad']
+    modesDesc.append( ['1st Blade Edge (Progressive)'  , 'ED 1st edgewise bending-mode DOF of blade (sine|cosine), m'] )
+    modesDesc.append( ['1st Drivetrain Torsion'        , 'ED Drivetrain rotational-flexibility DOF, rad'] )
+    modesDesc.append( ['2nd Tower FA'                  , 'ED 2nd tower fore-aft bending mode DOF, m'] )
+    modesDesc.append( ['2nd Tower SS'                  , 'ED 2nd tower side-to-side bending mode DOF, m'] )
+    modesDesc.append( ['2nd Blade Flap (Regressive)'   , 'ED 2nd flapwise bending-mode DOF of blade (sine|cosine), m'] )
+    modesDesc.append( ['2nd Blade Flap (Collective)'   , 'ED 2nd flapwise bending-mode DOF of blade collective, m', r'Blade collective finite element node \d rotational displacement in Y, rad'] )
+    modesDesc.append( ['2nd Blade Flap (Progressive)'  , 'ED 2nd flapwise bending-mode DOF of blade (sine|cosine), m'] )
+    modesDesc.append( ['Nacelle Yaw (not shown)'  , 'ED Nacelle yaw DOF, rad'] )
+
 
     nModes = int(len(modesDesc))
     nRuns = int(len(CampbellData))
-    #modesIdentified = np.zeros(nRuns,dtype=bool)
-    modesIdentified={}
-    modeID_table=np.zeros((nModes,nRuns))
-    #print(nModes, nRuns)
+    modeID_table=np.zeros((nModes,nRuns)).astype(int)
 
-    # for i in range(nModes):
-    #     print(CampbellData[0]['Modes'][i]['NaturalFreq_Hz'])
-
-    # print('----')
-    # for i in range(nModes):
-    #     print(CampbellData[1]['Modes'][i]['NaturalFreq_Hz'])
-
+    # Loop on operating points/Runs
     for i in range(nRuns):
-        res =  [False for i in range(len(CampbellData[i]['Modes']))]
-        modesIdentified[i] = res
+        Modes  = CampbellData[i]['Modes']
+        nModes = len(Modes)
+        # Array of logical, False for Modes that are not identified
+        modesIdentified = [False for i in range(nModes)]
+        modesConfidence = [0 for i in range(nModes)]
 
-        #print(' MODES IDENTIFIED ', modesIdentified,len(modesDesc))
+        # --- TODO: find well-defined modes first. Increasing order might be problematic at times
+        #for im, mode in enumerate(Modes):
+        #    m=im+1
+        #    stateMax=np.argwhere((mode['StateHasMaxAtThisMode']==1))
+        #    if len(stateMax.flatten())==1:
+        #        maxDesc=mode['DescStates'][stateMax.flatten()[0]]
+        #        print('>>> maxdesc',maxDesc)
+        #        for modeID, modeIDdescList in enumerate(modesDesc):
+        #            modeIDName     = modeIDdescList[0]
+        #            modeIDdescList = modeIDdescList[1:]
+        #            found = False
+        #            for tartgetDesc in modeIDdescList:
+        #                # Looking for targetDesc into list of descriptions
+        #                if re.search(tartgetDesc ,maxDesc,re.IGNORECASE)!=None:
+        #                    modesIdentified[m-1] = True;
+        #                    modeID_table[modeID,i] = m # Using Matlab Indexing
+        #                    found = True;
+        #                    break;
     
-        for modeID in range(1,len(modesDesc)): # list of modes we want to identify
+        # Loop on modes to be identified
+        for modeID, modeIDdescList in enumerate(modesDesc):
+            modeIDName     = modeIDdescList[0]
+            modeIDdescList = modeIDdescList[1:]
+
             found = False;
             
-            if ( len(modesDesc[modeID][1])==0 ): 
-                continue;
-        
+            # --- Loop on all non-identified modes in increasing order
             tryNumber = 0;
-            
             #print(' FOUND , Trynumber ', found, tryNumber)
             while not found and tryNumber <= 2:
                 m = 0;
-                while not found and m < len(modesIdentified[i]):
+                while not found and m < nModes:
                     m = m + 1;
-                    if modesIdentified[i][m-1] or CampbellData[i]['Modes'][m-1]['NaturalFreq_Hz'] < 0.1: # already identified this mode
+                    if modesIdentified[m-1] or Modes[m-1]['NaturalFreq_Hz'] < 1e-5: # already identified this mode
                         continue;
-
-                    #print(' NF ', i, m, CampbellData[i]['Modes'][m]['NaturalFreq_Hz'])
-
+                    # --- First, use as mode descriptions the ones where the mode has max
                     if tryNumber == 0:
-                        stateMax=np.argwhere((CampbellData[i]['Modes'][m-1]['StateHasMaxAtThisMode']==1))
-                        #print(' FF ',i,m,len(stateMax),type(stateMax))
-
-                        maxDesc=[CampbellData[i]['Modes'][m-1]['DescStates'][smIndx] for smIndx in stateMax.flatten()]
-                        #print(' TR0 sM ',i, m , tryNumber, len(maxDesc), maxDesc)
-                        #maxDesc = CampbellData[i]['Modes'][m]['DescStates'][stateMaxIndx]
+                        stateMax=np.argwhere((Modes[m-1]['StateHasMaxAtThisMode']==1))
+                        maxDesc=[Modes[m-1]['DescStates'][smIndx] for smIndx in stateMax.flatten()]
 
                         if len(maxDesc)==0:
                             tryNumber = tryNumber + 1;
                 
+                    # --- Otherwise, use as mode descriptions the other ones. Seems weird
                     if tryNumber > 0:
-                        if tryNumber < len(CampbellData[i]['Modes'][m-1]['DescStates']):
+                        if tryNumber < len(Modes[m-1]['DescStates']):
                             stateMax=np.argwhere((CampbellData[i]['Modes'][m-1]['StateHasMaxAtThisMode']==0))
-
-                            maxDesc=[CampbellData[i]['Modes'][m-1]['DescStates'][smIndx] for smIndx in stateMax.flatten()]
-                            #print(' TY1 sM ',i, m , tryNumber, len(maxDesc))
-                        
-                            #maxDesc = CampbellData[i]['Modes'][m]['DescStates'][~CampbellData[i]['Modes'][m]['StateHasMaxAtThisMode']]
-                            #print(maxDesc)
+                            maxDesc=[Modes[m-1]['DescStates'][smIndx] for smIndx in stateMax.flatten()]
                         else:
                             maxDesc = [];
                     
                     j = 0;
                     while not found and j < len(maxDesc):
                         j = j + 1;
-                        #print(' GGG00 ',j, len(modesDesc[modeID]))
-                        for iExp in range(1,len(modesDesc[modeID])):
-                            #print(' GGG0 ',iExp)
-                            if re.search(modesDesc[modeID][iExp],maxDesc[j-1],re.IGNORECASE)!=None:
-                                modesIdentified[i][m-1] = True;
+                        for tartgetDesc in modeIDdescList:
+                            # Looking for targetDesc into list of descriptions
+                            if re.search(tartgetDesc ,maxDesc[j-1],re.IGNORECASE)!=None:
+                                modesIdentified[m-1] = True;
                                 #print(' GGG1 ',i,j,m, modeID, iExp, tryNumber, maxDesc[j-1], len(maxDesc))
                                 modeID_table[modeID,i] = m # Using Matlab Indexing
                                 found = True;
@@ -136,7 +168,36 @@ def IdentifyModes(CampbellData):
 
     return modeID_table,modesDesc
 
+def IdentifiedModesDict(CampbellData,modeID_table,modesDesc):
+    """
+    To be called with the results of IdentifyModes.
+    Create a list of dictionaries to more easily interprete the result
+    """
+    nOP = modeID_table.shape[1]
+    modesInfoPerOP=[]
+    for iOP in np.arange(nOP):
+        modesInfo={}
+        for i in np.arange(len(modesDesc)):
+            desc = modesDesc[i][0]
+            ID   = int(modeID_table[i,iOP])
+            if ID==0:
+                freq=np.nan
+                damp=np.nan
+                cont=''
+            else:
+                freq = np.around(CampbellData[iOP]['Modes'][ID-1]['NaturalFreq_Hz'],5)
+                damp = np.around(CampbellData[iOP]['Modes'][ID-1]['DampingRatio'],5)
+                cont = CampbellData[iOP]['ShortModeDescr'][ID-1]
+            modesInfo[desc]={'ID':ID,'f0':freq,'zeta':damp,'cont':cont}
+        modesInfoPerOP.append(modesInfo)
+    return modesInfoPerOP
+
 def campbell_diagram_data(mbc_data, BladeLen, TowerLen):
+    """ 
+    
+    Original contribution by: Srinivasa B. Ramisett, ramisettisrinivas@yahoo.com, http://ramisetti.github.io
+    """
+
     CampbellData={}
     usePercent = False;
     #
@@ -174,6 +235,7 @@ def campbell_diagram_data(mbc_data, BladeLen, TowerLen):
 
     ModesMagnitude = np.matmul(ModesMagnitude,np.diag(1./scaleCol)) # scale the columns
 
+    # --- Summary data (array for all modes)
     CampbellData['NaturalFreq_Hz'] = mbc_data['eigSol']['NaturalFreqs_Hz'][SortedFreqIndx]
     CampbellData['DampingRatio']   = mbc_data['eigSol']['DampRatios'][SortedFreqIndx]
     CampbellData['RotSpeed_rpm']   = mbc_data['RotSpeed_rpm']
@@ -181,8 +243,9 @@ def campbell_diagram_data(mbc_data, BladeLen, TowerLen):
         CampbellData['WindSpeed']  = mbc_data['WindSpeed']
         
     #print(ModesMagnitude)
-    CampbellData['Modes']=[]
 
+    # --- Storing data per mode
+    CampbellData['Modes']=[]
     for i in range(nModes):
         CData={}
         CData['NaturalFreq_Hz'] = mbc_data['eigSol']['NaturalFreqs_Hz'][SortedFreqIndx[i]][0]
@@ -228,6 +291,9 @@ def campbell_diagram_data(mbc_data, BladeLen, TowerLen):
         CampbellData['Modes'].append(CData)
 
     #print(CampbellData[0]['MagnitudePhase'])
+    # Adding short description to summary
+    CampbellData['ShortModeDescr'] =[extractShortModeDescription(CampbellData['Modes'][i]) for i in range(nModes)]
+
 
     CampbellData['nColsPerMode'] = 5;
     CampbellData['ModesTable'] = {}
@@ -238,13 +304,13 @@ def campbell_diagram_data(mbc_data, BladeLen, TowerLen):
         CampbellData['ModesTable'][1, colStart+2 ] = i;
 
         CampbellData['ModesTable'][2, colStart+1 ] = 'Natural (undamped) frequency (Hz):';
-        CampbellData['ModesTable'][2, colStart+2 ] = np.asscalar(CampbellData['Modes'][i]['NaturalFreq_Hz'])
+        CampbellData['ModesTable'][2, colStart+2 ] = CampbellData['Modes'][i]['NaturalFreq_Hz']
 
         CampbellData['ModesTable'][3, colStart+1 ] = 'Damped frequency (Hz):';
-        CampbellData['ModesTable'][3, colStart+2 ] = np.asscalar(CampbellData['Modes'][i]['DampedFreq_Hz'])
+        CampbellData['ModesTable'][3, colStart+2 ] = CampbellData['Modes'][i]['DampedFreq_Hz']
 
         CampbellData['ModesTable'][4, colStart+1 ] = 'Damping ratio (-):';
-        CampbellData['ModesTable'][4, colStart+2 ] = np.asscalar(CampbellData['Modes'][i]['DampingRatio'])
+        CampbellData['ModesTable'][4, colStart+2 ] = CampbellData['Modes'][i]['DampingRatio']
         
         CampbellData['ModesTable'][5, colStart+1 ] = 'Mode ' + str(i) + ' state description';
         CampbellData['ModesTable'][5, colStart+2 ] = 'State has max at mode ' + str(i);
@@ -275,9 +341,12 @@ def extractShortModeDescription(Mode):
     DescCat = ''
     DescCatED = ''
     if len(Desc) == 0:
+        noMax=True
         DescCat = ''
-        DescCatED = 'NoMax -'
+        DescCatED = ''
         Desc = Mode['DescStates'][:5]
+    else:
+        noMax=False
     nBD = 0
     for iD, s in enumerate(Desc):
         s = replaceModeDescription(s)
@@ -288,25 +357,33 @@ def extractShortModeDescription(Mode):
         else:
             DescCat += ' - '+s
     DescCat =DescCatED+DescCat
+    if noMax:
+        DescCat = 'NoMax - ' + DescCat
     return DescCat
 
 
 def replaceModeDescription(s):
     """ Perform substitutions to make the mode description shorter"""
+    s = s.replace('Blade','Bld')
+    s = s.replace('blade','Bld')
     s = s.replace('First time derivative of','d/dt of')
     s = s.replace('fore-aft bending mode DOF, m','FA')
     s = s.replace('side-to-side bending mode DOF, m','SS')
-    s = s.replace('bending-mode DOF of blade ','')
+    s = s.replace('bending-mode DOF of Bld ','')
     s = s.replace(' rotational-flexibility DOF, rad','-rot')
     s = s.replace('rotational displacement in ','rot')
     s = s.replace('translational displacement in ','trans')
+    s = s.replace('Platform horizontal surge translation DOF','Platform surge')
+    s = s.replace('Platform vertical heave translation DOF','Platform heave')
+    s = s.replace('Platform pitch tilt rotation DOF','Platform pitch')
     s = s.replace(', rad','')
     s = s.replace(', m','')
     s = s.replace('finite element node ','N')
     s = s.replace('cosine','cos')
     s = s.replace('sine','sin')
+    s = s.replace('flapwise','FLAP')
+    s = s.replace('edgewise','EDGE')
     s = s.replace('collective','coll.')
-    s = s.replace('Blade','Bld')
     s = s.replace('rotZ','TORS-ROT')
     s = s.replace('transX','FLAP-DISP')
     s = s.replace('transY','EDGE-DISP')
@@ -333,8 +410,8 @@ def PrettyStateDescriptions(DescStates, ndof2, performedTransformation):
         StateDesc = tmpDS
     
     for i in range(len( StateDesc )):
-        First=re.split('\(',StateDesc[i],2)
-        Last=re.split('\)',StateDesc[i],2)
+        First = re.split(r'\(',StateDesc[i],2)
+        Last  = re.split(r'\)',StateDesc[i],2)
 
         if len(First)>0 and len(Last)>0 and len(First[0]) != len(StateDesc[i]) and len( Last[-1] ) != len(StateDesc[i]):
             StateDesc[i] = (First[0]).strip() + Last[-1];
@@ -478,6 +555,9 @@ def eiganalysis(A, ndof2, ndof1):
     return mbc,EigenVects_save[:,:,0]
 
 def fx_mbc3(FileNames, verbose=True):
+    """ 
+    Original contribution by: Srinivasa B. Ramisett, ramisettisrinivas@yahoo.com, http://ramisetti.github.io
+    """
     MBC={}
     matData, FAST_linData = gm.get_Mats(FileNames, verbose=verbose)
 
@@ -597,7 +677,7 @@ def fx_mbc3(FileNames, verbose=True):
             #---    
             T1q = np.eye(n_FixFrameStates1);               # Eq. 11 for first-order states (eq. 8 in MBC3 Update document)
             for ii in range(matData['n_RotTripletStates1']):
-                T1q = blkdiag(T1, tt);
+                T1q = blkdiag(T1q, tt);
 
             T1qv = np.eye(n_FixFrameStates1);              # inverse of T1q
             for ii in range(matData['n_RotTripletStates1']):

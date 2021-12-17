@@ -155,9 +155,14 @@ class TurbSimFile(File):
             f.write(struct.pack('<6f', scl[0],off[0],scl[1],off[1],scl[2],off[2]))
             f.write(struct.pack('<l' , len(info)))
             f.write(info.encode())
-            for it in np.arange(nt):
-                f.write(out[:,it,:,:].tostring(order='F'))
-                f.write(outTwr[:,it,:].tostring(order='F'))
+            try:
+                for it in np.arange(nt):
+                    f.write(out[:,it,:,:].tobytes(order='F'))
+                    f.write(outTwr[:,it,:].tobytes(order='F'))
+            except:
+                for it in np.arange(nt):
+                    f.write(out[:,it,:,:].tostring(order='F'))
+                    f.write(outTwr[:,it,:].tostring(order='F'))
 
     def hubValues(self, zHub=None):
         if zHub is None:
@@ -177,6 +182,13 @@ class TurbSimFile(File):
             iy = np.argmin(np.abs(self['y']-(self['y'][0]+self['y'][-1])/2))
             uHub = np.mean(self['u'][0,:,iy,iz])
         return zHub, uHub, bHub
+
+    def midValues(self):
+        iy,iz = self._iMid()
+        zMid = self['z'][iz]
+        #yMid = self['y'][iy] # always 0
+        uMid = np.mean(self['u'][0,:,iy,iz])
+        return zMid, uMid
 
     def _iMid(self):
         iy = np.argmin(np.abs(self['y']-(self['y'][0]+self['y'][-1])/2))
