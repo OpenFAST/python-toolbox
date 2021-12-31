@@ -345,7 +345,7 @@ def paramsStiff(p=None):
     p['EDFile|PtfmYDOF']  = 'False'
     return p
 
-def paramsWS_RPM_Pitch(WS, RPM, Pitch, baseDict=None, FlatInputs=False):
+def paramsWS_RPM_Pitch(WS, RPM, Pitch, baseDict=None, flatInputs=False):
     """ 
     Generate OpenFAST "parameters" (list of dictionaries with "address")
     chaing the inputs in ElastoDyn, InflowWind for different wind speed, RPM and Pitch
