@@ -2,7 +2,7 @@ import numpy as np
 import os
 
 import pyFAST.case_generation.case_gen as case_gen
-import pyFAST.case_generation.runner as case_gen
+import pyFAST.case_generation.runner as runner
 import pyFAST.input_output.postpro as postpro
 
 # Get current directory so this script can be called from any location
@@ -23,9 +23,9 @@ def PowerCurveParametricExample1():
        - they values are the values corresponding to this parameter
     """
     # --- Parameters for this script
-    FAST_EXE  = os.path.join(MyDir, '../../../data/openfast.exe') # Location of a FAST exe (and dll)
+    FAST_EXE  = os.path.join(MyDir, '../../../../openfast/build/bin/openfast_x64.exe') # Location of a FAST exe (and dll)
     ref_dir   = os.path.join(MyDir, '../../../data/NREL5MW/')     # Folder where the fast input files are located (will be copied)
-    main_file = 'Main_Onshore.fst'               # Main file in ref_dir, used as a template
+    main_file = 'Main_Onshore_OF.fst'               # Main file in ref_dir, used as a template
     work_dir  = '_NREL5MW_PowerCurveParametric/'     # Output folder (will be created)
 
     # --- Defining the parametric study  (list of dictionnaries with keys as FAST parameters)
@@ -82,7 +82,7 @@ def PowerCurveParametricExample2():
        - they values are the values corresponding to this parameter
     """
     # --- Parameters for this script
-    FAST_EXE  = os.path.join(MyDir, '../../../data/openfast.exe') # Location of a FAST exe (and dll)
+    FAST_EXE  = FAST_EXE  = os.path.join(MyDir, '../../../../openfast/build/bin/openfast_x64.exe') # Location of a FAST exe (and dll)
     ref_dir   = os.path.join(MyDir, '../../../data/NREL5MW/')     # Folder where the fast input files are located (will be copied)
     main_file = 'Main_Onshore_OF.fst'                # Main file in ref_dir, used as a template
     work_dir  = '_NREL5MW_PowerCurveParametric2/'     # Output folder (will be created)
