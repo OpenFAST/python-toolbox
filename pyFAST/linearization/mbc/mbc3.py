@@ -554,12 +554,12 @@ def eiganalysis(A, ndof2, ndof1):
     
     return mbc,EigenVects_save[:,:,0]
 
-def fx_mbc3(FileNames, verbose=True):
+def fx_mbc3(FileNames, verbose=True, removeTwrAzimuth=False):
     """ 
     Original contribution by: Srinivasa B. Ramisett, ramisettisrinivas@yahoo.com, http://ramisetti.github.io
     """
     MBC={}
-    matData, FAST_linData = gm.get_Mats(FileNames, verbose=verbose)
+    matData, FAST_linData = gm.get_Mats(FileNames, verbose=verbose, removeTwrAzimuth=removeTwrAzimuth)
 
     # print('matData[Omega] ', matData['Omega'])
     # print('matData[OmegaDot] ', matData['OmegaDot'])
@@ -677,15 +677,15 @@ def fx_mbc3(FileNames, verbose=True):
             #---    
             T1q = np.eye(n_FixFrameStates1);               # Eq. 11 for first-order states (eq. 8 in MBC3 Update document)
             for ii in range(matData['n_RotTripletStates1']):
-                T1q = blkdiag(T1q, tt);
+                T1q = scp.block_diag(T1q, tt);
 
             T1qv = np.eye(n_FixFrameStates1);              # inverse of T1q
             for ii in range(matData['n_RotTripletStates1']):
-                T1qv = blkdiag(T1qv, ttv);
+                T1qv = scp.block_diag(T1qv, ttv);
 
             T2q = np.zeros([n_FixFrameStates1,n_FixFrameStates1]);             # Eq. 14 for first-order states (eq.  9 in MBC3 Update document)
             for ii in range(matData['n_RotTripletStates1']):
-                T2q = blkdiag(T2q, tt2);
+                T2q = scp.block_diag(T2q, tt2);
 
             #print('T1q, T1qv, T2q ',T1q.shape, T1qv.shape, T2q.shape)
             #     T1qc = np.eye(matData.NumHDInputs);            # inverse of T1q
@@ -818,7 +818,7 @@ def fx_mbc3(FileNames, verbose=True):
     return MBC, matData, FAST_linData
 
 
-def runMBC(FileNames,NLinTimes=None):
+def runMBC(FileNames, NLinTimes=None, removeTwrAzimuth=False):
     CampbellData={}
     HubRad=None;TipRad=None;
     BladeLen=None; TowerHt=None
@@ -861,7 +861,7 @@ def runMBC(FileNames,NLinTimes=None):
         linFileNames=[basename+'.'+format(x, 'd')+'.lin' for x in range(1,NLinTimes+1)]
 
         print('Processing ', FileNames[i], ' file!')
-        MBC_data,getMatData,FAST_linData=fx_mbc3(linFileNames)
+        MBC_data,getMatData,FAST_linData=fx_mbc3(linFileNames, removeTwrAzimuth=removeTwrAzimuth)
         print('Multi-Blade Coordinate transformation completed!');
         print('  ');
         CampbellData[i]=campbell_diagram_data(MBC_data,BladeLen,TowerHt)
