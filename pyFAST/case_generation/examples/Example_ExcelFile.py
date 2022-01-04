@@ -5,7 +5,7 @@ import os
 import pandas as pd
 
 import pyFAST.case_generation.case_gen as case_gen
-import pyFAST.case_generation.runner as case_gen
+import pyFAST.case_generation.runner as runner
 import pyFAST.input_output.postpro as postpro
 import pyFAST.input_output as io
 
