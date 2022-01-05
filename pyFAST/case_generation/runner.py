@@ -167,7 +167,7 @@ def writeBatch(batchfile, fastfiles, fastExe=None, nBatches=1):
 
 
 
-def removeFASTOuputs(workDir):
+def removeFASTOutputs(workDir):
     # Cleaning folder
     for f in glob.glob(os.path.join(workDir,'*.out')):
         os.remove(f)
