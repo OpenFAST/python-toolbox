@@ -398,7 +398,7 @@ def get_Mats(FileNames, verbose=True, removeTwrAzimuth=False):
     data      = [data[i]      for i in ISort]
     FileNames = [FileNames[i] for i in ISort]
     if removeTwrAzimuth:
-        IDiscard = [i  for i,a in enumerate(Azimuth) if np.any(np.abs(np.array([60,120,300])-a)<4)  ]
+        IDiscard = [i  for i,a in enumerate(Azimuth) if np.any(np.abs(np.array([60,180,300])-a)<4)  ]
         n=len(FileNames[0]); sfmt='{:'+str(n+2)+'s}'
         for i in IDiscard:
             print('          discard: '+sfmt.format(FileNames[i]) + '  (psi={:5.1f})'.format(Azimuth[i]))
