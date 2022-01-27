@@ -20,7 +20,7 @@ def _isbool(str):
     return flag
 
 
-def findBladeTriplets(rotFrame,Desc, verbose=True):
+def findBladeTriplets(rotFrame, Desc, verbose=True):
 
     # Find the number of, and indices for, triplets in the rotating frame:
     chkStr = [r'[Bb]lade \d', r'[Bb]lade [Rr]oot \d', r'BD_\d', r'[Bb]\d', r'[Bb]lade\d', r'PitchBearing\d', r'\d']
@@ -29,6 +29,8 @@ def findBladeTriplets(rotFrame,Desc, verbose=True):
 
     # hack for ElastoDyn state names (remove unnecessary text in parenthesis)
     for i in range(len(rotFrame)):
+        if Desc[i] is None:
+            raise Exception('Description not defined, likely a bug.')
         ix = Desc[i].find('(internal DOF index = ')
         if ix>0:
             ix2 = Desc[i].find(')')
@@ -146,8 +148,9 @@ def getStateOrderingIndx(matData):
 
         tmp=(matData['DescStates'][i]); # name of the module whose states we are looking at
         modName = tmp.split(' ')[0]
+        ModOrd  = matData['StateDerivOrder'][i]
 
-        if lastModName!=modName:
+        if lastModName!=modName or lastModOrd!= ModOrd:
             # this is the start of a new set of DOFs, so we'll set the
             # indices for the last matrix
             if lastModOrd == 2:
@@ -163,7 +166,7 @@ def getStateOrderingIndx(matData):
                 
                 sum_nDOFs1 = sum_nDOFs1 + mod_nDOFs;
             
-            # reset for a new module
+            # reset for a new module (or new 1st-order states in the same module)
             mod_nDOFs = 0;
             
             indx_start = i; #start of this module
