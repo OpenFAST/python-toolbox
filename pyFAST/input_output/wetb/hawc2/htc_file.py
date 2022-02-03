@@ -59,7 +59,7 @@ class HTCFile(HTCContents, HTCDefaults, HTCExtensions):
 
     Examples:
     ---------
-    >>> htcfile = HTCFile('htc/test.htc')
+    >>> htcfile = HTCFile('htc/tests.htc')
     >>> htcfile.wind.wsp = 10
     >>> htcfile.save()
 
@@ -275,7 +275,7 @@ class HTCFile(HTCContents, HTCDefaults, HTCExtensions):
                     'visualization', subfolder), "%s.hdf5" % name).replace("\\", "/")
         elif 'test_structure' in self and 'logfile' in self.test_structure:  # hawc2aero
             self.test_structure.logfile = os.path.join(fmt_folder('log', subfolder), "%s.log" % name).replace("\\", "/")
-        self.output.filename = os.path.join(fmt_folder('res', subfolder), "%s" % name).replace("\\", "/")
+        self.output.ts_filename = os.path.join(fmt_folder('res', subfolder), "%s" % name).replace("\\", "/")
 
     def set_time(self, start=None, stop=None, step=None):
         self.contents  # load if not loaded
@@ -335,8 +335,8 @@ class HTCFile(HTCContents, HTCDefaults, HTCExtensions):
             if 'bemwake_method' in self.aero:
                 files.append(self.aero.bemwake_method.get('a-ct-filename', [None] * 3)[0])
         for dll in [self.dll[dll] for dll in self.get('dll', {}).keys() if 'filename' in self.dll[dll]]:
-            files.append(dll.filename[0])
-            f, ext = os.path.splitext(dll.filename[0])
+            files.append(dll.ts_filename[0])
+            f, ext = os.path.splitext(dll.ts_filename[0])
             files.append(f + "_64" + ext)
         if 'wind' in self:
             files.append(self.wind.get('user_defined_shear', [None])[0])
@@ -358,7 +358,7 @@ class HTCFile(HTCContents, HTCDefaults, HTCExtensions):
             theta_min = dtu_we_controller.init.constant__5[1]
             if theta_min >= 90:
                 files.append(os.path.join(os.path.dirname(
-                    dtu_we_controller.filename[0]), "wpdata.%d" % theta_min).replace("\\", "/"))
+                    dtu_we_controller.ts_filename[0]), "wpdata.%d" % theta_min).replace("\\", "/"))
         except Exception:
             pass
 
@@ -428,7 +428,7 @@ class HTCFile(HTCContents, HTCDefaults, HTCExtensions):
         for output in [self[k] for k in self.keys()
                        if self[k].name_.startswith("output") and not self[k].name_.startswith("output_at_time")]:
             dataformat = output.get('data_format', 'hawc_ascii')
-            res_filename = output.filename[0]
+            res_filename = output.ts_filename[0]
             if dataformat[0] == "gtsdf" or dataformat[0] == "gtsdf64":
                 res.append(res_filename + ".hdf5")
             elif dataformat[0] == "flex_int":

@@ -146,7 +146,7 @@ def FAST2Hawc2(fstIn, htcTemplate, htcOut, OPfile=None, TwrFAFreq=0.1, TwrSSFreq
         st_file = os.path.relpath(st_filefull, outDir)
 
         bdy.nbodies = dfMeanLine.shape[0]-1 # One body per station -1
-        bdy.timoschenko_input.filename = st_file
+        bdy.timoschenko_input.ts_filename = st_file
         bdy.timoschenko_input.set.values = [1,1]
 
         if FPM:

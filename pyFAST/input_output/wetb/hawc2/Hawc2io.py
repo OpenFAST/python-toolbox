@@ -9,9 +9,9 @@ Description:
 
 call ex.:
     # creat data file object, call without extension, but with parth
-    file = ReadHawc2("HAWC2ex/test")
+    file = ReadHawc2("HAWC2ex/tests")
     # if called with ReadOnly = 1 as
-    file = ReadHawc2("HAWC2ex/test",ReadOnly=1)
+    file = ReadHawc2("HAWC2ex/tests",ReadOnly=1)
     # no channels a stored in memory, otherwise read channels are stored for reuse
 
     # channels are called by a list

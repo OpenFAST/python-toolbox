@@ -24,8 +24,8 @@ class Executor:
     """
     Base execution class for OpenFAST regression tests.
 
-    This class first constructs the internal directories containing the test case input files.
-    Then, the test cases are executed using multiple processors, if requested.
+    This class first constructs the internal directories containing the tests case input files.
+    Then, the tests cases are executed using multiple processors, if requested.
     The locally generated outputs are tested against their corresponding baselines.
 
     Attributes
@@ -47,10 +47,10 @@ class Executor:
         Initialize the required inputs
 
         TODO:
-        - There should exist a test pipeline that executes the full regression test process for each case
+        - There should exist a tests pipeline that executes the full regression tests process for each case
         - Thats what should be parallelized, not just the case execution
-        - As is, the regression test results must wait for all tests to finish executing
-        - We want to be able to bail if one test case fails the regression test but others havent finished
+        - As is, the regression tests results must wait for all tests to finish executing
+        - We want to be able to bail if one tests case fails the regression tests but others havent finished
 
         - Choose to use str or Path for all paths
 
@@ -69,7 +69,7 @@ class Executor:
             None (machine's OS). Should be one of "windows", "linux", or
             "macos".
         no_execution : bool, default: False
-            Flag to avoid executing the simulations, but proceed with the regression test.
+            Flag to avoid executing the simulations, but proceed with the regression tests.
         verbose : bool, default: False
             Flag to include system ouptut.
         jobs : int, default: -1
@@ -80,8 +80,8 @@ class Executor:
 
         # These path variables are used throughout Executor for brevity
         self.build_directory = os.path.join(openfast_root, "build")
-        self.rtest_modules = os.path.join(openfast_root, "reg_tests", "r-test", "modules")
-        self.rtest_openfast = os.path.join(openfast_root, "reg_tests", "r-test", "glue-codes", "openfast")
+        self.rtest_modules = os.path.join(openfast_root, "reg_tests", "r-tests", "modules")
+        self.rtest_openfast = os.path.join(openfast_root, "reg_tests", "r-tests", "glue-codes", "openfast")
         self.local_test_location = os.path.join(self.build_directory, "reg_tests", "local_results")
 
         system = platform.system() if system is None else system.lower()
@@ -182,16 +182,16 @@ class Executor:
             verbose: bool = False,
         ):
         """
-        Runs an OpenFAST regression test case.
+        Runs an OpenFAST regression tests case.
 
         Parameters
         ----------
         executable : str
             File path to the approptiate executable for this case.
         case_directory : str
-            Directory containing the test case files.
+            Directory containing the tests case files.
         input_file : str
-            Input file for the test case.
+            Input file for the tests case.
         ix : str
             String index/total of case being run.
         case : str
@@ -233,7 +233,7 @@ class Executor:
 
     def _run_case(self, index: str, case: str):
         """
-        Runs a single OpenFAST test case
+        Runs a single OpenFAST tests case
 
         Parameters
         ----------
@@ -287,11 +287,11 @@ class Executor:
         Returns
         -------
         case_list : list
-            List of valid non-linear regression test cases.
+            List of valid non-linear regression tests cases.
         baseline_list : List[tuple]
-            List of valid non-linear regression test cases (attribute, data).
+            List of valid non-linear regression tests cases (attribute, data).
         test_list : List[tuple]
-            List of valid non-linear regression test cases (attribute, data).
+            List of valid non-linear regression tests cases (attribute, data).
         """
 
         test_list = []
@@ -315,7 +315,7 @@ class Executor:
                 data, info, _ = load_output(results_file)
                 baseline_list.append( (data, info) )
 
-        # Get the local test results
+        # Get the local tests results
         for case in self.cases:
 
             case_info = CASE_MAP[case]

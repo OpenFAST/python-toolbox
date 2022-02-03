@@ -226,6 +226,7 @@ class FASTInputFile(File):
         nWrongLabels = 0
         allowSpaceSeparatedList=False
         while i<len(lines):
+
             line = lines[i]
 
             # --- Read special sections
@@ -981,6 +982,17 @@ def cleanAfterChar(l,c):
 def getDict():
     return {'value':None, 'label':'', 'isComment':False, 'descr':'', 'tabType':TABTYPE_NOT_A_TAB}
 
+def _merge_value(splits):
+
+    merged = splits.pop(0)
+    if merged[0] == '"':
+        while merged[-1] != '"':
+            merged += f" {splits.pop(0)}"
+
+    splits.insert(0, merged)
+
+
+
 
 def parseFASTInputLine(line_raw,i,allowSpaceSeparatedList=False):
     d = getDict()
@@ -1038,7 +1050,9 @@ def parseFASTInputLine(line_raw,i,allowSpaceSeparatedList=False):
         else:
             # It's not a list, we just use space as separators
             splits=line.split(' ')
+            _merge_value(splits)
             s=splits[0]
+
 
             if strIsInt(s):
                 d['value']=int(s)

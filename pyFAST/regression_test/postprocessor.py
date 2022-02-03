@@ -366,7 +366,7 @@ class SummaryHandler():
             
     def plot_error(self, baseline_data: list, test_data: list, attributes: List[Tuple[str, str]],) -> List[Tuple[str, str, str]]:
         """
-        Plots the raw baseline vs test results for each attribute in one column and
+        Plots the raw baseline vs tests results for each attribute in one column and
         the normalized differences between the two in a second column.
 
         Parameters
@@ -418,7 +418,7 @@ class SummaryHandler():
         attributes : List[Tuple[str, str]]
             List of tuples of attribute names and units.
         passing : bool
-            Indicator if the test passed.
+            Indicator if the tests passed.
 
         Returns
         -------
@@ -445,7 +445,7 @@ class SummaryHandler():
         attributes : List[List[Tuple[str, str]]]
             List of tuples of attribute name and units for each case.
         pass_fail : List[bool]
-            List of whether or not each case passed the regression test.
+            List of whether or not each case passed the regression tests.
 
         Returns
         -------

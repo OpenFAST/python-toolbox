@@ -37,7 +37,7 @@ def diff(baseline: np.ndarray, test: np.ndarray, abs_val: bool = True) -> np.nda
 
 def pass_regression_test(norm: np.ndarray, tolerance: float) -> bool:
     """
-    Indicator for if a norm passes the regression test tolerance condition.
+    Indicator for if a norm passes the regression tests tolerance condition.
 
     Parameters
     ----------
@@ -49,7 +49,7 @@ def pass_regression_test(norm: np.ndarray, tolerance: float) -> bool:
     Returns
     -------
     bool
-        Indicator for if the regression test norm passed.
+        Indicator for if the regression tests norm passed.
     """
     return norm.max() < tolerance
 
@@ -59,7 +59,7 @@ def pass_regression_test(norm: np.ndarray, tolerance: float) -> bool:
 
 def max_norm(baseline: np.ndarray, test: np.ndarray) -> np.ndarray:
     """
-    Compute the max norm of the difference between baseline and test results.
+    Compute the max norm of the difference between baseline and tests results.
 
     Parameters
     ----------
@@ -73,7 +73,7 @@ def max_norm(baseline: np.ndarray, test: np.ndarray) -> np.ndarray:
     Returns
     -------
     float
-        Max norm of the differene betwen baseline and test data.
+        Max norm of the differene betwen baseline and tests data.
     """
 
     return LA.norm(diff(baseline, test, True), np.inf, axis=0)
@@ -81,7 +81,7 @@ def max_norm(baseline: np.ndarray, test: np.ndarray) -> np.ndarray:
 
 def l2_norm(baseline: np.ndarray, test: np.ndarray, abs_val: bool = True) -> np.ndarray:
     """
-    Compute the L2 norm of the difference between baseline and test results.
+    Compute the L2 norm of the difference between baseline and tests results.
 
     Parameters
     ----------
@@ -95,7 +95,7 @@ def l2_norm(baseline: np.ndarray, test: np.ndarray, abs_val: bool = True) -> np.
     Returns
     -------
     float
-        L2 norm of the differene betwen baseline and test data.
+        L2 norm of the differene betwen baseline and tests data.
     """
 
     return LA.norm(diff(baseline, test, abs_val), 2, axis=0)
@@ -103,7 +103,7 @@ def l2_norm(baseline: np.ndarray, test: np.ndarray, abs_val: bool = True) -> np.
 
 def relative_l2_norm(baseline: np.ndarray, test: np.ndarray) -> np.ndarray:
     """
-    Compute the relative L2 norm of the difference between baseline and test
+    Compute the relative L2 norm of the difference between baseline and tests
     results.
 
     Parameters
@@ -120,7 +120,7 @@ def relative_l2_norm(baseline: np.ndarray, test: np.ndarray) -> np.ndarray:
     Returns
     -------
     float
-        Relative L2 norm of the differene betwen baseline and test data.
+        Relative L2 norm of the differene betwen baseline and tests data.
     """
 
     norm_diff = l2_norm(baseline, test, abs_val=False)
@@ -137,7 +137,7 @@ def relative_l2_norm(baseline: np.ndarray, test: np.ndarray) -> np.ndarray:
 
 def max_norm_over_range(baseline: np.ndarray, test: np.ndarray) -> np.ndarray:
     """
-    Compute the maximum norm of the difference between baseline and test
+    Compute the maximum norm of the difference between baseline and tests
     results over the range of the baseline data.
 
     Parameters
@@ -152,7 +152,7 @@ def max_norm_over_range(baseline: np.ndarray, test: np.ndarray) -> np.ndarray:
     Returns
     -------
     float
-        Maximum norm of the differene betwen baseline and test data.
+        Maximum norm of the differene betwen baseline and tests data.
     """
 
     ranges = diff(baseline.max(axis=0), baseline.min(axis=0), True)
@@ -174,7 +174,7 @@ def calculate_norms(
     ],
 ) -> np.ndarray:
     """
-    Compute all the listed norm of the difference between baseline and test
+    Compute all the listed norm of the difference between baseline and tests
     results over the range of the baseline data.
 
     Parameters
@@ -190,7 +190,7 @@ def calculate_norms(
     Returns
     -------
     np.ndarray
-        Maximum norm of the differene betwen baseline and test data.
+        Maximum norm of the differene betwen baseline and tests data.
     """
 
     norm_results = np.hstack(
@@ -210,7 +210,7 @@ NORM_MAP = {
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(
-        description="Calculates the regression test norms."
+        description="Calculates the regression tests norms."
     )
     parser.add_argument(
         "baseline",
@@ -220,7 +220,7 @@ if __name__ == "__main__":
         help="Baseline data file for comparison.",
     )
     parser.add_argument(
-        "test", metavar="Test", type=str, nargs=1, help="Test-produced data file."
+        "tests", metavar="Test", type=str, nargs=1, help="Test-produced data file."
     )
     parser.add_argument(
         "norms",
