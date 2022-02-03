@@ -15,12 +15,12 @@ from pyFAST import (
 
 def match_cases(case_regex: str) -> List[str]:
     """
-    Match provided case with available test cases.
+    Match provided case with available tests cases.
 
     Parameters
     ----------
     case_regex : str
-        Case to match against available test cases.
+        Case to match against available tests cases.
 
     Returns
     -------
@@ -47,7 +47,7 @@ def main():
         "--list-cases",
         dest="list",
         action="store_true",
-        help=('Display the available test cases.'),
+        help=('Display the available tests cases.'),
     )
     _list_flag_given = '-l' in sys.argv or '--list' in sys.argv
 
@@ -141,13 +141,13 @@ def main():
     #     help="The norm(s) to be computed.",
     # )
     # parser.add_argument(
-    #     "--test-norm",
+    #     "--tests-norm",
     #     dest="test_norm",
     #     type=str.lower,
     #     nargs="+",
     #     default=["relative_l2_norm"],
     #     choices=["max_norm", "max_norm_over_range", "l2_norm", "relative_l2_norm"],
-    #     help="Norm(s) used to determine if the test(s) pass. Must be a normed passed to `-norm`.",
+    #     help="Norm(s) used to determine if the tests(s) pass. Must be a normed passed to `-norm`.",
     # )
 
     args = parser.parse_args()
@@ -184,7 +184,7 @@ def main():
     # Gather the outputs
     baseline, test = executor.read_output_files()
 
-    # Run the regression test
+    # Run the regression tests
     reg_test = RegressionTester(args.tolerance)
     ix = [f"{i}/{len(executor.cases)}" for i in range(1, len(executor.cases) + 1)]
     norm_res, pass_fail_list, norm_list = reg_test.test_norm(
@@ -202,7 +202,7 @@ def main():
     baseline_data = [data for data, _ in baseline]
     test_data = [data for data, _ in test]
 
-    # Create the regression test summaries
+    # Create the regression tests summaries
     summary = SummaryHandler(args.plot, executor.local_test_location)
     plots = summary.retrieve_plot_html(baseline_data, test_data, attributes, pass_fail_list)
     summary.create_results_summary(cases, attributes, norm_res, norm_list, plots, args.tolerance)

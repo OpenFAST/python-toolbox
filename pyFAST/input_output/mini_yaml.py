@@ -90,7 +90,7 @@ def yaml_read(filename,dictIn=None):
 
 
 if __name__=='__main__':
-    d=read('test.yaml')
+    d=read('tests.yaml')
     #d=yaml_read('TetraSpar_outputs_DOUBLE_PRECISION.SD.sum.yaml')
     print(d.keys())
     print(d)

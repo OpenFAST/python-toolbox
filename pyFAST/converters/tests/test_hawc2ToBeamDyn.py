@@ -19,7 +19,7 @@ class Test(unittest.TestCase):
         copyfile(htc_template,  H2_htcfile_new) # Backup template
         df_c2, df_st = bd.beamDynToHawc2(BD_mainfile, BD_bladefile, H2_htcfile_new, H2_stfile, 'blade1', FPM=True, verbose=True)
 
-        # NOTE: NREL5MW is too simple of a test since straight
+        # NOTE: NREL5MW is too simple of a tests since straight
         np.testing.assert_almost_equal(df_c2['x_[m]'].values[10]      ,  0.0   ,3)
         np.testing.assert_almost_equal(df_c2['y_[m]'].values[-1]      , -4.0    ,3)
         np.testing.assert_almost_equal(df_c2['z_[m]'].values[-1]      ,99.9963   ,3)

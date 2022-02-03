@@ -129,7 +129,7 @@ class File(dict):
         """ Test that we can write and then read what we wrote
         NOTE: this does not check that what we read is the same..
         """
-        # --- First, test write function (assuming read)
+        # --- First, tests write function (assuming read)
         try:
             f,ext=os.path.splitext(self.filename)
             filename_out = f+'_TMP'+ext
@@ -149,7 +149,7 @@ class File(dict):
         # compare ourselves (assuming read has occured) with what we write
 
         f,ext=os.path.splitext(self.filename)
-        # --- Perform a simple write/read test
+        # --- Perform a simple write/read tests
         filename_out=self.test_write_read()
 
         # --- Perform ascii comparison (and delete if success)

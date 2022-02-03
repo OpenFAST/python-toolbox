@@ -470,8 +470,8 @@ def createStepWind(filename,WSstep=1,WSmin=3,WSmax=25,tstep=100,dt=0.5,tmin=0,tm
 
     #print(f.toDataFrame())
     #pass
-#createStepWind('test.wnd',tstep=200,WSmax=28)
-# createStepWind('test.wnd',tstep=200,WSmin=5,WSmax=7,WSstep=2)
+#createStepWind('tests.wnd',tstep=200,WSmax=28)
+# createStepWind('tests.wnd',tstep=200,WSmin=5,WSmax=7,WSstep=2)
 
 
 

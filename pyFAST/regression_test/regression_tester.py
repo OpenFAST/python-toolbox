@@ -22,7 +22,7 @@ class RegressionTester:
         test_norm_condition: List[str] = ["relative_l2_norm"],  # flag in __main__.py
     ) -> Tuple[List[np.ndarray], List[bool], List[str]]:
         """
-        Computes the norms for each of the valid test cases.
+        Computes the norms for each of the valid tests cases.
 
         Parameters
         ----------
@@ -33,7 +33,7 @@ class RegressionTester:
         baseline_list : List[Tuple[np.ndarray, list]]
             Tuples of baseline data and info corresponding to `case_list.
         test_list : List[Tuple[np.ndarray, list]]
-            Tuples of test data and info correpsonding to `case_list`.
+            Tuples of tests data and info correpsonding to `case_list`.
         norm_list : List[str], optional
             List of norms to be computed, by default:
             ["max_norm","max_norm_over_range","l2_norm","relative_l2_norm"]
@@ -41,7 +41,7 @@ class RegressionTester:
             Defines which norm(s) to use for the pass/fail condition, by
             default ["relative_l2_norm"].
         jobs : int
-            Number of parallel jobs to compute the norms and test them.
+            Number of parallel jobs to compute the norms and tests them.
 
         Returns
         -------
@@ -49,12 +49,12 @@ class RegressionTester:
             List of norm results corresponding to `case_list`. Each array will
             have shape [len(attributes), len(norm_list)]
         pass_fail_list : List[bool]
-            A list of indicators for if the case passed the regression test.
+            A list of indicators for if the case passed the regression tests.
         norm_list : List[str]
             `norm_list`.
         """
 
-        # Test to make sure that the test norm is included in the computed norms
+        # Test to make sure that the tests norm is included in the computed norms
         if not set(test_norm_condition).issubset(norm_list):
             message = (
                 f"test_norm_condition: {test_norm_condition} should be contained in "
