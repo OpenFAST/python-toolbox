@@ -16,8 +16,8 @@ MyDir=os.path.dirname(__file__)
 def main():
     # --- Main Parameters
     ref_dir        = os.path.join(MyDir, '../../../data/NREL5MW/')  # Folder where the fast input files are located (will be copied)
-    FAST_EXE       = FAST_EXE  = os.path.join(MyDir, '../../../../openfast/build/bin/openfast_x64.exe') # Location of a FAST exe (and dll)
-    main_file      = 'Main_Onshore_OF.fst'          # Main file in ref_dir, used as a template
+    FAST_EXE       = os.path.join(MyDir, '../../../data/openfast.exe') # Location of a FAST exe (and dll)
+    main_file      = 'Main_Onshore.fst'          # Main file in ref_dir, used as a template
     work_dir       = os.path.join(MyDir, '_NREL5MW_ParametricExcel/')     # Output folder (will be created)
     parametricFile = 'ParametricExcel.xlsx'          # Excel file containing set of parameters
 

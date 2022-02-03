@@ -45,6 +45,12 @@ class Test(unittest.TestCase):
         self.assertEqual(DF.columns.values[-1],'GenTq_(kN m)')
         self.assertEqual(DF.shape,(9,6))
 
+    def test_CSV_string(self):
+        DF=self.DF('CSVxIsString.csv')
+        self.assertEqual(DF.shape,(7,2))
+        self.assertEqual(DF.columns.values[0],'Label_[-]')
+
+
 if __name__ == '__main__':
     #Test().test_CSV()
     unittest.main()
