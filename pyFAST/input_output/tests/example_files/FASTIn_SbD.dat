@@ -19,7 +19,7 @@ JointID          JointXss               JointYss               JointZss  [Coordi
    2              0.00000                0.00000                 0.00000
 ----- BASE REACTION JOINTS: 1/0 for Locked/Free DOF @ each Reaction Node ---------------------
              1   NReact      - Number of Joints with reaction forces; be sure to remove all rigid motion DOFs of the structure  (else det([K])=[0])
-RJointID   RctTDXss    RctTDYss    RctTDZss    RctRDXss    RctRDYss    RctRDZss   SSIFile    [Global Coordinate System]
+RJointID   RctTDXss    RctTDYss    RctTDZss    RctRDXss    RctRDYss    RctRDZss   SSIFile  [Global Coordinate System]
   (-)       (flag)      (flag)      (flag)      (flag)      (flag)      (flag)   (-)
    1           1           1           1           1           1           1   "soil.txt"
 ------- INTERFACE JOINTS: 1/0 for Locked (to the TP)/Free DOF @each Interface Joint (only Locked-to-TP implemented thus far (=rigid TP)) ---------

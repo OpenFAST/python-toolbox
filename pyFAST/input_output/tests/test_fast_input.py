@@ -6,6 +6,7 @@ from .helpers_for_test import MyDir, reading_test
 
 import pyFAST
 from pyFAST.input_output import FASTInputFile
+from pyFAST.input_output.fast_wind_file import FASTWndFile
 
 
 class Test(unittest.TestCase):
@@ -69,6 +70,23 @@ class Test(unittest.TestCase):
         F=FASTInputFile(os.path.join(MyDir,'FASTIn_MD.dat'))
         F.test_ascii(bCompareWritesOnly=True,bDelete=True)
         self.assertEqual(float(F['LineTypes'][0,1]),0.02)
+
+    def test_FASTWnd(self):
+        F=FASTWndFile(os.path.join(MyDir,'FASTWnd.wnd'))
+        F.test_ascii(bCompareWritesOnly=True,bDelete=True)
+
+    def test_FASTInGraph(self):
+        F=FASTInputFile(os.path.join(MyDir,'FASTIn_HD.dat'))
+        #graph = F.toGraph()
+        #print(graph)
+        #self.assertEqual(len(graph.Nodes), 4)
+        #self.assertEqual(len(graph.Elements), 3)
+# 
+        #F=FASTInputFile(os.path.join(MyDir,'FASTIn_SbD.dat'))
+        #print(F)
+        #graph = F.toGraph()
+#         self.assertEqual(len(graph.Nodes), 2)
+#         self.assertEqual(len(graph.Elements), 1)
 
 if __name__ == '__main__':
     #Test().test_FASTIn()

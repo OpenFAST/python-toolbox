@@ -345,7 +345,7 @@ def paramsStiff(p=None):
     p['EDFile|PtfmYDOF']  = 'False'
     return p
 
-def paramsWS_RPM_Pitch(WS, RPM, Pitch, baseDict=None, FlatInputs=False):
+def paramsWS_RPM_Pitch(WS, RPM, Pitch, baseDict=None, flatInputs=False):
     """ 
     Generate OpenFAST "parameters" (list of dictionaries with "address")
     chaing the inputs in ElastoDyn, InflowWind for different wind speed, RPM and Pitch
@@ -470,8 +470,8 @@ def createStepWind(filename,WSstep=1,WSmin=3,WSmax=25,tstep=100,dt=0.5,tmin=0,tm
 
     #print(f.toDataFrame())
     #pass
-#createStepWind('tests.wnd',tstep=200,WSmax=28)
-# createStepWind('tests.wnd',tstep=200,WSmin=5,WSmax=7,WSstep=2)
+#createStepWind('test.wnd',tstep=200,WSmax=28)
+# createStepWind('test.wnd',tstep=200,WSmin=5,WSmax=7,WSstep=2)
 
 
 

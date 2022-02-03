@@ -517,8 +517,8 @@ class FASTInputFile(File):
             return val+' '+lab+' - '+descr.strip().strip('-').strip()+'\n'
 
         def beamdyn_section_mat_tostring(x,K,M):
-            def mat_tostring(M,fmt='.5e'):
-                return '\n'.join(['   '+' '.join(['{:.6E}'.format(m) for m in M[i,:]]) for i in range(np.size(M,1))])
+            def mat_tostring(M,fmt='24.16e'):
+                return '\n'.join(['   '+' '.join(['{:24.16E}'.format(m) for m in M[i,:]]) for i in range(np.size(M,1))])
             s=''
             s+='{:.6f}\n'.format(x)
             s+=mat_tostring(K)
@@ -1052,7 +1052,6 @@ def parseFASTInputLine(line_raw,i,allowSpaceSeparatedList=False):
             splits=line.split(' ')
             _merge_value(splits)
             s=splits[0]
-
 
             if strIsInt(s):
                 d['value']=int(s)

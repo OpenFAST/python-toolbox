@@ -20,7 +20,7 @@ class CSVFile(File):
     --------
 
         # Read a csv file and convert it to a pandas dataframe
-        f = CSVFile('tests.csv')
+        f = CSVFile('test.csv')
         df = f.toDataFrame()
 
     """
