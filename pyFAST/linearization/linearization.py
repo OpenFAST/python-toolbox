@@ -43,8 +43,8 @@ from pyFAST.case_generation.case_gen import templateReplace
 def campbell(templateFstFile, operatingPointsFile, workDir, toolboxDir, fastExe,  
              nPerPeriod=36, baseDict=None, tStart=5400, trim=True, viz=False,
              trimGainPitch = 0.001, trimGainGenTorque = 300,
-             MaxTrq= None, 
-             generateInputs=True, runFast=True, runMBC=True, prefix='',sortedSuffix=None, ylim=None):
+             maxTrq= None, 
+             generateInputs=True, runFast=True, runMBC=True, prefix='',sortedSuffix=None, ylim=None, removeTwrAzimuth=False):
     """ 
     Wrapper function to perform a Campbell diagram study
        see: writeLinearizationFiles, postproLinearization and postproMBC for more description of inputs.
@@ -70,7 +70,8 @@ def campbell(templateFstFile, operatingPointsFile, workDir, toolboxDir, fastExe,
         # Generate input files
         fastfiles= writeLinearizationFiles(mainFst, workDir, operatingPointsFile, 
                     nPerPeriod=nPerPeriod, baseDict=baseDict, tStart=tStart, trim=trim, viz=viz,
-                    prefix=prefix)
+                    trimGainPitch=trimGainPitch, trimGainGenTorque=trimGainGenTorque,
+                    prefix=prefix, maxTrq=maxTrq)
         # Create a batch script (optional)
         runner.writeBatch(os.path.join(workDir,'_RUN_ALL.bat'),fastfiles,fastExe=fastExe)
 
@@ -80,7 +81,7 @@ def campbell(templateFstFile, operatingPointsFile, workDir, toolboxDir, fastExe,
 
     # --- Postprocess linearization outputs (MBC + modes ID)
     if runMBC:
-        OP, Freq, Damp, _, _, modeID_file = lin.postproCampbell(FSTfilenames)
+        OP, Freq, Damp, _, _, modeID_file = lin.postproCampbell(FSTfilenames, removeTwrAzimuth=removeTwrAzimuth)
 
     # ---  Plot Campbell
     fig, axes = plotCampbell(OP, Freq, Damp, sx='WS_[m/s]', UnMapped=UnMapped, ylim=ylim)
@@ -98,6 +99,9 @@ def readOperatingPoints(OP_file):
 
     """
     OP=pd.read_csv(OP_file);
+    for c in OP.columns:
+        if c.lower().find('kn-m')>1 or c.lower().find('knm')>1:
+            OP[c]*=1000
     OP.rename(columns=lambda x: x.strip().lower().replace(' ','').replace('_','').replace('(','[').split('[')[0], inplace=True)
     # Perform column replacements (tolerating small variations)
     OP.rename(columns={'wind':'windspeed','ws': 'windspeed'}, inplace=True)
@@ -108,6 +112,7 @@ def readOperatingPoints(OP_file):
     # Standardizing column names
     OP.rename(columns={
          'rotorspeed': 'RotorSpeed_[rpm]', 
+         'rotspeed': 'RotorSpeed_[rpm]', 
          'windspeed' : 'WindSpeed_[m/s]',
          'pitchangle': 'PitchAngle_[deg]',
          'generatortorque': 'GeneratorTorque_[Nm]',
@@ -151,7 +156,7 @@ def defaultFilenames(OP, rpmSweep=None):
 def writeLinearizationFiles(main_fst, workDir, operatingPointsFile, 
         nPerPeriod=36, baseDict=None, tStart=5400, trim=True, viz=False,
         trimGainPitch = 0.001, trimGainGenTorque = 300,
-        MaxTrq= None, 
+        maxTrq= None, 
         LinInputs=0, LinOutputs=0):
     """
     Write FAST inputs files for linearization, to a given directory `workDir`.
@@ -193,6 +198,17 @@ def writeLinearizationFiles(main_fst, workDir, operatingPointsFile,
     fst = FASTInputFile(main_fst) # TODO TODO use fast input deck
     hasTrim = 'TrimCase' in fst.keys()
 
+    # Update fst file with basedict if needed
+    fst_keys = fst.keys()
+    for k,v in baseDict.items():
+        if k in fst_keys:
+            print('Updating fst file key {} from {} to {}'.format(k,fst[k],v))
+            fst[k] = v
+
+    # --- Reading operating points
+    OP = readOperatingPoints(operatingPointsFile)
+
+
     if fst['CompServo']==1:
         if 'GeneratorTorque_[Nm]' not in OP:
             raise Exception('`GeneratorTorque_[Nm]` not found in operating point file. It needs to be provided when the controller is active (`CompServo>0`).')
@@ -210,9 +226,6 @@ def writeLinearizationFiles(main_fst, workDir, operatingPointsFile,
     if viz and not hasTrim:
         viz=False
         print('[WARN] Deactivating VTK vizualization since not available in this version of OpenFAST')
-
-    # --- Reading operating points
-    OP = readOperatingPoints(operatingPointsFile)
 
     # --- Generating list of parameters that vary based on the operating conditions provided
     PARAMS     = []
@@ -261,14 +274,19 @@ def writeLinearizationFiles(main_fst, workDir, operatingPointsFile,
         if trim:
             linDict['CalcSteady'] = True
             if fst['CompServo']==1:
-                if abs(OP['GeneratorTorque_[Nm]']-MaxTrq)/MaxTrq*100 < 5 and (not noAero):
+                GenTrq= op['GeneratorTorque_[Nm]']
+                trq_rat = np.abs((GenTrq -maxTrq))/maxTrq*100 
+                print('ws {:5.2f} - GenTrq {:9.1f} - ratio: {:9.2f} '.format(ws, GenTrq, trq_rat), end='')
+                if abs(op['GeneratorTorque_[Nm]']-maxTrq)/maxTrq*100 < 5 and (not noAero):
                     linDict['TrimCase'] = 3 # Adjust Pitch to get desired RPM
                     linDict['TrimGain'] = trimGainPitch; 
+                    print('Trim: {} - Gain: {}'.format(3, trimGainPitch))
                     # TrimGain = .1 / (RotSpeed(iOP) * pi/30); %-> convert RotSpeed to rad/s
                     # TrimGain = TrimGain*0.1
                 else:
                     linDict['TrimCase'] = 2 # Adjust GenTorque to get desired RPM
                     linDict['TrimGain'] = trimGainGenTorque; 
+                    print('Trim: {} - Gain: {}'.format(2, trimGainGenTorque))
                     # TrimGain = 3340 / (RotSpeed(iOP) * pi/30); %-> convert RotSpeed to rad/s
             else:
                 # NOTE: in that case, trimming will just "wait", trim variable is not relevant

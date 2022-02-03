@@ -17,7 +17,7 @@ except ImportError:
     import weis.control.mbc.mbc3 as mbc
 
 
-def postproCampbell(out_or_fstfiles, BladeLen=None, TowerLen=None, verbose=True, nFreqOut=15, WS_legacy=None):
+def postproCampbell(out_or_fstfiles, BladeLen=None, TowerLen=None, verbose=True, nFreqOut=15, WS_legacy=None, removeTwrAzimuth=False):
     """ 
     Postprocess linearization files to extract Campbell diagram (linearization at different Operating points)
     - Run MBC
@@ -29,7 +29,7 @@ def postproCampbell(out_or_fstfiles, BladeLen=None, TowerLen=None, verbose=True,
         raise Exception('postproCampbell requires a list of at least one .fst or .out file')
 
     # --- Run MBC for all operating points
-    MBC = run_pyMBC(out_or_fstfiles, verbose)
+    MBC = run_pyMBC(out_or_fstfiles, verbose, removeTwrAzimuth=removeTwrAzimuth)
 
     # --- Attemps to extract Blade Length and TowerLen from first file...
     filebase, ext = os.path.splitext(out_or_fstfiles[0])
@@ -76,7 +76,7 @@ def postproCampbell(out_or_fstfiles, BladeLen=None, TowerLen=None, verbose=True,
     
     return OP, Freq, Damp, UnMapped, ModeData, modeID_file
 
-def run_pyMBC(out_or_fstfiles, verbose=True):
+def run_pyMBC(out_or_fstfiles, verbose=True, removeTwrAzimuth=False):
     """
     Run MBC transform on set of openfast linear outputs
 
@@ -107,7 +107,7 @@ def run_pyMBC(out_or_fstfiles, verbose=True):
         if len(lin_files)>0:
             if verbose:
                 print('       Lin. files: {} ({})'.format(lin_file_fmt, len(lin_files)))
-            MBC[i_lin], matData, FAST_linData = mbc.fx_mbc3(lin_files, verbose=False)
+            MBC[i_lin], matData, FAST_linData = mbc.fx_mbc3(lin_files, verbose=False, removeTwrAzimuth=removeTwrAzimuth)
         else:
             if verbose:
                 print('[WARN] Lin. files: {} ({})'.format(lin_file_fmt, len(lin_files)))
