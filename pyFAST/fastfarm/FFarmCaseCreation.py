@@ -9,21 +9,27 @@ import numpy as np
 
 class FFarmCaseCreation:
     
-    def __init__(self,nTurbs,prefix='FFarm'):
+    def __init__(self, D, HubHt, x, y, z=None, cmax=5.0):
         """
         Instantiate the object. 
         
         Parameters
         ----------
-        prefix  :   string,
-                   prefix for FAST.Farm simulations
-        nTurbs:   integer,
-                   number of turbines in the simulations
+        D       :   float,
+                   rotor diameter (m)
+        HubHt   :   float,
+                   turbine hub height (m)
+        x, y, z   :   float,
+               x-, y-, and z-location of turbine, respectively
+                  if z is None, z is set to 0
+        cmax    :   float,
+                   maximum blade chord (m). If not specified, set to NREL 5MW value.
         """
-        self.prefix = prefix
-        self.nTurbs = nTurbs
+
+        self.Turb(D, HubHt, cmax=cmax)
+        self.turbLocs(x,y,z)
         
-    def Turb(self, D, HubHt, tpath, cmax=5, fmax=5):
+    def Turb(self, D, HubHt, cmax=5.0):
         """
         Define turbine parameters
         
@@ -33,21 +39,15 @@ class FFarmCaseCreation:
                    rotor diameter (m)
         HubHt   :   float,
                    turbine hub height (m)
-        tpath   :   string,
-                   path to base turbine location (.fst)
         cmax    :   float,
                    maximum blade chord (m). If not specified, set to NREL 5MW value.
-        fmax    :   float,
-                   maximum excitation frequency (Hz). If not specified set to NREL 5MW tower value.
         """
         
         self.D = D
         self.HubHt = HubHt
         self.cmax = cmax
-        self.fmax = fmax
-        self.tpath = tpath
         
-    def turbLocs(self,x,y,z):
+    def turbLocs(self,x,y,z=None):
         """
         Specify turbine locations
         
@@ -56,14 +56,21 @@ class FFarmCaseCreation:
         x, y, z   :   float,
                x-, y-, and z-location of turbine, respectively
         """
-        self.x = x
-        self.y = y
-        self.z = z
+        self.x = np.asarray(x)
+        self.y = np.asarray(y)
+        if z is None:
+            self.z = np.asarray(y)*0
+        else:
+            self.z = np.asarray(z)
         
     def discretization(self,Vhub,Cmeander=1.9):
         
         self.dX_High_desired = self.cmax
         self.dX_Low_desired = Cmeander*self.D*Vhub/150.0
+
+    @property
+    def nTurbs(self):
+        return len(self.x)
 
     def highResDomain(self,ifdata,meanU,dx_des,extent_X,extent_Y):
         
@@ -131,9 +138,59 @@ class FFarmCaseCreation:
         self.nX_Low = round(xdist/self.dX_Low)+1
         self.nY_Low = round(self.Width/self.dY_Low)+1
         self.nZ_Low = round(self.Zdist_High/self.dZ_Low)+1
+
+
+    def setupFromBTS(self, BTSFilename, high_extent_X=1.2, high_extent_Y=1.2, Cmeander=1.9):
+        """ Setup Low and High res based on BTS file"""
+        from pyFAST.fastfarm.bts_file import BTSFile
+        # --- Read in TurbSim box from BTS file to get:
+        # mean hub height, dt, dy, dz, zbot
+        IFdata = BTSFile(BTSFilename, self.D, self.HubHt)
+        Vhub = IFdata.Vhub
+
+        # Compute all additional input parameters
+        self.discretization(Vhub, Cmeander=Cmeander)
+        self.highResDomain(IFdata, Vhub, self.dX_High_desired, high_extent_X, high_extent_Y)
+        self.lowResDomain(self.dX_Low_desired, Vhub, Cmeander=Cmeander)
+
+    def plotSetup(self, fig=None, ax=None):
+        """ Plot a figure showing the turbine locations and the extent of the turbulence box (low and high)"""
+        if fig is None:
+            import matplotlib.pyplot as plt
+            fig = plt.figure(figsize=(13.5,10))
+            ax  = fig.add_subplot(111,aspect="equal")
+        xmax_low = self.X0_Low+self.dX_Low*self.nX_Low
+        ymax_low = self.Y0_Low+self.dY_Low*self.nY_Low
+
+        # low-res box
+        ax.plot([self.X0_Low,xmax_low,xmax_low,self.X0_Low,self.X0_Low],
+                [self.Y0_Low,self.Y0_Low,ymax_low,ymax_low,self.Y0_Low],'--k',lw=2,label='Low')
+
+        # high-res boxes
+        for wt in range(self.nTurbs):
+            xmax_high = self.X0_High[wt]+self.dX_High*self.nX_High
+            ymax_high = self.Y0_High[wt]+self.dY_High*self.nY_High
+            ax.plot([self.X0_High[wt],xmax_high,xmax_high,self.X0_High[wt],self.X0_High[wt]],
+                    [self.Y0_High[wt],self.Y0_High[wt],ymax_high,ymax_high,self.Y0_High[wt]],
+                    '-',
+                    label="HighT{0}".format(wt+1))
+            ax.plot(self.x[wt],self.y[wt],'x',ms=8,mew=2,label="WT{0}".format(wt+1))
+
+        ax.legend(bbox_to_anchor=(1.05,1.015),frameon=False)
+        ax.set_xlabel("x-location [m]")
+        ax.set_ylabel("y-location [m]")
+        fig.tight_layout
+        return fig, ax
+
+    def writeFFarmFile(self, fileIn, fileOut, FSTPath, NewFile=True):
+
+        WriteFFarmFile(fileIn, fileOut, self, FSTPath, NewFile=NewFile)
         
-def WriteFFarmFile(fileIn,fileOut,params,NewFile=True):
+
+def WriteFFarmFile(fileIn, fileOut, params, FSTPath, NewFile=True):
     """ Write a FAST.Farm primary input file, 
+
+    FSTPath: path of "FST" files, will be appended with WTi.fst for i=1,nTurbs
 
     """
 
@@ -151,13 +208,13 @@ def WriteFFarmFile(fileIn,fileOut,params,NewFile=True):
             f.write('2\tMod_AmbWind        Ambient wind model (-) (switch) {1: high-fidelity precursor in VTK format, 2: InflowWind module}\n')
             f.write('--- SUPER CONTROLLER --- [used only for UseSC=True]\n')
             f.write('"SC_DLL.dll"       SC_FileName        Name/location of the dynamic library {.dll [Windows] or .so [Linux]} containing the Super Controller algorithms (quoated string)\n')
-            f.write('--- AMBIENT WIND ---\n')
-            f.write('{:.1f}\tDT                 Time step for low -resolution wind data input files; will be used as the global FAST.Farm time step (s) [>0.0]\n'.format(params.dT_Low))
-            f.write('{:.6f}\tDT_High            Time step for high-resolution wind data input files (s) [>0.0]\n'.format(params.dT_High))
+            f.write('--- AMBIENT WIND: PRECURSOR IN VTK FORMAT --- [used only for Mod_AmbWind=1]\n')
+            f.write('{:.1f}\tDT_Low-VTK         Time step for low -resolution wind data input files; will be used as the global FAST.Farm time step (s) [>0.0]\n'.format(params.dT_Low))
+            f.write('{:.6f}\tDT_High-VTK        Time step for high-resolution wind data input files (s) [>0.0]\n'.format(params.dT_High))
             f.write('"/projects/isda/kshaler/WESC/freestream/08ms"          WindFilePath       Path name to wind data files from precursor (string)\n')
             f.write('False              ChkWndFiles        Check all the ambient wind files for data consistency? (flag)\n')
-            f.write('--- AMBIENT WIND: INFLOWWIND MODULE --- [used only for Mod_AmbWind=2]\n')
-            f.write('{:.3f}\t\tDT                 Time step for low -resolution wind data interpolation; will be used as the global FAST.Farm time step (s) [>0.0]\n'.format(params.dT_Low))
+            f.write('--- AMBIENT WIND: INFLOWWIND MODULE --- [used only for Mod_AmbWind=2 or 3]\n')
+            f.write('{:.3f}\t\tDT_Low             Time step for low -resolution wind data interpolation; will be used as the global FAST.Farm time step (s) [>0.0]\n'.format(params.dT_Low))
             f.write('{:.6f}\t\tDT_High            Time step for high-resolution wind data interpolation (s) [>0.0]\n'.format(params.dT_High))
             f.write('{:.0f}\t\tNX_Low             Number  of low -resolution spatial nodes in X direction for wind data interpolation (-) [>=2]\n'.format(params.nX_Low))
             f.write('{:.0f}\t\tNY_Low             Number  of low -resolution spatial nodes in Y direction for wind data interpolation (-) [>=2]\n'.format(params.nY_Low))
@@ -177,7 +234,7 @@ def WriteFFarmFile(fileIn,fileOut,params,NewFile=True):
             f.write('WT_X   WT_Y   WT_Z   WT_FASTInFile                                                               X0_High  Y0_High  Z0_High  dX_High  dY_High  dZ_High\n')
             f.write('(m)    (m)    (m)    (string)                                                                    (m)      (m)      (m)      (m)      (m)      (m)\n')
             for wt in range(params.nTurbs):
-                f.write('{:.3f}\t{:.3f}\t{:.3f}\t{}_WT{:d}.fst"\t{:.3f}\t{:.3f}\t{:.3f}\t{:.3f}\t{:.3f}\t{:.3f}\n'.format(params.x[wt],params.y[wt],params.z[wt],params.tpath,wt+1,params.X0_High[wt],params.Y0_High[wt],params.Z0_High,params.dX_High,params.dY_High,params.dZ_High))
+                f.write('{:.3f}\t{:.3f}\t{:.3f}\t{}_WT{:d}.fst"\t{:.3f}\t{:.3f}\t{:.3f}\t{:.3f}\t{:.3f}\t{:.3f}\n'.format(params.x[wt],params.y[wt],params.z[wt],FSTpath,wt+1,params.X0_High[wt],params.Y0_High[wt],params.Z0_High,params.dX_High,params.dY_High,params.dZ_High))
             f.write('--- WAKE DYNAMICS ---\n')
             f.write('3.0\t\tdr                 Radial increment of radial finite-difference grid (m) [>0.0]\n')
             f.write('50\t\tNumRadii           Number of radii in the radial finite-difference grid (-) [>=2]\n')
@@ -210,7 +267,7 @@ def WriteFFarmFile(fileIn,fileOut,params,NewFile=True):
             f.write('748.0, 1252.0, 1378.0, 1504.0, 1630.0, 1756.0, 1882.0, 2008.0   OutDisWindX        X coordinates of YZ planes for output of disturbed wind data across the low-resolution domain (m) [1 to NOutDisWindYZ] [unused for NOutDisWindYZ=0]\n')
             f.write('0\t\tNOutDisWindXZ      Number of XZ planes for output of disturbed wind data across the low-resolution domain to <RootName>/Low.DisXZ<n_out>.t<n>.vtk (-) [0 to 9]\n')
             f.write('0.0\tO\tutDisWindY        Y coordinates of XZ planes for output of disturbed wind data across the low-resolution domain (m) [1 to NOutDisWindXZ] [unused for NOutDisWindXZ=0]\n')
-            f.write('2.0\t\tWrDisDT            Time step for disturbed wind visualization output (s) [>0.0] or DEFAULT [DEFAULT=DT] [unused for WrDisWind=False and NOutDisWindXY=NOutDisWindYZ=NOutDisWindXZ=0]\n')
+            f.write('2.0\t\tWrDisDT            Time step for disturbed wind visualization output (s) [>0.0] or DEFAULT [DEFAULT=DT_Low or DT_Low-VTK] [unused for WrDisWind=False and NOutDisWindXY=NOutDisWindYZ=NOutDisWindXZ=0]\n')
             f.write('--- OUTPUT ---\n')
             f.write('True\t\tSumPrint           Print summary data to <RootName>.sum? (flag)\n')
             f.write('99999.9\t\tChkptTime          Amount of time between creating checkpoint files for potential restart (s) [>0.0]\n')
@@ -258,16 +315,20 @@ def WriteFFarmFile(fileIn,fileOut,params,NewFile=True):
         print('Modifying {0} to be {1}'.format(fileIn,fileOut))
 
         NewPars = [format(params.dT_Low,'.1f'), format(params.dT_High,'.6f'), int(params.nX_Low), int(params.nY_Low), int(params.nZ_Low), format(params.X0_Low,'.2f'), format(params.Y0_Low,'.2f'), format(params.Z0_Low,'.2f'), format(params.dX_Low,'.2f'), format(params.dY_Low,'.2f'), format(params.dZ_Low,'.2f'), int(params.nX_High), int(params.nY_High), int(params.nZ_High)]
-        ModVars = ['DT','DT_High','NX_Low','NY_Low','NZ_Low','X0_Low','Y0_Low','Z0_Low','dX_Low','dY_Low','dZ_Low','NX_High','NY_High','NZ_High']
+        ModVars = ['DT_Low','DT_High','NX_Low','NY_Low','NZ_Low','X0_Low','Y0_Low','Z0_Low','dX_Low','dY_Low','dZ_Low','NX_High','NY_High','NZ_High']
         wt=0
         with open(fileOut, 'w+') as new_file:
             with open(fileIn) as old_file:
                 for line in old_file.readlines():
                     newline = line
-                    for index,tmpVar in enumerate(ModVars):
-                        if tmpVar in line:
-                            newline = str(NewPars[index])+'\t!!Orig is:  '+line
+                    splits = line.split()
+                    if len(splits)>2:
+                        for index,tmpVar in enumerate(ModVars):
+                            if tmpVar.lower().strip() == splits[1].lower().strip():
+                                newline = str(NewPars[index])+'\t'+tmpVar+'\t!!Orig is:  '+line
                     if '.fst' in line:
-                        newline =str('{:.3f}\t\t{:.3f}\t\t{:.3f}\t\t{}_WT{:d}.fst"\t{:.3f}\t\t{:.3f}\t\t{:.3f}\t\t{:.3f}\t\t{:.3f}\t\t{:.3f}\n'.format(params.x[wt],params.y[wt],params.z[wt],params.tpath,wt+1,params.X0_High[wt],params.Y0_High[wt],params.Z0_High,params.dX_High,params.dY_High,params.dZ_High))
+                        if wt>=params.nTurbs:
+                            raise Exception('The number of turbines in the fstsf is larger than the number of turbines')
+                        newline =str('{:.3f}\t\t{:.3f}\t\t{:.3f}\t\t{}_WT{:d}.fst"\t{:.3f}\t\t{:.3f}\t\t{:.3f}\t\t{:.3f}\t\t{:.3f}\t\t{:.3f}\n'.format(params.x[wt],params.y[wt],params.z[wt],FSTPath,wt+1,params.X0_High[wt],params.Y0_High[wt],params.Z0_High,params.dX_High,params.dY_High,params.dZ_High))
                         wt+=1
                     new_file.write(newline)

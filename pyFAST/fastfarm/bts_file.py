@@ -11,9 +11,9 @@ import numpy as np
 from scipy import fftpack 
 import matplotlib.pyplot as plt
 
-class stochasticTurbulence:
+class BTSFile:
     
-    def __init__(self,D,prefix='prefix'):
+    def __init__(self, BTSfile, D, zHub):
         """
         Instantiate the object. 
         
@@ -22,32 +22,28 @@ class stochasticTurbulence:
         prefix : string,
             can be used to read existing files or generate new ones.
         """
-        self.prefix = prefix         
+        self.BTSfile = BTSfile         
         self.D = D
         self.R = D/2.0
+        self.zHub = zHub ## KS -- adding b/c HubHeight specified in TurbSim file is NOT the real HH
+
+        # Reading BTS file
+        self.read()
         
-    def readBTS(self,pathToBinary, zHub):
+    def read(self):
         """
         Read TurbSim Binary FF.
-        
-        Parameters
-        ----------
-        pathToBinaries : string,
-            where to find binary outputs        
-        """      
-        fPath = os.path.join(pathToBinary,"{0}.bts".format(self.prefix))
-        
-        filePath = glob.glob(fPath)        
-        
-        if len(filePath)==0:
-            raise Exception("Could not find file at {0}.".format(fPath))        
 
-        print('Opening file {0}...'.format(filePath[0]))
-        self.filePath = filePath
-        self.fileDir  = pathToBinary
+        # TODO use TurbSimFile reader instead here for performance improvements
+
+        """      
+        if not os.path.exists(self.BTSfile):
+            raise Exception("Could not find file at {0}.".format(self.BTSfile))        
+
+        print('Opening file {0}...'.format(self.BTSfile))
         components = ['u','v','w']
 
-        with open(filePath[0], mode='rb') as file:            
+        with open(self.BTSfile, mode='rb') as file:            
             fileContent = file.read()
 
             self.nZ, self.nY, self.nTower, self.nTimeSteps = \
@@ -56,7 +52,6 @@ class stochasticTurbulence:
                                     struct.unpack('f'*6,fileContent[18:42])
             self.nSeconds = self.nTimeSteps * self.dT
 
-            self.zHub = zHub ## KS -- adding b/c HubHeight specified in TurbSim file is NOT the real HH
             vSlope = {} ; vIntercept = {} ; byteStart = 42    
             for component in components:
                 vSlope[component], vIntercept[component] = struct.unpack('f'*2,
@@ -124,6 +119,14 @@ class stochasticTurbulence:
         Computes k grid index for a given z.
         """
         return np.argmin(np.abs(self.z-z))
+
+    @property
+    def Vhub(self):
+        """ Streamwise velocity value at hub height"""
+        kHub = self.z2k(self.zHub)
+        Vhub = self.u[:,self.jHub,kHub].mean()
+        return Vhub
+
   
     def TI(self,y=None,z=None,j=None,k=None):       
         """
