@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 from pyFAST.fastfarm.TurbSimCaseCreation import TSCaseCreation
 
 # --- Define parameters necessary for this script
-OldTSFile = 'SampleFiles/TestCase.inp'       # template file used for TubSim, need to exist
+OldTSFile = 'SampleFiles/TestCase.inp'       # template file used for TurbSim, need to exist
 NewTSFile  = 'SampleFiles/_TestCase_mod.inp' # new file that will be written
 D     = 77.0                                                # Turbine diameter (m)
 HubHt = 78.045                                              # Hub Height (m)
@@ -24,7 +24,7 @@ PLExp = 0.2                                                 # power law exponent
 xlocs = [0.0, 265.643]  # x positions of turbines
 ylocs = [0.0, 50.0   ]  # y postitions of turbines
 # xlocs = [0.0      , 265.643, 653.506,  871.276,  653.901]  # x positions of turbines
-# ylocs = [-377.410 , 0.0    ,  -5.378,  28.494 ,  342.903]  # y postitions of turbines
+# ylocs = [-377.410 , 0.0    ,  -5.378,  28.494 ,  342.903]  # y positions of turbines
 
 # --- "Optional" inputs
 cmax     = 5   # maximum blade chord (m). Turbine specific.
