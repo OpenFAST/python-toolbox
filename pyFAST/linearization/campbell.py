@@ -464,6 +464,7 @@ def plotCampbell(OP, Freq, Damp, sx='WS_[m/s]', UnMapped=None, fig=None, axes=No
     # Init figure
     if fig is None:
         fig,axes_ = plt.subplots(1,2)
+        # fig.set_size_inches(7,7.0,forward=True) # default is (6.4,4.8)
         fig.set_size_inches(13,7.0,forward=True) # default is (6.4,4.8)
         fig.subplots_adjust(top=0.78,bottom=0.11,left=0.04,right=0.98,hspace=0.06,wspace=0.16)
     if axes is None:
@@ -566,9 +567,9 @@ def plotCampbellDataFile(xls_or_csv, ws_or_rpm='rpm', sheetname=None, ylim=None,
     figName = os.path.join(baseDir,basename+'_'+ws_or_rpm)
 
     if to_csv:
-        Freq.to_csv(os.path.join(baseDir, 'freq.csv'), index=None, sep=' ')
-        Damp.to_csv(os.path.join(baseDir, 'damp.csv'), index=None, sep=' ')
-        OP.to_csv(os.path.join(baseDir, 'op.csv'), index=None, sep=' ')
+        Freq.to_csv(os.path.join(baseDir, 'freq.csv'), index=None, sep=' ', na_rep='NaN')
+        Damp.to_csv(os.path.join(baseDir, 'damp.csv'), index=None, sep=' ', na_rep='NaN')
+        OP.to_csv(os.path.join(baseDir, 'op.csv'), index=None, sep=' ', na_rep='NaN')
 
     return fig, axes, figName
 
