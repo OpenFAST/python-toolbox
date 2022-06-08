@@ -491,7 +491,7 @@ def campbellModeStyles(i, lbl):
         mk=''; 
     return c, ls, ms, mk
 
-def plotCampbell(OP, Freq, Damp, sx='WS_[m/s]', UnMapped=None, fig=None, axes=None, ylim=None, legend=True, plotUnMapped=True):
+def plotCampbell(OP, Freq, Damp, sx='WS_[m/s]', UnMapped=None, fig=None, axes=None, ylim=None, legend=True, plotUnMapped=True, ps=[1,3,6,9]):
     """ Plot Campbell data as returned by postproMBC 
 
     INPUTS:
@@ -503,6 +503,7 @@ def plotCampbell(OP, Freq, Damp, sx='WS_[m/s]', UnMapped=None, fig=None, axes=No
       - UnMapped: dataframe of UnMapped modes
       - fig, axes: optional fig and axes used for plotting (freq and damp)
       - ylim: limits for the frequency axis
+      - ps: multiple of "p" (rotational speed) to plot in the background
     """
     import matplotlib.pyplot as plt
 
@@ -529,10 +530,8 @@ def plotCampbell(OP, Freq, Damp, sx='WS_[m/s]', UnMapped=None, fig=None, axes=No
     RPM     = OP['RotSpeed_[rpm]'].values
     omega   = RPM/60*2*np.pi
     freq_1p = omega/(2*np.pi)
-    axes[0].plot(OP[sx].values,  freq_1p, ':',color=(0.7,0.7,0.7), lw=1.0)
-    axes[0].plot(OP[sx].values,3*freq_1p, ':',color=(0.7,0.7,0.7), lw=1.0)
-    axes[0].plot(OP[sx].values,6*freq_1p, ':',color=(0.7,0.7,0.7), lw=1.0)
-    axes[0].plot(OP[sx].values,9*freq_1p, ':',color=(0.7,0.7,0.7), lw=1.0)
+    for p in ps:
+        axes[0].plot(OP[sx].values,  p*freq_1p, ':',color=(0.7,0.7,0.7), lw=1.0)
 
     # Plot mapped modes
     Markers = ['', '+', 'o', '^', 's', 'd', 'x', '.']
