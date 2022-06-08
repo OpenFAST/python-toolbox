@@ -314,6 +314,8 @@ def writeLinearizationFiles(main_fst, workDir, operatingPointsFile,
                     print('Trim: {} - Gain: {}'.format(3, trimGainPitch))
                     # TrimGain = .1 / (RotSpeed(iOP) * pi/30); %-> convert RotSpeed to rad/s
                     # TrimGain = TrimGain*0.1
+                    # NOTE: set rated speed to a small value so that Qgen=Qrated
+                    linDict['ServoFile|VS_RtGnSp'] = 0.01 
                 else:
                     linDict['TrimCase'] = 2 # Adjust GenTorque to get desired RPM
                     linDict['TrimGain'] = trimGainGenTorque; 
