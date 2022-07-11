@@ -48,7 +48,7 @@ if __name__ == '__main__':
     time_overview = pd.read_excel(
         r'C:\mmpe\programming\Fortran\HAWC2_git\HAWC2\pytest_hawc2\release_tests\Time_overview.xlsx')
     for pbs in pbs_files:
-        f = pbs.ts_filename
+        f = pbs.filename
 
         pbs.walltime = time_overview.loc[f[:-3].replace("pbs_in/", 'simple1/')]['mean'] * 24 * 3600
         pbs.save(model_path)

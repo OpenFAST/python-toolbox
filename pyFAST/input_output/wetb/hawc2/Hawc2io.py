@@ -171,7 +171,7 @@ class ReadHawc2(object):
         try:
             fid = opent(DirName + r"\sensor ", 'r')
         except IOError:
-            print ("can't finde sensor file for FLEX format")
+            print("can't finde sensor file for FLEX format")
             return
         Lines = fid.readlines()
         fid.close()
@@ -185,24 +185,27 @@ class ReadHawc2(object):
             if not temp.strip():
                 break
             self.NrCh += 1
-            temp = str(Lines[i][38:45]); Unit.append(temp.strip())
-            temp = str(Lines[i][45:53]); Name.append(temp.strip())
-            temp = str(Lines[i][53:]); Description.append(temp.strip())
+            temp = str(Lines[i][38:45])
+            Unit.append(temp.strip())
+            temp = str(Lines[i][45:53])
+            Name.append(temp.strip())
+            temp = str(Lines[i][53:])
+            Description.append(temp.strip())
         self.ChInfo = [Name, Unit, Description]
         # read general info from *.int file
         fid = open(self.FileName, 'rb')
         fid.seek(4 * 19)
         if not np.fromfile(fid, 'int32', 1) == self.NrCh:
-            print ("number of sensors in sensor file and data file are not consisten")
+            print("number of sensors in sensor file and data file are not consisten")
         fid.seek(4 * (self.NrCh) + 4, 1)
         self.Version = np.fromfile(fid, 'int32',1)[0]
-        temp = np.fromfile(fid, 'f', 2)
-        self.Freq = 1 / temp[1];
+        time_start, time_step = np.fromfile(fid, 'f', 2)
+        self.Freq = 1 / time_step
         self.ScaleFactor = np.fromfile(fid, 'f', self.NrCh)
         fid.seek(2 * 4 * self.NrCh + 48 * 2)
         self.NrSc = int(len(np.fromfile(fid, 'int16')) / self.NrCh)
-        self.Time = self.NrSc * temp[1]
-        self.t = np.arange(0, self.Time, temp[1])
+        self.Time = self.NrSc * time_step
+        self.t = np.arange(0, self.Time, time_step) + time_start
         fid.close()
 ################################################################################
 # init function, load channel and other general result file info
