@@ -1398,7 +1398,7 @@ def averagePostPro(outFiles,avgMethod='periods',avgParam=None,ColMap=None,ColKee
 
 
 def integrateMoment(r, F):
-    """ 
+    r""" 
     Integrate moment from force and radial station
         M_j =  \int_{r_j}^(r_n) f(r) * (r-r_j) dr  for j=1,nr
     TODO: integrate analytically the "r" part
@@ -1409,7 +1409,7 @@ def integrateMoment(r, F):
     return M
 
 def integrateMomentTS(r, F):
-    """
+    r"""
     Integrate moment from time series of forces at nr radial stations
 
     Compute 

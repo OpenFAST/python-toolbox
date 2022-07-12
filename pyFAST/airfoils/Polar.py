@@ -218,7 +218,10 @@ class Polar(object):
             find_linear_region = True
 
         # rename and convert units for convenience
-        alpha = np.radians(self.alpha)
+        if self._radians:
+            alpha = alpha
+        else:
+            alpha = np.radians(self.alpha)
         cl_2d = self.cl
         cd_2d = self.cd
         alpha_max_corr = np.radians(alpha_max_corr)
@@ -230,7 +233,10 @@ class Polar(object):
         b = 1
         d = 1
         lam = tsr / (1 + tsr ** 2) ** 0.5  # modified tip speed ratio
-        expon = d / lam / r_over_R
+        if np.abs(r_over_R)>1e-4:
+            expon = d / lam / r_over_R
+        else:
+            expon = d / lam / 1e-4
 
         # find linear region with numpy polyfit
         if find_linear_region:
@@ -244,11 +250,14 @@ class Polar(object):
 
         if lift_method == "DuSelig":
             # Du-Selig correction factor
-            fcl = (
-                1.0
-                / cl_slope
-                * (1.6 * chord_over_r / 0.1267 * (a - chord_over_r ** expon) / (b + chord_over_r ** expon) - 1)
-            )
+            if np.abs(cl_slope)>1e-4:
+                fcl = (
+                    1.0
+                    / cl_slope
+                    * (1.6 * chord_over_r / 0.1267 * (a - chord_over_r ** expon) / (b + chord_over_r ** expon) - 1)
+                )
+            else:
+                fcl=1.0
         elif lift_method == "Snel":
             # Snel correction
             fcl = 3.0 * chord_over_r ** 2.0
@@ -286,7 +295,7 @@ class Polar(object):
 
         cd_3d = cd_2d + delta_cd
 
-        return type(self)(self.Re, np.degrees(alpha), cl_3d, cd_3d, self.cm)
+        return type(self)(self.Re, np.degrees(alpha), cl=cl_3d, cd=cd_3d, cm=self.cm, radians=False)
 
     def extrapolate(self, cdmax, AR=None, cdmin=0.001, nalpha=15):
         """Extrapolates force coefficients up to +/- 180 degrees using Viterna's method
@@ -903,7 +912,7 @@ class Polar(object):
             slope_FD, off_FD = _find_slope(self.alpha, self.cl, xi=alpha0, window=window, method="finitediff_1c")
             if abs(slope - slope_FD) / slope_FD * 100 > 50:
                 #raise Exception('Warning: More than 20% error between estimated slope ({:.4f}) and the slope around alpha0 ({:.4f}). The window for the slope search ([{} {}]) is likely wrong.'.format(slope,slope_FD,window[0],window[-1]))
-                print('Warning: More than 20% error between estimated slope ({:.4f}) and the slope around alpha0 ({:.4f}). The window for the slope search ([{} {}]) is likely wrong.'.format(slope,slope_FD,window[0],window[-1]))
+                print('[WARN] More than 20% error between estimated slope ({:.4f}) and the slope around alpha0 ({:.4f}). The window for the slope search ([{} {}]) is likely wrong.'.format(slope,slope_FD,window[0],window[-1]))
 #         print('slope ',slope,' Alpha range: {:.3f} {:.3f} - nLin {}  nMin {}  nMax {}'.format(alpha[iStart],alpha[iEnd],len(alpha[iStart:iEnd+1]),nMin,len(alpha)))
 
         return myret(slope, off)
@@ -951,15 +960,17 @@ class Polar(object):
         return Cl, fs
 
     def toAeroDyn(self, filenameOut=None, templateFile=None, Re=1.0, comment=None):
-        from pyFAST.input_output.fast_input_file import FASTInputFile
+        from pyFAST.input_output.fast_input_file import ADPolarFile
         cleanComments=comment is not None
         # Read a template file for AeroDyn polars
         if templateFile is None:
             MyDir=os.path.dirname(__file__)
             templateFile = os.path.join(MyDir,'../../data/NREL5MW/5MW_Baseline/Airfoils/Cylinder1.dat')
             cleanComments=True
-
-        ADpol = FASTInputFile(templateFile)
+        if isinstance(templateFile, ADPolarFile):
+            ADpol = templateFile
+        else:
+            ADpol = ADPolarFile(templateFile)
 
         # Compute unsteady parameters
         (alpha0,alpha1,alpha2,cnSlope,cn1,cn2,cd0,cm0)=self.unsteadyParams()
@@ -985,20 +996,10 @@ class Polar(object):
         ADpol['AFCoeff'] = np.around(PolarTable, 5)
 
         # --- Comment
-        # Find lines that are comments
-        I=[]
-        for i in [1,2,3]:
-            if ADpol.data[i]['value'].startswith('!'):
-                if not ADpol.data[i]['value'].startswith('! ---'):
-                    I.append(i)
-	# remove comment from template
         if cleanComments:
-            for i in I:
-                ADpol.data[i]['value'] = '!'
+            ADpol.comment='' # remove comment from template
         if comment is not None:
-            splits = comment.split('\n')
-            for i,com in zip(I,splits):
-                ADpol.data[i]['value'] = '! '+com
+            ADpol.comment=comment
 
         if filenameOut is not None:
             ADpol.write(filenameOut)
