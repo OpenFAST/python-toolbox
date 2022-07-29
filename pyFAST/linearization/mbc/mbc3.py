@@ -218,9 +218,10 @@ def IdentifyModes(CampbellData):
                 if len(stateMax)>=1:
                     modesSkipped[im]=True
                     shortdescr = CampbellData[i]['ShortModeDescr'][im]
-                    if shortdescr.find('ED')>=0:
-                        print('>>>> short', CampbellData[i]['ShortModeDescr'][im])
-                        print('>>>> Problem in IndentifyModes. ED DOF found in level 2')
+                    if verbose:
+                        if shortdescr.find('ED')>=0:
+                            print('>>>> short', CampbellData[i]['ShortModeDescr'][im])
+                            print('>>>> Problem in IdentifyModes. ED DOF found in level 2')
                     #    import pdb; pdb.set_trace()
 
         if 3 in Levels:
