@@ -23,6 +23,7 @@ def main():
     runner.run_cmd(TurbSim_FILE, Turbsim_EXE, wait=True, showOutputs=False, showCommand=True)
 
     """Open the turbulence box, containing the wind speed in 3 directions"""
+    # NOTE:  See Example_TurbSimBox for more use cases of the TurbSimFile class
     ts = TurbSimFile(os.path.join(MyDir, '../tests/example_files/FASTIn_TurbSim_change.bts'))  # Output file
     print(ts.keys())
     print(ts['info'])
