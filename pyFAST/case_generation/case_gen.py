@@ -1,4 +1,3 @@
-# --- For cmd.py
 from __future__ import division, print_function
 import os
 import collections
@@ -13,6 +12,7 @@ import re
 import pyFAST.input_output.fast_input_file as fi
 import pyFAST.case_generation.runner as runner
 import pyFAST.input_output.postpro as postpro
+from pyFAST.input_output.fast_wind_file import FASTWndFile
 
 # --------------------------------------------------------------------------------}
 # --- Template replace 
@@ -442,7 +442,6 @@ def paramsLinearTrim(p=None):
 # ---  
 # --------------------------------------------------------------------------------{
 def createStepWind(filename,WSstep=1,WSmin=3,WSmax=25,tstep=100,dt=0.5,tmin=0,tmax=999):
-    from pyFAST.input_output.fast_wind_file import FASTWndFile
     f = FASTWndFile()
     Steps= np.arange(WSmin,WSmax+WSstep,WSstep)
     print(Steps)

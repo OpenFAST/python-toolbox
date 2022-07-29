@@ -592,29 +592,30 @@ def get_new_seq(rot_triplet,ntot):
         #print(new_seq)
     return new_seq,nRotTriplets,nb
 
-def eiganalysis(A, ndof2, ndof1):
+def eiganalysis(A, ndof2=None, ndof1=None):
     # this line has to be the first line for this function
     # to get the number of function arguments
-    nargin=len(locals())
 
     mbc={}
     m, ns = A.shape;
     if(m!=ns):
-        print('**ERROR: the state-space matrix is not a square matrix.');
+        raise Exception('**ERROR: the state-space matrix is not a square matrix.');
 
-    if nargin == 1:
+    if ndof2 is None:
+        # Assume that all DOF are second order
         ndof1 = 0;
-        ndof2 = ns/2;
+        ndof2 = int(ns/2)
 
         if np.mod(ns,2) != 0:
-            print('**ERROR: the input matrix is not of even order.');
-    elif nargin == 2:
+            raise Exception('**ERROR: the input matrix is not of even order.');
+    elif ndof1 is None:
+        # Assume that first order states are "reminder" 
         ndof1 = ns - 2*ndof2;
         if ndof1 < 0:
-            print('**ERROR: ndof2 must be no larger than half the dimension of the state-space matrix.');      
+            raise Exception('**ERROR: ndof2 must be no larger than half the dimension of the state-space matrix.');      
     else:
-        if ns != 2*ndof2 + ndof1:
-            print('**ERROR: the dimension of the state-space matrix must equal 2*ndof2 + ndof1.');
+        if ns != int(2*ndof2 + ndof1):
+            raise Exception('**ERROR: the dimension of the state-space matrix must equal 2*ndof2 + ndof1.');
 
     ndof = ndof2 + ndof1;
 
@@ -844,11 +845,13 @@ def fx_mbc3(FileNames, verbose=True, removeTwrAzimuth=False):
             #print('Before ',T1c)
     
             if 'A' in matData:
+                #A =  matData['A'][:,:,iaz]
+                #A_reordered =  A[np.ix_(new_seq_states, new_seq_states)]
                 # Eq. 29
                 L1=np.concatenate((T1, np.zeros([matData['ndof2'],matData['ndof2']]), np.zeros([matData['ndof2'], matData['ndof1']])), axis=1)
                 L2=np.concatenate((matData['Omega'][iaz]*T2,T1,np.zeros([matData['ndof2'], matData['ndof1']])), axis=1)
                 L3=np.concatenate((np.zeros([matData['ndof1'], matData['ndof2']]),np.zeros([matData['ndof1'], matData['ndof2']]), T1q), axis=1)            
-                L=np.matmul(matData['A'][new_seq_states[:,None],new_seq_states,iaz],np.concatenate((L1,L2,L3),axis=0))
+                L=np.matmul(matData['A'][new_seq_states[:,None],new_seq_states,iaz], np.concatenate((L1,L2,L3),axis=0))
 
                 R1=np.concatenate((matData['Omega'][iaz]*T2, np.zeros([matData['ndof2'],matData['ndof2']]), np.zeros([matData['ndof2'], matData['ndof1']])), axis=1)
                 R2=np.concatenate((OmegaSquared*T3 + matData['OmegaDot'][iaz]*T2,  2*matData['Omega'][iaz]*T2, np.zeros([matData['ndof2'], matData['ndof1']])),axis=1)

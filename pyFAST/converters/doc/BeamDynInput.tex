@@ -87,14 +87,14 @@ This coordinate system is similar to the one used by OpenFAST, with the exceptio
 \svgtex{BeamDynSectionCoord}{Coordinate system assumed in this document for BeamDyn. Coordinates $x_b$,$y_b$,$z_b$ are the coordinates at the root of the blade, used to define the reference axis of the beam. Coordinates $x,y,z$ are used for a typical cross section, with $z$ normal to the cross section, tangent to the reference axis. Point $O$ is the origin of the cross section (defined by the reference axis), point $C$ the centroid, point $S$ the shear center and point $G$ the center of gravity. The coordinates of each points are expressed with respect to the origin of the cross section.}{1.0}{0.90}
 % --------------------------------------------------------------------------------
 The blade coordinate system includes rigid-body pitch rotation relative to the coned coordinate system.
-The position/orientation, velocity, and acceleration of the blade coordinate system are passed from ElastoDyn to BeamDyn every time step.
+The position/orientation, velocity, and acceleration of the blade coordinate system are passed from ElastoDyn to BeamDyn at every time step.
 
 
 \section{Stiffness matrix}
 The results presented in this section are inspired by the expressions given in the \textit{Dymore} manual~\cite{dymore} but for a different coordinate system\footnote{Note that the signs in equation (11) of \cite{dymore} are erroneous and have to be reversed. Apart from that, the coordinate mapping from this reference to the current document is simply $1\to z$, $2\to x$, $3\to y$.}.
 
 \subsection{Introduction}
-The stifness matrix that relates the cross-section strains to the loads is asumed to take the following form (valid for orthotropic layups, that is, with no off-axis plies):
+The stiffness matrix that relates the cross-section strains to the loads is assumed to take the following form (valid for orthotropic layups, that is, with no off-axis plies):
 \begin{align}
     \begin{bmatrix}
     F_x \\ F_y\\ F_z \\ M_x \\ M_y\\ M_z\\ 
@@ -163,7 +163,7 @@ The transformation between the principal axes and the cross-section axis is such
 \shortintertext{with}
     \m{T}&=\begin{bmatrix}1 & 0 & 0\\0 & \cos\theta_p & -\sin\theta_p\\0 & \sin\theta_p& \cos\theta_p\end{bmatrix}
 \end{align}
-and where the variables $H_{xx},H_{xy},H_{yy}$ represent the bending stiffnesses in the cross-section coordinates system, obtained from the principal axis stifnesses as:
+and where the variables $H_{xx},H_{xy},H_{yy}$ represent the bending stiffnesses in the cross-section coordinates system, obtained from the principal axis stiffnesses as:
 \begin{align}
 H_{xx} &=  \EI_{x_p} \cos^{2}\theta_p + \EI_{y_p} \sin^{2}\theta_p \\
 H_{yy} &= \EI_{x_p} \sin^{2}\theta_p + \EI_{y_p} \cos^{2}{\theta_p}  \\
