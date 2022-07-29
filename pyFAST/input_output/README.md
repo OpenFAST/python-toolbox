@@ -56,7 +56,8 @@ ts = TurbSimFile('Turb.bts')
 print(ts.keys())
 print(ts['u'].shape)  
 ```
+For more examples on how to manipulate TurbSim files see
+see [examples](examples/Example_TurbSimBox.py)
 
-TurbSim file processing  
-Including TurbSim input file modification, run and result export.  
-see [examples](pyFAST/input_output/examples/Example_TurbSim_Processing.py)
+TurbSim input file processing (file modification, run and result export) 
+see [examples](examples/Example_TurbSim_Processing.py).

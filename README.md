@@ -28,6 +28,54 @@ The repository contains a set of small packages:
 - case\_generation: tools to generate and run a set of input of OpenFAST input files (see [examples](pyFAST/case_generation/examples))
 
 
+## QuickStart and main usage
+
+### Read and write files
+Find examples scripts in this [folder](pyFAST/input_output/examples) and the different fileformats [here](pyFAST/input_output). 
+
+Read an AeroDyn file (or any OpenFAST input file), modifies some values and write the modified file:
+```python
+from pyFAST.input_output import FASTInputFile
+filename = 'AeroDyn.dat'
+f = FASTInputFile(filename)
+f['TwrAero'] = True
+f['AirDens'] = 1.225
+f.write('AeroDyn_Changed.dat')
+```
+
+Read an OpenFAST binary output file and convert it to a pandas DataFrame
+```python
+from pyFAST.input_output import FASTOutputFile
+df = FASTOutputFile('5MW.outb').toDataFrame()
+time  = df['Time_[s]']
+Omega = df['RotSpeed_[rpm]']
+```
+
+Read a TurbSim binary file, modify it and write it back
+```python 
+from pyFAST.input_output import TurbSimFile
+ts = TurbSimFile('Turb.bts')
+print(ts.keys())
+print(ts['u'].shape)  
+ts['u'][0,:,:,:] += 1 # Adding 1 m/s in the streamwise
+tw.write('NewTurbulenceBox.bts')
+```
+
+### Polar/airfoil manipulation
+Find examples scripts in this [folder](pyFAST/polar/examples).
+
+
+Read a CSV file with `alpha, Cl, Cd, Cm`, and write it to AeroDyn format (also computes unsteady coefficients)
+```python 
+from pyFAST.airfoils.Polar import Polar
+polar = Polar('pyFAST/airfoils/data/DU21_A17.csv', fformat='delimited')
+ADpol = polar.toAeroDyn('AeroDyn_Polar_DU21_A17.dat')
+```
+
+### Write a set of OpenFAST input file for multiple simulations
+Find examples scripts in this [folder](pyFAST/case_generation/examples).
+
+
 
 ## Future work and friend projects
 
