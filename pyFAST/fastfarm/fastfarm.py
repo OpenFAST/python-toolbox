@@ -137,47 +137,74 @@ def rectangularLayoutSubDomains(D,Lx,Ly):
 
     return XWT, YWT, ZWT
 
-def fastFarmTurbSimExtent(TurbSimFilename, HubHeight, D, xWT, yWT, Cmeander=1.9, Chord_max=3, extent_X=1.2, extent_Y=1.2):
+
+def fastFarmTurbSimExtent(TurbSimFilename, hubHeight, D, xWT, yWT, Cmeander=1.9, chord_max=3, extent_X=1.2, extent_YZ=1.2, meanUAtHubHeight=False):
     """ 
     Determines "Ambient Wind" box parametesr for FastFarm, based on a TurbSimFile ('bts')
+
+    Implements the guidelines listed here:
+        https://openfast.readthedocs.io/en/dev/source/user/fast.farm/ModelGuidance.html
+
+    INPUTS:
+     - TurbSimFilename: name of the BTS file used in the FAST.Farm simulation
+     - hubHeight      : Hub height [m]
+     - D              : turbine diameter [m]
+     - xWT            : vector of x positions of the wind turbines (e.g. [0,300,600])
+     - yWT            : vector of y positions of the wind turbines (e.g. [0,0,0])
+     - Cmeander       : parameter for meandering used in FAST.Farm [-]
+     - chord_max      : maximum chord of the wind turbine blade. Used to determine the high resolution 
+     - extent_X       : x-extent of high res box in diamter around turbine location
+     - extent_YZ      : y-extent of high res box in diamter around turbine location
+
     """
     # --- TurbSim data
-    ts      = TurbSimFile(TurbSimFilename)
-    #iy,iz   = ts.closestPoint(y=0,z=HubHeight)
-    #iy,iz   = ts.closestPoint(y=0,z=HubHeight)
-    zMid, uMid =  ts.midValues()
-    #print('uMid',uMid)
-    #meanU   = ts['u'][0,:,iy,iz].mean()
-    meanU   = uMid
-    dY_High = ts['y'][1]-ts['y'][0]
-    dZ_High = ts['z'][1]-ts['z'][0]
-    Z0_Low  = ts['z'][0]
-    Z0_High = ts['z'][0] # we start at lowest to include tower
-    Width   = ts['y'][-1]-ts['y'][0]
-    Height  = ts['z'][-1]-ts['z'][0]
-    dT_High = ts['dt']
-    #effSimLength = ts['t'][-1]-ts['t'][0] + Width/meanU
-    effSimLength = ts['t'][-1]-ts['t'][0]
+    ts = TurbSimFile(TurbSimFilename)
+
+    if meanUAtHubHeight:
+        # Use Hub Height to determine convection velocity
+        iy,iz   = ts.closestPoint(y=0,z=hubHeight)
+        meanU   = ts['u'][0,:,iy,iz].mean()
+    else:
+        # Use middle of the box to determine convection velocity
+        zMid, meanU =  ts.midValues()
+
+    return fastFarmBoxExtent(ts.y, ts.z, ts.t, meanU, hubHeight, D, xWT, yWT, Cmeander=Cmeander, chord_max=chord_max, extent_X=extent_X, extent_YZ=extent_YZ) 
+
+def fastFarmBoxExtent(yBox, zBox, tBox, meanU, hubHeight, D, xWT, yWT, Cmeander=1.9, chord_max=3, extent_X=1.2, extent_YZ=1.2):
+    """ 
+    Determines "Ambient Wind" box parametesr for FastFarm, based on turbulence box parameters
+    INPUTS:
+     - yBox: y vector of grid points of the box
+     - zBox: z vector of grid points of the box
+     - zBox: time vector of the box
+     - meanU: mean velocity used to convect the box
+    """
+    dY_High      = yBox[1]-yBox[0]
+    dZ_High      = zBox[1]-zBox[0]
+    dT_High      = tBox[1]-tBox[0]
+    Z0_Low       = zBox[0]
+    Z0_High      = zBox[0]                # we start at lowest to include tower
+    Width        = yBox[-1]-yBox[0]
+    Height       = zBox[-1]-zBox[0]
+    effSimLength = tBox[-1]-tBox[0]
 
     # Desired resolution, rule of thumbs
-    dX_High_desired = Chord_max             
+    dX_High_desired = chord_max             
     dX_Low_desired  = Cmeander*D*meanU/150.0
     dt_des          = Cmeander*D/(10.0*meanU)
 
     # --- High domain
-    ZMax_High = HubHeight+extent_Y*D/2.0
+    ZMax_High = hubHeight+extent_YZ*D/2.0
     # high-box extent in x and y [D]
     Xdist_High = extent_X*D
-    Ydist_High = extent_Y*D
+    Ydist_High = extent_YZ*D
     Zdist_High = ZMax_High-Z0_High # we include the tower
     X0_rel     = Xdist_High/2.0
     Y0_rel     = Ydist_High/2.0
     Length     = effSimLength*meanU
     nx         = int(round(effSimLength/dT_High))
     dx_TS      = Length/(nx-1)
-    #print('dx_TS',dx_TS)
-    dX_High    = round(dX_High_desired/dx_TS)*dx_TS
-    #print('dX_High_desired',dX_High_desired, dX_High)
+    dX_High    = np.around(  round(dX_High_desired/dx_TS)*dx_TS  , 2) # keeping 2 digits
     
     nX_High = int(round(Xdist_High/dX_High)+1)
     nY_High = int(round(Ydist_High/dY_High)+1)
@@ -195,16 +222,15 @@ def fastFarmTurbSimExtent(TurbSimFilename, HubHeight, D, xWT, yWT, Cmeander=1.9,
     dx_des = dX_Low_desired
     dy_des = dX_Low_desired
     dz_des = dX_Low_desired
-    X0_Low = round( (min(xWT)-2*D)/dX_High) *dX_High
-    Y0_Low = round( -Width/2      /dY_High) *dY_High
+    X0_Low = np.around( (min(xWT)-2*D) , 0)
+    Y0_Low = np.around( -Width/2       , 0)
     dX_Low = round( dx_des        /dX_High)*dX_High
     dY_Low = round( dy_des        /dY_High)*dY_High
     dZ_Low = round( dz_des        /dZ_High)*dZ_High
+
     Xdist  = max(xWT)+8.0*D-X0_Low  # Maximum extent
     Ydist  = Width
     Zdist  = Height
-    #print('dX_Low',dX_Low, dX_Low/dx_TS, dX_High/dx_TS)
-
     nX_Low = int(Xdist/dX_Low)+1; 
     nY_Low = int(Ydist/dY_Low)+1;
     nZ_Low = int(Zdist/dZ_Low)+1;
@@ -217,7 +243,7 @@ def fastFarmTurbSimExtent(TurbSimFilename, HubHeight, D, xWT, yWT, Cmeander=1.9,
         nZ_Low=nZ_Low-1 
 
     d = dict()
-    d['DT']      = np.around(dT_Low ,3)
+    d['DT_Low']  = np.around(dT_Low ,3)
     d['DT_High'] = np.around(dT_High,3)
     d['NX_Low']  = int(nX_Low)
     d['NY_Low']  = int(nY_Low)
@@ -238,8 +264,15 @@ def fastFarmTurbSimExtent(TurbSimFilename, HubHeight, D, xWT, yWT, Cmeander=1.9,
     d['X0_High'] = X0_High
     d['Y0_High'] = Y0_High
     d['Z0_High'] = np.around(Z0_High,3)
+    # --- Misc
+    d['dX_des_High'] = dX_High_desired
+    d['dX_des_Low']  = dX_Low_desired
+    d['DT_des'] = dt_des
+    d['U_mean'] = meanU
+
 
     return d
+
 
 def writeFastFarm(outputFile, templateFile, xWT, yWT, zWT, FFTS=None, OutListT1=None):
     """ Write FastFarm input file based on a template, a TurbSimFile and the Layout
@@ -254,12 +287,13 @@ def writeFastFarm(outputFile, templateFile, xWT, yWT, zWT, FFTS=None, OutListT1=
     # --- Replace box extent values
     if FFTS is not None:
         fst['Mod_AmbWind'] = 2
-        for k in ['DT', 'DT_High', 'NX_Low', 'NY_Low', 'NZ_Low', 'X0_Low', 'Y0_Low', 'Z0_Low', 'dX_Low', 'dY_Low', 'dZ_Low', 'NX_High', 'NY_High', 'NZ_High']:
+        ModVars = ['DT_Low', 'DT_High', 'NX_Low', 'NY_Low', 'NZ_Low', 'X0_Low', 'Y0_Low', 'Z0_Low', 'dX_Low', 'dY_Low', 'dZ_Low', 'NX_High', 'NY_High', 'NZ_High']
+        for k in ModVars:
             if isinstance(FFTS[k],int):
                 fst[k] = FFTS[k] 
             else:
                 fst[k] = np.around(FFTS[k],3)
-        fst['WrDisDT'] = FFTS['DT']
+        fst['WrDisDT'] = FFTS['DT_Low']
 
     # --- Set turbine names, position, and box extent
     nWT = len(xWT)

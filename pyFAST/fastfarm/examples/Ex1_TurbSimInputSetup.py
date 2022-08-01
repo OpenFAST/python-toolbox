@@ -13,9 +13,11 @@ import matplotlib.pyplot as plt
 # Local
 from pyFAST.fastfarm.TurbSimCaseCreation import TSCaseCreation
 
+MyDir=os.path.dirname(__file__)
+
 # --- Define parameters necessary for this script
-OldTSFile = 'SampleFiles/TestCase.inp'       # template file used for TurbSim, need to exist
-NewTSFile  = 'SampleFiles/_TestCase_mod.inp' # new file that will be written
+OldTSFile = os.path.join(MyDir, 'SampleFiles/TestCase.inp'     )   # Template file used for TurbSim, need to exist
+NewTSFile = os.path.join(MyDir, 'SampleFiles/_TestCase_mod.inp')   # New file that will be written
 D     = 77.0                                                # Turbine diameter (m)
 HubHt = 78.045                                              # Hub Height (m)
 Vhub  = 6                                                   # mean wind speed at hub height (m/s)
@@ -23,8 +25,6 @@ TI    = 10                                                  # turbulence intensi
 PLExp = 0.2                                                 # power law exponent for shear (-)
 xlocs = [0.0, 265.643]  # x positions of turbines
 ylocs = [0.0, 50.0   ]  # y postitions of turbines
-# xlocs = [0.0      , 265.643, 653.506,  871.276,  653.901]  # x positions of turbines
-# ylocs = [-377.410 , 0.0    ,  -5.378,  28.494 ,  342.903]  # y positions of turbines
 
 # --- "Optional" inputs
 cmax     = 5   # maximum blade chord (m). Turbine specific.
@@ -43,13 +43,12 @@ fig, ax  = Case.plotSetup()
 
 
 
-plt.show()
 
+if __name__ == '__main__':
+    plt.show()
 
-
-
-
-
+if __name__ == '__test__':
+    pass
 
 
 

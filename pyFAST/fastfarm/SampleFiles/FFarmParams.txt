@@ -1,9 +1,0 @@
-####THIS FILE MUST BE TAB-DELIMITED####
-D	77.0
-HubHt	78.045
-high_extent_X	1.2
-high_extent_Y	1.2
-nTurbs	5
-xlocs	0.0	265.643	653.506	871.276	653.901
-ylocs	-377.410	0.0	-5.378	28.494	342.903
-zlocs	0.0	0.0	0.0	0.0	0.0
