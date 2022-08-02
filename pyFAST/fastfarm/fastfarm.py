@@ -246,9 +246,10 @@ def fastFarmBoxExtent(yBox, zBox, tBox, meanU, hubHeight, D, xWT, yWT,
     LY_Low = LY_Box 
     LZ_Low = LZ_Box 
     # Number of points
-    nX_Low = int(LX_Low/dX_Low)+1; 
-    nY_Low = int(LY_Low/dY_Low)+1;
-    nZ_Low = int(LZ_Low/dZ_Low)+1;
+    nX_Low = int(np.ceil(LX_Low/dX_Low))
+    nY_Low = int(np.ceil(LY_Low/dY_Low))
+    nZ_Low = int(np.ceil(LZ_Low/dZ_Low))
+    # Make sure we don't exceed box in Y and Z
     if (nY_Low*dY_Low>LY_Box): nY_Low=nY_Low-1 
     if (nZ_Low*dZ_Low>LZ_Box): nZ_Low=nZ_Low-1 
 
@@ -261,6 +262,7 @@ def fastFarmBoxExtent(yBox, zBox, tBox, meanU, hubHeight, D, xWT, yWT,
     nX_High = int(np.ceil(LX_High/dX_High))
     nY_High = int(np.ceil(LY_High/dY_High))
     nZ_High = int(np.ceil(LZ_High/dZ_High))
+    # Make sure we don't exceed box in Y and Z
     if (nY_High*dY_High>LY_Box): nY_High=nY_High-1 
     if (nZ_High*dZ_High>LZ_Box): nZ_High=nZ_High-1 
 
@@ -376,7 +378,7 @@ def setFastFarmOutputs(fastFarmFile, OutListT1):
     fst.write(fastFarmFile)
 
 
-def plotFastFarmSetup(fastFarmFile, grid=True, fig=None):
+def plotFastFarmSetup(fastFarmFile, grid=True, fig=None, D=None, plane='XY', hubHeight=None):
     """ """
     import matplotlib.pyplot as plt
 
@@ -390,52 +392,99 @@ def plotFastFarmSetup(fastFarmFile, grid=True, fig=None):
         return x_bound, y_bound
 
 
+    # --- Read FAST.Farm input file
     fst=FASTInputFile(fastFarmFile)
 
     if fig is None:
-        fig = plt.figure(figsize=(13.5,6))
+        fig = plt.figure(figsize=(13.5,8))
         ax  = fig.add_subplot(111,aspect="equal")
 
     WT=fst['WindTurbines']
-    xWT     = WT[:,0].astype(float)
-    yWT     = WT[:,1].astype(float)
+    xWT = WT[:,0].astype(float)
+    yWT = WT[:,1].astype(float)
+    zWT = yWT*0 
+    if hubHeight is not None:
+        zWT += hubHeight
+
+    if plane == 'XY':
+        pass
+    elif plane == 'XZ':
+        yWT = zWT
+    elif plane == 'YZ':
+        xWT = yWT
+        yWT = zWT
+    else:
+        raise Exception("Plane should be 'XY' 'XZ' or 'YZ'")
 
     if fst['Mod_AmbWind'] == 2:
         x_low = fst['X0_Low'] + np.arange(fst['NX_Low']+1)*fst['DX_Low']
         y_low = fst['Y0_Low'] + np.arange(fst['NY_Low']+1)*fst['DY_Low']
+        z_low = fst['Z0_Low'] + np.arange(fst['NZ_Low']+1)*fst['DZ_Low']
+        if plane == 'XZ':
+            y_low = z_low
+        elif plane == 'YZ':
+            x_low = y_low
+            y_low = z_low
         # Plot low-res box
         x_bound_low, y_bound_low =  boundingBox(x_low, y_low)
-        ax.plot(x_bound_low, y_bound_low ,'--k',lw=2,label='Low')
+        ax.plot(x_bound_low, y_bound_low ,'--k',lw=2,label='Low-res')
         # Plot Low res grid lines
         if grid:
-            ax.vlines(x = x_low, ymin=y_low[0], ymax=y_low[-1], ls='-', lw=0.3, color=(0.3,0.3,0.3))
-            ax.hlines(y = y_low, xmin=x_low[0], xmax=x_low[-1], ls='-', lw=0.3, color=(0.3,0.3,0.3))
+            ax.vlines(x_low, ymin=y_low[0], ymax=y_low[-1], ls='-', lw=0.3, color=(0.3,0.3,0.3))
+            ax.hlines(y_low, xmin=x_low[0], xmax=x_low[-1], ls='-', lw=0.3, color=(0.3,0.3,0.3))
 
         X0_High = WT[:,4].astype(float)
         Y0_High = WT[:,5].astype(float)
+        Z0_High = WT[:,6].astype(float)
         dX_High = WT[:,7].astype(float)[0]
         dY_High = WT[:,8].astype(float)[0]
+        dZ_High = WT[:,9].astype(float)[0]
         nX_High = fst['NX_High']
         nY_High = fst['NY_High']
+        nZ_High = fst['NZ_High']
 
         # high-res boxes
         for wt in range(len(xWT)):
             x_high = X0_High[wt] + np.arange(nX_High+1)*dX_High
             y_high = Y0_High[wt] + np.arange(nY_High+1)*dY_High
+            z_high = Z0_High[wt] + np.arange(nZ_High+1)*dZ_High
+            if plane == 'XZ':
+                y_high = z_high
+            elif plane == 'YZ':
+                x_high = y_high
+                y_high = z_high
+
             x_bound_high, y_bound_high =  boundingBox(x_high, y_high)
-            ax.plot(x_bound_high, y_bound_high, '-', lw=2, c=col(wt), label="HighT{0}".format(wt+1))
+            ax.plot(x_bound_high, y_bound_high, '-', lw=2, c=col(wt))
             # Plot High res grid lines
             if grid:
-                ax.vlines(x = x_high, ymin=y_high[0], ymax=y_high[-1], ls='--', lw=0.4, color=col(wt))
-                ax.hlines(y = y_high, xmin=x_high[0], xmax=x_high[-1], ls='--', lw=0.4, color=col(wt))
+                ax.vlines(x_high, ymin=y_high[0], ymax=y_high[-1], ls='--', lw=0.4, color=col(wt))
+                ax.hlines(y_high, xmin=x_high[0], xmax=x_high[-1], ls='--', lw=0.4, color=col(wt))
 
     # Plot turbines
     for wt in range(len(xWT)):
-        ax.plot(xWT[wt], yWT[wt], 'x', ms=8, mew=2, c=col(wt),label="WT{0}".format(wt+1))
+        ax.plot(xWT[wt], yWT[wt], 'x', ms=8, mew=2, c=col(wt),label="WT{}".format(wt+1))
+        if plane=='XY' and D is not None:
+            ax.plot([xWT[wt],xWT[wt]], [yWT[wt]-D/2,yWT[wt]+D/2], '-', lw=2, c=col(wt))
+        elif plane=='XZ' and D is not None and hubHeight is not None:
+            ax.plot([xWT[wt],xWT[wt]], [yWT[wt]-D/2,yWT[wt]+D/2], '-', lw=2, c=col(wt))
+        elif plane=='YZ' and D is not None and hubHeight is not None:
+            theta = np.linspace(0,2*np.pi, 40)
+            x = xWT[wt] + D/2*np.cos(theta)
+            y = yWT[wt] + D/2*np.sin(theta)
+            ax.plot(x, y, '-', lw=2, c=col(wt))
 
-    plt.legend(bbox_to_anchor=(1.05,1.015),frameon=False)
-    ax.set_xlabel("x [m]")
-    ax.set_ylabel("y [m]")
+    #plt.legend(bbox_to_anchor=(1.05,1.015),frameon=False)
+    ax.legend()
+    if plane=='XY':
+        ax.set_xlabel("x [m]")
+        ax.set_ylabel("y [m]")
+    elif plane=='XZ':
+        ax.set_xlabel("x [m]")
+        ax.set_ylabel("z [m]")
+    elif plane=='YZ':
+        ax.set_xlabel("y [m]")
+        ax.set_ylabel("z [m]")
     fig.tight_layout
     # fig.savefig('FFarmLayout.pdf',bbox_to_inches='tight',dpi=500)
 
