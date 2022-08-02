@@ -54,7 +54,7 @@ if __name__ == '__main__':
     print('Output file:',outputFSTF)
 
     # --- Visualize low&high extent and turbine positions
-    plotFastFarmSetup(outputFSTF)
+    fig = plotFastFarmSetup(outputFSTF, grid=True)
 
     # --- Finer tuning
     #fst = FASTInputFile(outputFSTF)

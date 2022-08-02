@@ -138,7 +138,7 @@ def rectangularLayoutSubDomains(D,Lx,Ly):
     return XWT, YWT, ZWT
 
 
-def fastFarmTurbSimExtent(TurbSimFilename, hubHeight, D, xWT, yWT, Cmeander=1.9, chord_max=3, extent_X=1.2, extent_YZ=1.2, meanUAtHubHeight=False):
+def fastFarmTurbSimExtent(TurbSimFilename, hubHeight, D, xWT, yWT, Cmeander=1.9, chord_max=3, extent_X=1.1, extent_YZ=1.1, meanUAtHubHeight=False):
     """ 
     Determines "Ambient Wind" box parametesr for FastFarm, based on a TurbSimFile ('bts')
 
@@ -170,106 +170,145 @@ def fastFarmTurbSimExtent(TurbSimFilename, hubHeight, D, xWT, yWT, Cmeander=1.9,
 
     return fastFarmBoxExtent(ts.y, ts.z, ts.t, meanU, hubHeight, D, xWT, yWT, Cmeander=Cmeander, chord_max=chord_max, extent_X=extent_X, extent_YZ=extent_YZ) 
 
-def fastFarmBoxExtent(yBox, zBox, tBox, meanU, hubHeight, D, xWT, yWT, Cmeander=1.9, chord_max=3, extent_X=1.2, extent_YZ=1.2):
+def fastFarmBoxExtent(yBox, zBox, tBox, meanU, hubHeight, D, xWT, yWT, 
+        Cmeander=1.9, chord_max=3, extent_X=1.1, extent_YZ=1.1, 
+        extent_wake=8, LES=False):
     """ 
     Determines "Ambient Wind" box parametesr for FastFarm, based on turbulence box parameters
     INPUTS:
-     - yBox: y vector of grid points of the box
-     - zBox: z vector of grid points of the box
-     - zBox: time vector of the box
-     - meanU: mean velocity used to convect the box
+     - yBox  : y vector of grid points of the box
+     - zBox  : z vector of grid points of the box
+     - tBox  : time vector of the box
+     - meanU : mean velocity used to convect the box
+     - hubHeight      : Hub height [m]
+     - D              : turbine diameter [m]
+     - xWT            : vector of x positions of the wind turbines (e.g. [0,300,600])
+     - yWT            : vector of y positions of the wind turbines (e.g. [0,0,0])
+     - Cmeander       : parameter for meandering used in FAST.Farm [-]
+     - chord_max      : maximum chord of the wind turbine blade. Used to determine the high resolution 
+     - extent_X       : x-extent of high-res box (in diameter) around turbine location
+     - extent_YZ      : y-extent of high-res box (in diameter) around turbine location
+     - extent_wake    : extent of low-res box (in diameter) to add beyond the "last" wind turbine
+     - LES: False for TurbSim box, true for LES. Perform additional checks for LES.
     """
-    dY_High      = yBox[1]-yBox[0]
-    dZ_High      = zBox[1]-zBox[0]
-    dT_High      = tBox[1]-tBox[0]
-    Z0_Low       = zBox[0]
-    Z0_High      = zBox[0]                # we start at lowest to include tower
-    Width        = yBox[-1]-yBox[0]
-    Height       = zBox[-1]-zBox[0]
-    effSimLength = tBox[-1]-tBox[0]
+    if LES:
+        raise NotImplementedError()
+    # --- Box resolution and extents
+    dY_Box      = yBox[1]-yBox[0]
+    dZ_Box      = zBox[1]-zBox[0]
+    dT_Box      = tBox[1]-tBox[0]
+    dX_Box      = dT_Box * meanU
+    Z0_Box      = zBox[0]
+    LY_Box      = yBox[-1]-yBox[0]
+    LZ_Box      = zBox[-1]-zBox[0]
+    LT_Box      = tBox[-1]-tBox[0]    
+    LX_Box      = LT_Box * meanU
 
-    # Desired resolution, rule of thumbs
-    dX_High_desired = chord_max             
+    # --- Desired resolution, rules of thumb
+    dX_High_desired = chord_max
     dX_Low_desired  = Cmeander*D*meanU/150.0
-    dt_des          = Cmeander*D/(10.0*meanU)
+    dY_Low_desired  = dX_Low_desired
+    dZ_Low_desired  = dX_Low_desired
+    dT_Low_desired  = Cmeander*D/(10.0*meanU)
 
-    # --- High domain
-    ZMax_High = hubHeight+extent_YZ*D/2.0
-    # high-box extent in x and y [D]
-    Xdist_High = extent_X*D
-    Ydist_High = extent_YZ*D
-    Zdist_High = ZMax_High-Z0_High # we include the tower
-    X0_rel     = Xdist_High/2.0
-    Y0_rel     = Ydist_High/2.0
-    Length     = effSimLength*meanU
-    nx         = int(round(effSimLength/dT_High))
-    dx_TS      = Length/(nx-1)
-    dX_High    = np.around(  round(dX_High_desired/dx_TS)*dx_TS  , 2) # keeping 2 digits
+    # --- Suitable resolution for high res
+    dX_High = int(dX_High_desired/dX_Box)*dX_Box
+    if dX_High==0: raise Exception('The x-resolution of the box ({}) is too large and cannot satisfy the requirements for the high-res domain of dX~{} (based on chord_max). Reduce DX (or DT) of the box.'.format(dX_Box, dX_High_desired))
+    dY_High = dY_Box  # TODO? 
+    dZ_High = dZ_Box  # TODO? 
+    dT_High = dT_Box  # TODO? 
+
+    # --- Suitable resolution for Low res
+    dT_Low = int(dT_Low_desired/dT_Box )*dT_Box
+    dX_Low = int(dX_Low_desired/dX_High)*dX_High
+    dY_Low = int(dY_Low_desired/dY_High)*dY_High
+    dZ_Low = int(dZ_Low_desired/dZ_High)*dZ_High
+    if dT_Low==0: raise Exception('The time-resolution of the box ({}) is too large and cannot satisfy the requirements for the low-res domain of dT~{} (based on D & U). Reduce the DT of the box.'.format(dT_Box, dT_Low_desired))
+    if dX_Low==0: raise Exception('The X-resolution of the box ({}) is too large and cannot satisfy the requirements for the low-res domain of dX~{} (based on D & U). Reduce the DX of the box.'.format(dX_Box, dX_Low_desired))
+    if dY_Low==0: raise Exception('The Y-resolution of the box ({}) is too large and cannot satisfy the requirements for the low-res domain of dY~{} (based on D & U). Reduce the DY of the box.'.format(dY_Box, dY_Low_desired))
+    if dZ_Low==0: raise Exception('The Z-resolution of the box ({}) is too large and cannot satisfy the requirements for the low-res domain of dZ~{} (based on D & U). Reduce the DZ of the box.'.format(dZ_Box, dZ_Low_desired))
+
+    # --- Low-res domain
+    # NOTE: more work is needed to make sure the domain encompass the turbines
+    #       Also, we need to know the main flow direction to add a buffere with extent_wake
+    # Origin
+    nD_Before = extent_X/2 # Diameters before the first turbine to start the domain
+    X0_Low = np.floor( (min(xWT)-nD_Before*D-dX_Low)) # Starting on integer value for esthetics. With a dX_Low margin.
+    Y0_Low = np.floor( -LY_Box/2                    ) # Starting on integer value for esthetics
+    Z0_Low = zBox[0] # we start at lowest to include tower
+    if LES:
+        if Y0_Low > min(yWT)-3*D:
+            Y0_Low = np.floor(min(yWT)-3*D) 
+    # Extent NOTE: this assumes main flow about x. Might need to be changed
     
-    nX_High = int(round(Xdist_High/dX_High)+1)
-    nY_High = int(round(Ydist_High/dY_High)+1)
-    nZ_High = int(round(Zdist_High/dZ_High)+1)
+    XMax_Low = max(xWT) + extent_wake*D
+    LX_Low = XMax_Low-X0_Low
+    LY_Low = LY_Box 
+    LZ_Low = LZ_Box 
+    # Number of points
+    nX_Low = int(LX_Low/dX_Low)+1; 
+    nY_Low = int(LY_Low/dY_Low)+1;
+    nZ_Low = int(LZ_Low/dZ_Low)+1;
+    if (nY_Low*dY_Low>LY_Box): nY_Low=nY_Low-1 
+    if (nZ_Low*dZ_Low>LZ_Box): nZ_Low=nZ_Low-1 
 
-    # --- High extent per turbine
-    nTurbs = len(xWT)
-    X0_des = np.asarray(xWT)-X0_rel
-    Y0_des = np.asarray(yWT)-Y0_rel
-    X0_High = np.around(np.round(X0_des/dX_High)*dX_High,3)
-    Y0_High = np.around(np.round(Y0_des/dY_High)*dY_High,3)
+    # --- High-res domain extent and number of points
+    ZMax_High = hubHeight+extent_YZ*D/2
+    Z0_High   = zBox[0] # we start at lowest to include tower
+    LX_High =  extent_X*D        
+    LY_High =  min(LY_Box, extent_YZ*D      ) # Bounding to not exceed the box dimension
+    LZ_High =  min(LZ_Box, ZMax_High-Z0_High) # Bounding to not exceed the box dimension
+    nX_High = int(np.ceil(LX_High/dX_High))
+    nY_High = int(np.ceil(LY_High/dY_High))
+    nZ_High = int(np.ceil(LZ_High/dZ_High))
+    if (nY_High*dY_High>LY_Box): nY_High=nY_High-1 
+    if (nZ_High*dZ_High>LZ_Box): nZ_High=nZ_High-1 
 
-    # --- Low domain
-    dT_Low = round(dt_des/dT_High)*dT_High
-    dx_des = dX_Low_desired
-    dy_des = dX_Low_desired
-    dz_des = dX_Low_desired
-    X0_Low = np.around( (min(xWT)-2*D) , 0)
-    Y0_Low = np.around( -Width/2       , 0)
-    dX_Low = round( dx_des        /dX_High)*dX_High
-    dY_Low = round( dy_des        /dY_High)*dY_High
-    dZ_Low = round( dz_des        /dZ_High)*dZ_High
-
-    Xdist  = max(xWT)+8.0*D-X0_Low  # Maximum extent
-    Ydist  = Width
-    Zdist  = Height
-    nX_Low = int(Xdist/dX_Low)+1; 
-    nY_Low = int(Ydist/dY_Low)+1;
-    nZ_Low = int(Zdist/dZ_Low)+1;
-
-    if (nX_Low*dX_Low>Xdist):
-        nX_Low=nX_Low-1 
-    if (nY_Low*dY_Low>Ydist):
-        nY_Low=nY_Low-1 
-    if (nZ_Low*dZ_Low>Zdist):
-        nZ_Low=nZ_Low-1 
+    # --- High-res location per turbine 
+    X0_desired = np.asarray(xWT)-LX_High/2 # high-res is centered on turbine location
+    Y0_desired = np.asarray(yWT)-LY_High/2 # high-res is centered on turbine location
+    X0_High    = X0_Low + np.floor((X0_desired-X0_Low)/dX_High)*dX_High
+    Y0_High    = Y0_Low + np.floor((Y0_desired-Y0_Low)/dY_High)*dY_High
 
     d = dict()
-    d['DT_Low']  = np.around(dT_Low ,3)
-    d['DT_High'] = np.around(dT_High,3)
-    d['NX_Low']  = int(nX_Low)
-    d['NY_Low']  = int(nY_Low)
-    d['NZ_Low']  = int(nZ_Low)
-    d['X0_Low']  = np.around(X0_Low,3)
-    d['Y0_Low']  = np.around(Y0_Low,3)
-    d['Z0_Low']  = np.around(Z0_Low,3)
-    d['dX_Low']  = np.around(dX_Low,3)
-    d['dY_Low']  = np.around(dY_Low,3)
-    d['dZ_Low']  = np.around(dZ_Low,3)
-    d['NX_High'] = int(nX_High)
-    d['NY_High'] = int(nY_High)
-    d['NZ_High'] = int(nZ_High)
+    d['DT_Low']  = np.around(dT_Low ,4)
+    d['DT_High'] = np.around(dT_High,4)
+    d['NX_Low']  = nX_Low
+    d['NY_Low']  = nY_Low
+    d['NZ_Low']  = nZ_Low
+    d['X0_Low']  = np.around(X0_Low,4)
+    d['Y0_Low']  = np.around(Y0_Low,4)
+    d['Z0_Low']  = np.around(Z0_Low,4)
+    d['dX_Low']  = np.around(dX_Low,4)
+    d['dY_Low']  = np.around(dY_Low,4)
+    d['dZ_Low']  = np.around(dZ_Low,4)
+    d['NX_High'] = nX_High
+    d['NY_High'] = nY_High
+    d['NZ_High'] = nZ_High
     # --- High extent info for turbine outputs
-    d['dX_High'] = np.around(dX_High,3)
-    d['dY_High'] = np.around(dY_High,3)
-    d['dZ_High'] = np.around(dZ_High,3)
-    d['X0_High'] = X0_High
-    d['Y0_High'] = Y0_High
-    d['Z0_High'] = np.around(Z0_High,3)
+    d['dX_High'] = np.around(dX_High,4)
+    d['dY_High'] = np.around(dY_High,4)
+    d['dZ_High'] = np.around(dZ_High,4)
+    d['X0_High'] = np.around(X0_High,4)
+    d['Y0_High'] = np.around(Y0_High,4)
+    d['Z0_High'] = np.around(Z0_High,4)
     # --- Misc
     d['dX_des_High'] = dX_High_desired
     d['dX_des_Low']  = dX_Low_desired
-    d['DT_des'] = dt_des
-    d['U_mean'] = meanU
+    d['DT_des']      = dT_Low_desired
+    d['U_mean']      = meanU
 
+    # --- Sanity check: check that the high res is at "almost" an integer location
+    X_rel = (np.array(d['X0_High'])-d['X0_Low'])/d['dX_High']
+    Y_rel = (np.array(d['Y0_High'])-d['Y0_Low'])/d['dY_High']
+    dX = X_rel - np.round(X_rel) # Should be close to zero
+    dY = Y_rel - np.round(Y_rel) # Should be close to zero
+    if any(abs(dX)>1e-3):
+        print('Deltas:',dX)
+        raise Exception('Some X0_High are not on an integer multiple of the high-res grid')
+    if any(abs(dY)>1e-3):
+        print('Deltas:',dY)
+        raise Exception('Some Y0_High are not on an integer multiple of the high-res grid')
 
     return d
 
@@ -337,48 +376,70 @@ def setFastFarmOutputs(fastFarmFile, OutListT1):
     fst.write(fastFarmFile)
 
 
-def plotFastFarmSetup(fastFarmFile):
+def plotFastFarmSetup(fastFarmFile, grid=True, fig=None):
     """ """
     import matplotlib.pyplot as plt
+
+    def col(i): 
+        Colrs=plt.rcParams['axes.prop_cycle'].by_key()['color']
+        return Colrs[ np.mod(i,len(Colrs)) ]
+    def boundingBox(x, y):
+        """ return x and y coordinates to form a box marked by the min and max of x and y"""
+        x_bound = [x[0],x[-1],x[-1],x[0] ,x[0]]
+        y_bound = [y[0],y[0] ,y[-1],y[-1],y[0]]
+        return x_bound, y_bound
+
+
     fst=FASTInputFile(fastFarmFile)
 
-    fig = plt.figure(figsize=(13.5,10))
-    ax  = fig.add_subplot(111,aspect="equal")
+    if fig is None:
+        fig = plt.figure(figsize=(13.5,6))
+        ax  = fig.add_subplot(111,aspect="equal")
 
     WT=fst['WindTurbines']
-    x       = WT[:,0].astype(float)
-    y       = WT[:,1].astype(float)
+    xWT     = WT[:,0].astype(float)
+    yWT     = WT[:,1].astype(float)
 
     if fst['Mod_AmbWind'] == 2:
-        xmax_low = fst['X0_Low']+fst['DX_Low']*fst['NX_Low']
-        ymax_low = fst['Y0_Low']+fst['DY_Low']*fst['NY_Low']
-        # low-res box
-        ax.plot([fst['X0_Low'],xmax_low,xmax_low,fst['X0_Low'],fst['X0_Low']],
-                [fst['Y0_Low'],fst['Y0_Low'],ymax_low,ymax_low,fst['Y0_Low']],'--k',lw=2,label='Low')
+        x_low = fst['X0_Low'] + np.arange(fst['NX_Low']+1)*fst['DX_Low']
+        y_low = fst['Y0_Low'] + np.arange(fst['NY_Low']+1)*fst['DY_Low']
+        # Plot low-res box
+        x_bound_low, y_bound_low =  boundingBox(x_low, y_low)
+        ax.plot(x_bound_low, y_bound_low ,'--k',lw=2,label='Low')
+        # Plot Low res grid lines
+        if grid:
+            ax.vlines(x = x_low, ymin=y_low[0], ymax=y_low[-1], ls='-', lw=0.3, color=(0.3,0.3,0.3))
+            ax.hlines(y = y_low, xmin=x_low[0], xmax=x_low[-1], ls='-', lw=0.3, color=(0.3,0.3,0.3))
+
         X0_High = WT[:,4].astype(float)
         Y0_High = WT[:,5].astype(float)
         dX_High = WT[:,7].astype(float)[0]
         dY_High = WT[:,8].astype(float)[0]
         nX_High = fst['NX_High']
         nY_High = fst['NY_High']
+
         # high-res boxes
-        for wt in range(len(x)):
-            xmax_high = X0_High[wt]+dX_High*nX_High
-            ymax_high = Y0_High[wt]+dY_High*nY_High
-            ax.plot([X0_High[wt],xmax_high,xmax_high,X0_High[wt],X0_High[wt]],
-                    [Y0_High[wt],Y0_High[wt],ymax_high,ymax_high,Y0_High[wt]],
-                    '-',
-                    label="HighT{0}".format(wt+1))
-            ax.plot(x[wt],y[wt],'x',ms=8,mew=2,label="WT{0}".format(wt+1))
-    else:
-        for wt in range(len(x)):
-            ax.plot(x[wt],y[wt],'x',ms=8,mew=2,label="WT{0}".format(wt+1))
-        # 
+        for wt in range(len(xWT)):
+            x_high = X0_High[wt] + np.arange(nX_High+1)*dX_High
+            y_high = Y0_High[wt] + np.arange(nY_High+1)*dY_High
+            x_bound_high, y_bound_high =  boundingBox(x_high, y_high)
+            ax.plot(x_bound_high, y_bound_high, '-', lw=2, c=col(wt), label="HighT{0}".format(wt+1))
+            # Plot High res grid lines
+            if grid:
+                ax.vlines(x = x_high, ymin=y_high[0], ymax=y_high[-1], ls='--', lw=0.4, color=col(wt))
+                ax.hlines(y = y_high, xmin=x_high[0], xmax=x_high[-1], ls='--', lw=0.4, color=col(wt))
+
+    # Plot turbines
+    for wt in range(len(xWT)):
+        ax.plot(xWT[wt], yWT[wt], 'x', ms=8, mew=2, c=col(wt),label="WT{0}".format(wt+1))
+
     plt.legend(bbox_to_anchor=(1.05,1.015),frameon=False)
-    ax.set_xlabel("x-location [m]")
-    ax.set_ylabel("y-location [m]")
+    ax.set_xlabel("x [m]")
+    ax.set_ylabel("y [m]")
     fig.tight_layout
     # fig.savefig('FFarmLayout.pdf',bbox_to_inches='tight',dpi=500)
+
+    return fig
 
 # --------------------------------------------------------------------------------}
 # --- Tools for postpro 
