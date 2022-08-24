@@ -13,38 +13,46 @@ import numpy as np
 
 class TSCaseCreation:
     
-    def __init__(self, D, HubHt, Vhub, TI, PLexp, x, y, z=None, zbot=1.0, cmax=5.0, fmax=5.0, Cmeander=1.9):
+    def __init__(self, D, HubHt, Vhub, TI, PLexp, x, y, z=None, zbot=1.0, cmax=5.0, fmax=5.0,
+                 Cmeander=1.9, boxType='highres', high_ext=1.2):
         """
         Instantiate the object. 
         
         Parameters
         ----------
-        D       :   float,
-                   rotor diameter (m)
-        HubHt   :   float,
-                   turbine hub height (m)
-        Vhub	:   float,
-                   mean wind speed at hub height (m/s)
-        TI	:   float,
+        D        :   float,
+                    rotor diameter (m)
+        HubHt    :   float,
+                    turbine hub height (m)
+        Vhub	 :   float,
+                    mean wind speed at hub height (m/s)
+        TI	     :   float,
                    turbulence intensity at hub height
-        PLexp	:   float,
-                   power law exponent for shear (-)
-        x, y, z   :   float,
-               x-, y-, and z-location of turbine, respectively
-                  if z is None, z is set to 0
-        cmax    :   float,
-                   maximum blade chord (m). If not specified, set to NREL 5MW value.
-        fmax    :   float,
-                   maximum excitation frequency (Hz). If not specified set to NREL 5MW tower value.
+        PLexp    :   float,
+                    power law exponent for shear (-)
+        x, y, z  :   float,
+                    x-, y-, and z-location of turbine, respectively
+                    if z is None, z is set to 0
+        cmax     :   float,
+                    maximum blade chord (m). If not specified, set to NREL 5MW value.
+        fmax     :   float,
+                    maximum excitation frequency (Hz). If not specified set to NREL 5MW tower value.
+        boxType  :   str,
+                    box type, either 'lowres' or 'highres'. Sets the appropriate dt, dy, and dz for discretization
+                    Defaults to `highres` for backward compatibility
+        high_ext :   float
+                    extent of the high-res box around individual turbines (in D) 
         """
         # Turbine parameters
         self.Turb(D, HubHt, cmax, fmax)
         # Turbine location
         self.turbLocs(x,y,z)
         # Discretization
-        self.discretization(Vhub, TI, PLexp)
+        self.discretization(Vhub, TI, PLexp, Cmeander=Cmeander, boxType=boxType)
         # Setup domain size
-        self.domainSize(zbot=zbot, Cmeander=Cmeander)
+        self.domainSize(zbot=zbot, Cmeander=Cmeander, boxType=boxType, high_ext=high_ext)
+        # Determine origin
+        # self.originLoc()
 
     def Turb(self, D, HubHt, cmax=5.0, fmax=5.0):
         """
@@ -85,34 +93,75 @@ class TSCaseCreation:
         else:
             self.z     = np.asarray(z)
 
-    def discretization(self,Vhub,TI,Shear):
+    def discretization(self,Vhub,TI,Shear, Cmeander=1.9, boxType='highres'):
+        '''
+        Specify discretization for both the high-res and low-res boxes. Follows guidelines present at
+        https://openfast.readthedocs.io/en/main/source/user/fast.farm/ModelGuidance.html#low-resolution-domain
+
+        '''
         
         self.URef = Vhub
         self.TI = TI
         self.PLexp = Shear
         
         # Derived properties
-        self.dt = 1.0/(2.0*self.fmax)
-        self.dy = self.cmax
-        self.dz = self.cmax
+        if boxType == 'lowres':
+            self.dt = Cmeander*self.D/(10*Vhub)
+            ds_low  = Cmeander*self.D*Vhub/150
+            ds_high = self.cmax
+            self.dy = np.floor(ds_low/ds_high)*ds_high
+            self.dz = np.floor(ds_low/ds_high)*ds_high
 
-    def domainSize(self, zbot, Cmeander=1.9):
+        elif boxType == 'highres':
+            self.dt = 1.0/(2.0*self.fmax)
+            self.dy = self.cmax
+            self.dz = self.cmax
+
+        else:
+            raise ValueError("boxType can only be 'lowres' or 'highres'. Stopping.")
+
+    def domainSize(self, zbot, Cmeander=1.9, boxType='highres', high_ext=1.2):
     
-        ymin = min(self.y)-2.23313*Cmeander*self.D/2
-        ymax = max(self.y)+2.23313*Cmeander*self.D/2
-        
-        width_des = ymax-ymin
-        height_des = self.RefHt+self.D/2+2.23313*Cmeander*self.D/2
-        
-        self.ny = round(width_des/self.dy)+1
-        self.nz = round(height_des/self.dz)+1
-        
-        self.Width  = self.dy*(self.ny-1)
-        self.Height = self.dz*(self.nz-1)
-        
-        Dgrid=min(self.Height,self.Width)
-        self.HubHt_for_TS = zbot-0.5*Dgrid+self.Height
+        if boxType == 'lowres':
+            ymin = min(self.y)-2.23313*Cmeander*self.D/2
+            ymax = max(self.y)+2.23313*Cmeander*self.D/2
+            
+            Ydist_Low = ymax - ymin
+            Zdist_Low = self.RefHt + self.D/2 + 2.23313*Cmeander*self.D/2
 
+            self.ny = np.ceil(Ydist_Low/self.dy)+1
+            self.nz = np.ceil(Zdist_Low/self.dz)+1
+            
+            self.Width  = self.dy*(self.ny-1)
+            self.Height = self.dz*(self.nz-1)
+            
+            Dgrid=min(self.Height,self.Width)
+
+            # Set the hub height using half of the total grid height 
+            self.HubHt_for_TS = zbot - 0.5*Dgrid + self.Height
+
+        elif boxType=='highres':
+            Ydist_high = high_ext*self.D
+            Zdist_high = self.RefHt + high_ext*self.D/2.0 - zbot
+           
+            self.ny = np.ceil(Ydist_high/self.dy)+1
+            self.nz = np.ceil(Zdist_high/self.dz)+1
+           
+            self.Width  = self.dy*(self.ny-1)
+            self.Height = self.dz*(self.nz-1)
+           
+            Dgrid = min(self.Height,self.Width)
+
+            # Set the hub height using half of the total grid height 
+            self.HubHt_for_TS = zbot - 0.5*Dgrid + self.Height
+
+        else:
+            raise ValueError("boxType can only be 'lowres' or 'highres'. Stopping.")
+
+
+    def originLoc(self):
+        raise NotImplementedError
+        
 
     def plotSetup(self, fig=None, ax=None):
         """ Plot a figure showing the turbine locations and the extent of the turbulence box"""
