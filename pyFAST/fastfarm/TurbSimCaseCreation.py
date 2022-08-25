@@ -124,16 +124,11 @@ class TSCaseCreation:
         
         # Derived properties
         if self.boxType == 'lowres':
-            # this is what is on the manual. Commenting it out to get to KS's values
             self.dt = self.Cmeander*self.D/(10*Vhub)
             ds_low  = self.Cmeander*self.D*Vhub/150
             ds_high = self.cmax
             self.dy = np.floor(ds_low/ds_high)*ds_high
             self.dz = np.floor(ds_low/ds_high)*ds_high
-
-            # I'm getting dt of 7.1969 for wspd 6.6. KS had 0.5. let's hard code for a bit
-            self.dt = 0.5
-
             #self.dt = 1.0/(2.0*self.fmax)
             #self.dy = self.cmax
             #self.dz = self.cmax
