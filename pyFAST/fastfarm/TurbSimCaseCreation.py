@@ -14,7 +14,7 @@ import numpy as np
 class TSCaseCreation:
     
     def __init__(self, D, HubHt, Vhub, TI, PLexp, x, y, z=None, zbot=1.0, cmax=5.0, fmax=5.0,
-                 Cmeander=1.9, boxType='highres', high_ext=1.2):
+                 Cmeander=1.9, boxType='highres', high_ext=1.2, low_ext=None):
         """
         Instantiate the object. 
         
@@ -42,15 +42,33 @@ class TSCaseCreation:
                     Defaults to `highres` for backward compatibility
         high_ext :   float
                     extent of the high-res box around individual turbines (in D) 
+        low_ext  :  list of floats [xmin, xmax, ymin, ymax, zabovehub]
+                    extents for the low-res box. All values should be positive  If not specified, resorts to
+                    computations by the manual
         """
+
+        # Perform some checks on the input
+        if low_ext is not None and len(low_ext) != 5:
+            raise ValueError('low_ext not defined properly. It should be [xmin, xmax, ymin, ymax, zabovehub]')
+
+        if low_ext is None:
+            manual_mode = False
+        else:
+            manual_mode = True
+
+        # Set parameters for convenience
+        self.Cmeander = Cmeander
+        self.boxType  = boxType
+        self.high_ext = high_ext
+        self.low_ext  = low_ext
         # Turbine parameters
         self.Turb(D, HubHt, cmax, fmax)
         # Turbine location
         self.turbLocs(x,y,z)
         # Discretization
-        self.discretization(Vhub, TI, PLexp, Cmeander=Cmeander, boxType=boxType)
+        self.discretization(Vhub, TI, PLexp)
         # Setup domain size
-        self.domainSize(zbot=zbot, Cmeander=Cmeander, boxType=boxType, high_ext=high_ext)
+        self.domainSize(zbot=zbot, manual_mode=manual_mode)
         # Determine origin
         # self.originLoc()
 
@@ -93,7 +111,7 @@ class TSCaseCreation:
         else:
             self.z     = np.asarray(z)
 
-    def discretization(self,Vhub,TI,Shear, Cmeander=1.9, boxType='highres'):
+    def discretization(self, Vhub, TI, Shear):
         '''
         Specify discretization for both the high-res and low-res boxes. Follows guidelines present at
         https://openfast.readthedocs.io/en/main/source/user/fast.farm/ModelGuidance.html#low-resolution-domain
@@ -105,14 +123,22 @@ class TSCaseCreation:
         self.PLexp = Shear
         
         # Derived properties
-        if boxType == 'lowres':
-            self.dt = Cmeander*self.D/(10*Vhub)
-            ds_low  = Cmeander*self.D*Vhub/150
+        if self.boxType == 'lowres':
+            # this is what is on the manual. Commenting it out to get to KS's values
+            self.dt = self.Cmeander*self.D/(10*Vhub)
+            ds_low  = self.Cmeander*self.D*Vhub/150
             ds_high = self.cmax
             self.dy = np.floor(ds_low/ds_high)*ds_high
             self.dz = np.floor(ds_low/ds_high)*ds_high
 
-        elif boxType == 'highres':
+            # I'm getting dt of 7.1969 for wspd 6.6. KS had 0.5. let's hard code for a bit
+            self.dt = 0.5
+
+            #self.dt = 1.0/(2.0*self.fmax)
+            #self.dy = self.cmax
+            #self.dz = self.cmax
+
+        elif self.boxType == 'highres':
             self.dt = 1.0/(2.0*self.fmax)
             self.dy = self.cmax
             self.dz = self.cmax
@@ -120,14 +146,18 @@ class TSCaseCreation:
         else:
             raise ValueError("boxType can only be 'lowres' or 'highres'. Stopping.")
 
-    def domainSize(self, zbot, Cmeander=1.9, boxType='highres', high_ext=1.2):
+    def domainSize(self, zbot, manual_mode=False):
     
-        if boxType == 'lowres':
-            ymin = min(self.y)-2.23313*Cmeander*self.D/2
-            ymax = max(self.y)+2.23313*Cmeander*self.D/2
+        if self.boxType == 'lowres':
+            if manual_mode:
+                self.ymin = min(self.y) - self.low_ext[2]*self.D
+                self.ymax = max(self.y) + self.low_ext[3]*self.D
+            else:
+                self.ymin = min(self.y)-2.23313*self.Cmeander*self.D/2
+                self.ymax = max(self.y)+2.23313*self.Cmeander*self.D/2
             
-            Ydist_Low = ymax - ymin
-            Zdist_Low = self.RefHt + self.D/2 + 2.23313*Cmeander*self.D/2
+            Ydist_Low = self.ymax - self.ymin
+            Zdist_Low = self.RefHt + self.D/2 + 2.23313*self.Cmeander*self.D/2
 
             self.ny = np.ceil(Ydist_Low/self.dy)+1
             self.nz = np.ceil(Zdist_Low/self.dz)+1
@@ -140,9 +170,9 @@ class TSCaseCreation:
             # Set the hub height using half of the total grid height 
             self.HubHt_for_TS = zbot - 0.5*Dgrid + self.Height
 
-        elif boxType=='highres':
-            Ydist_high = high_ext*self.D
-            Zdist_high = self.RefHt + high_ext*self.D/2.0 - zbot
+        elif self.boxType=='highres':
+            Ydist_high = self.high_ext*self.D
+            Zdist_high = self.RefHt + self.high_ext*self.D/2.0 - zbot
            
             self.ny = np.ceil(Ydist_high/self.dy)+1
             self.nz = np.ceil(Zdist_high/self.dz)+1
@@ -172,11 +202,6 @@ class TSCaseCreation:
         xmin = min(self.x)-self.D
         xmax = max(self.x)+self.D
 
-        ymid = np.mean(self.y)
-        ymin = -self.Width/2 + ymid
-        ymax =  self.Width/2 + ymid
-
-
         # high-res boxes
         for wt in range(len(self.x)):
             ax.plot(self.x[wt],self.y[wt],'x',ms=8,mew=2,label="WT{0}".format(wt+1))
@@ -184,8 +209,8 @@ class TSCaseCreation:
         # low-res box
         #         ax.plot([xmin,xmax,xmax,xmin,xmin],
         #                 [ymin,ymin,ymax,ymax,ymin],'--k',lw=2,label='Low')
-        ax.axhline(ymin, ls='--', c='k', lw=2, label='Low')
-        ax.axhline(ymax, ls='--', c='k', lw=2)
+        ax.axhline(self.ymin, ls='--', c='k', lw=2, label='Low')
+        ax.axhline(self.ymax, ls='--', c='k', lw=2)
 
         ax.legend(bbox_to_anchor=(1.05,1.015),frameon=False)
         ax.set_xlabel("x-location [m]")
