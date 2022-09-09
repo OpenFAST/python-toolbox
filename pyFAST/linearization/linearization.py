@@ -32,19 +32,20 @@ import pandas as pd
 import numpy as np
 import pyFAST.linearization.mbc.mbc3 as mbc
 # Making interface from campbell available here
-from pyFAST.linearization.campbell import postproCampbell, plotCampbell, plotCampbellDataFile, run_pyMBC
+from pyFAST.linearization.campbell import postproMBC, postproCampbell, plotCampbell, plotCampbellDataFile, run_pyMBC
 
 # TODO Alternative, Aeroelastic SE
 #--- Used for functions campbell, 
 import pyFAST.case_generation.runner as runner
 from pyFAST.input_output import FASTInputFile
+from pyFAST.input_output import FASTInputDeck
 from pyFAST.case_generation.case_gen import templateReplace
 
 def campbell(templateFstFile, operatingPointsFile, workDir, toolboxDir, fastExe,  
              nPerPeriod=36, baseDict=None, tStart=5400, trim=True, viz=False,
              trimGainPitch = 0.001, trimGainGenTorque = 300,
-             MaxTrq= None, 
-             generateInputs=True, runFast=True, runMBC=True, prefix='',sortedSuffix=None, ylim=None):
+             maxTrq= None, 
+             generateInputs=True, runFast=True, runMBC=True, prefix='',sortedSuffix=None, ylim=None, removeTwrAzimuth=False):
     """ 
     Wrapper function to perform a Campbell diagram study
        see: writeLinearizationFiles, postproLinearization and postproMBC for more description of inputs.
@@ -70,7 +71,8 @@ def campbell(templateFstFile, operatingPointsFile, workDir, toolboxDir, fastExe,
         # Generate input files
         fastfiles= writeLinearizationFiles(mainFst, workDir, operatingPointsFile, 
                     nPerPeriod=nPerPeriod, baseDict=baseDict, tStart=tStart, trim=trim, viz=viz,
-                    prefix=prefix)
+                    trimGainPitch=trimGainPitch, trimGainGenTorque=trimGainGenTorque,
+                    prefix=prefix, maxTrq=maxTrq)
         # Create a batch script (optional)
         runner.writeBatch(os.path.join(workDir,'_RUN_ALL.bat'),fastfiles,fastExe=fastExe)
 
@@ -80,7 +82,7 @@ def campbell(templateFstFile, operatingPointsFile, workDir, toolboxDir, fastExe,
 
     # --- Postprocess linearization outputs (MBC + modes ID)
     if runMBC:
-        OP, Freq, Damp, _, _, modeID_file = lin.postproCampbell(FSTfilenames)
+        OP, Freq, Damp, _, _, modeID_file = lin.postproCampbell(FSTfilenames, removeTwrAzimuth=removeTwrAzimuth, suffix=suffix)
 
     # ---  Plot Campbell
     fig, axes = plotCampbell(OP, Freq, Damp, sx='WS_[m/s]', UnMapped=UnMapped, ylim=ylim)
@@ -98,25 +100,35 @@ def readOperatingPoints(OP_file):
 
     """
     OP=pd.read_csv(OP_file);
+    for c in OP.columns:
+        if c.lower().find('kn-m')>1 or c.lower().find('knm')>1:
+            OP[c]*=1000
     OP.rename(columns=lambda x: x.strip().lower().replace(' ','').replace('_','').replace('(','[').split('[')[0], inplace=True)
     # Perform column replacements (tolerating small variations)
+    #   format:   old:new
     OP.rename(columns={'wind':'windspeed','ws': 'windspeed'}, inplace=True)
     OP.rename(columns={'rotorspeed': 'rotorspeed', 'rpm': 'rotorspeed','omega':'rotorspeed'}, inplace=True)
     OP.rename(columns={'file': 'filename'}, inplace=True)
     OP.rename(columns={'pitch': 'pitchangle', 'bldpitch':'pitchangle'}, inplace=True)
     OP.rename(columns={'gentrq': 'generatortorque', 'gentorque':'generatortorque'}, inplace=True)
+    OP.rename(columns={'ttdspfa': 'ttdspfa'}, inplace=True)
+    OP.rename(columns={'oopdefl': 'oopdefl'}, inplace=True)
+    OP.rename(columns={'amean': 'a_bar', 'ameanfromct': 'a_bar'}, inplace=True)
+
     # Standardizing column names
     OP.rename(columns={
          'rotorspeed': 'RotorSpeed_[rpm]', 
+         'rotspeed': 'RotorSpeed_[rpm]', 
          'windspeed' : 'WindSpeed_[m/s]',
          'pitchangle': 'PitchAngle_[deg]',
          'generatortorque': 'GeneratorTorque_[Nm]',
-         'filename'  : 'Filename_[-]'
+         'filename': 'Filename_[-]',
+         'ttdspfa': 'TTDspFA_[m]',
+         'oopdefl': 'OoPDefl_[m]',
+         'a_bar': 'a_bar_[-]',
          }, inplace=True)
     if 'FileName_[-]' not in OP.columns:
         OP['Filename_[-]']=defaultFilenames(OP)
-    print('readOperatingPoints:')
-    print(OP)
     return OP
 
 def defaultFilenames(OP, rpmSweep=None):
@@ -151,7 +163,7 @@ def defaultFilenames(OP, rpmSweep=None):
 def writeLinearizationFiles(main_fst, workDir, operatingPointsFile, 
         nPerPeriod=36, baseDict=None, tStart=5400, trim=True, viz=False,
         trimGainPitch = 0.001, trimGainGenTorque = 300,
-        MaxTrq= None, 
+        maxTrq= None, 
         LinInputs=0, LinOutputs=0):
     """
     Write FAST inputs files for linearization, to a given directory `workDir`.
@@ -190,8 +202,30 @@ def writeLinearizationFiles(main_fst, workDir, operatingPointsFile,
         baseDict=dict()
 
     # --- Checking main fst file
-    fst = FASTInputFile(main_fst) # TODO TODO use fast input deck
+    deck = FASTInputDeck(main_fst, ['ED','AD'])
+    fst = deck.fst
+    ED  = deck.fst_vt['ElastoDyn'] # TODO update using basedict
+    AD  = deck.AD                  # TODO update using basedict
+
+    # Update fst file with basedict if needed
+    fst_keys = fst.keys()
+    for k,v in baseDict.items():
+        if k in fst_keys:
+            print('Updating fst file key {} from {} to {}'.format(k,fst[k],v))
+            fst[k] = v
+
+    # Sanity checks
+    if fst['CompAero']>0:
+        if AD is None:
+            raise Exception('Unable to read AeroDyn file but the file will be needed to generate cases.')
+    if ED is None:
+        raise Exception('Unable to infer BladeLen, ElastoDyn file not found.')
+    BladeLen = ED['TipRad'] - ED['HubRad']
     hasTrim = 'TrimCase' in fst.keys()
+
+
+    # --- Reading operating points
+    OP = readOperatingPoints(operatingPointsFile)
 
     if fst['CompServo']==1:
         if 'GeneratorTorque_[Nm]' not in OP:
@@ -211,8 +245,11 @@ def writeLinearizationFiles(main_fst, workDir, operatingPointsFile,
         viz=False
         print('[WARN] Deactivating VTK vizualization since not available in this version of OpenFAST')
 
-    # --- Reading operating points
-    OP = readOperatingPoints(operatingPointsFile)
+    if AD is not None:
+        if AD['WakeMod']==2 and AD['DBEMT_Mod'] in [1,3]:
+            if 'a_bar_[-]' not in OP.keys():
+                print('[WARN] Axial induction `a` not present in Operating point file, but DBEMT needs `tau1_constant`. Provide this column, or make sure your value of `tau1_const` is valid')
+
 
     # --- Generating list of parameters that vary based on the operating conditions provided
     PARAMS     = []
@@ -222,7 +259,14 @@ def writeLinearizationFiles(main_fst, workDir, operatingPointsFile,
         rpm      = op['RotorSpeed_[rpm]']
         pitch    = op['PitchAngle_[deg]']
         filename = op['Filename_[-]']
-        # TODO gen trq or Tower top displacement
+        if 'TTDspFA_[m]' in op.keys():
+            tt= op['TTDspFA_[m]']
+        else:
+            tt=None
+        if 'OoPDefl_[m]' in op.keys():
+            oop= op['OoPDefl_[m]']
+        else:
+            oop=None
 
         # Main Flags
         noAero=abs(ws)<0.001 
@@ -261,14 +305,21 @@ def writeLinearizationFiles(main_fst, workDir, operatingPointsFile,
         if trim:
             linDict['CalcSteady'] = True
             if fst['CompServo']==1:
-                if abs(OP['GeneratorTorque_[Nm]']-MaxTrq)/MaxTrq*100 < 5 and (not noAero):
+                GenTrq= op['GeneratorTorque_[Nm]']
+                trq_rat = np.abs((GenTrq -maxTrq))/maxTrq*100 
+                print('ws {:5.2f} - GenTrq {:9.1f} - ratio: {:9.2f} '.format(ws, GenTrq, trq_rat), end='')
+                if abs(op['GeneratorTorque_[Nm]']-maxTrq)/maxTrq*100 < 5 and (not noAero):
                     linDict['TrimCase'] = 3 # Adjust Pitch to get desired RPM
                     linDict['TrimGain'] = trimGainPitch; 
+                    print('Trim: {} - Gain: {}'.format(3, trimGainPitch))
                     # TrimGain = .1 / (RotSpeed(iOP) * pi/30); %-> convert RotSpeed to rad/s
                     # TrimGain = TrimGain*0.1
+                    # NOTE: set rated speed to a small value so that Qgen=Qrated
+                    linDict['ServoFile|VS_RtGnSp'] = 0.01 
                 else:
                     linDict['TrimCase'] = 2 # Adjust GenTorque to get desired RPM
                     linDict['TrimGain'] = trimGainGenTorque; 
+                    print('Trim: {} - Gain: {}'.format(2, trimGainGenTorque))
                     # TrimGain = 3340 / (RotSpeed(iOP) * pi/30); %-> convert RotSpeed to rad/s
             else:
                 # NOTE: in that case, trimming will just "wait", trim variable is not relevant
@@ -296,9 +347,14 @@ def writeLinearizationFiles(main_fst, workDir, operatingPointsFile,
             linDict['WrVTK']        = 0
         # --- Aero options
         if fst['CompAero']>0:
-            linDict['AeroFile|WakeMod']   = 1 # Needed for linearization
-            linDict['AeroFile|AFAeroMod'] = 1 # Needed for linearization
-            linDict['AeroFile|FrozenWake'] = True # Needed for linearization
+            if AD['WakeMod']==2 and AD['DBEMT_Mod'] in [1,3]:
+                if 'a_bar_[-]' in OP.keys():
+                    a_bar= op['a_bar_[-]']
+                    linDict['AeroFile|tau1_const'] = np.around(1.1/(1-1.3*min(a_bar,0.5))*BladeLen/ws, 3)
+                    print('>>> setting tau_1 to ', linDict['AeroFile|tau1_const'])
+        #    linDict['AeroFile|WakeMod']    = 1 # Needed for linearization
+        #    linDict['AeroFile|AFAeroMod']  = 1 # Needed for linearization
+        #    linDict['AeroFile|FrozenWake'] = True # Needed for linearization
         # --- Inflow options
         if fst['CompInflow']>0:
             linDict['InflowFile|WindType'] = 1
@@ -308,7 +364,10 @@ def writeLinearizationFiles(main_fst, workDir, operatingPointsFile,
         linDict['EDFile|BlPitch(2)'] = pitch
         linDict['EDFile|BlPitch(3)'] = pitch
         linDict['EDFile|RotSpeed']   = rpm
-        #linDict['EDFile|TTDspFA']    = tt
+        if tt is not None:
+            linDict['EDFile|TTDspFA']    = tt
+        if oop is not None:
+            linDict['EDFile|OoPDefl']    = oop
         # --- Servo options
 
         # --- Merging linDict dictionary with user override inputs

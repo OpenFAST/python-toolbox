@@ -69,6 +69,9 @@ class FASTInputFile(File):
     def __init__(self, filename=None, **kwargs):
         self._size=None
         self._encoding=None
+        self.data=[]
+        self.hasNodal=False
+        self.module = None
         if filename:
             self.filename = filename
             self.read()
@@ -140,6 +143,25 @@ class FASTInputFile(File):
             d['descr']=descr
         self.data.append(d)
 
+    def addValKey(self,val,key,descr=None):
+        self.addKeyVal(key, val, descr)
+
+    def addComment(self, comment='!'):
+        d=getDict()
+        d['isComment'] = True
+        d['value']     = comment
+        self.data.append(d)
+
+    def addTable(self, label, tab, cols=None, units=None, tabType=1, tabDimVar=None):
+        d=getDict()
+        d['label']          = label
+        d['value']          = tab
+        d['tabType']        = tabType
+        d['tabDimVar']      = tabDimVar
+        d['tabColumnNames'] = cols
+        d['tabUnits']       = units
+        self.data.append(d)
+
     def read(self, filename=None):
         if filename:
             self.filename = filename
@@ -155,19 +177,24 @@ class FASTInputFile(File):
     def _read(self):
 
         # --- Tables that can be detected based on the "Value" (first entry on line)
-        # TODO members for  BeamDyn with mutliple key point                                                                                                                                                                                                                                                                                                        ####### TODO PropSetID is Duplicate SubDyn and used in HydroDyn
-        NUMTAB_FROM_VAL_DETECT  = ['HtFract'  , 'TwrElev'   , 'BlFract'  , 'Genspd_TLU' , 'BlSpn'        , 'WndSpeed' , 'HvCoefID' , 'AxCoefID' , 'JointID'  , 'Dpth'      , 'FillNumM'    , 'MGDpth'    , 'SimplCd'  , 'RNodes'       , 'kp_xr'      , 'mu1'           , 'TwrHtFr'   , 'TwrRe'  , 'WT_X']
-        NUMTAB_FROM_VAL_DIM_VAR = ['NTwInpSt' , 'NumTwrNds' , 'NBlInpSt' , 'DLL_NumTrq' , 'NumBlNds'     , 'NumCases' , 'NHvCoef'  , 'NAxCoef'  , 'NJoints'  , 'NCoefDpth' , 'NFillGroups' , 'NMGDepths' , 1          , 'BldNodes'     , 'kp_total'   , 1               , 'NTwrHt'    , 'NTwrRe' , 'NumTurbines']
-        NUMTAB_FROM_VAL_VARNAME = ['TowProp'  , 'TowProp'   , 'BldProp'  , 'DLLProp'    , 'BldAeroNodes' , 'Cases'    , 'HvCoefs'  , 'AxCoefs'  , 'Joints'   , 'DpthProp'  , 'FillGroups'  , 'MGProp'    , 'SmplProp' , 'BldAeroNodes' , 'MemberGeom' , 'DampingCoeffs' , 'TowerProp' , 'TowerRe', 'WindTurbines']
-        NUMTAB_FROM_VAL_NHEADER = [2          , 2           , 2          , 2            , 2              , 2          , 2          , 2          , 2          , 2           , 2             , 2           , 2          , 1              , 2            , 2               , 1           , 1        , 2 ]
-        NUMTAB_FROM_VAL_TYPE    = ['num'      , 'num'       , 'num'      , 'num'        , 'num'          , 'num'      , 'num'      , 'num'      , 'num'      , 'num'       , 'num'         , 'num'       , 'num'      , 'mix'          , 'num'        , 'num'           , 'num'       , 'num'    , 'mix']
+        # TODO members for  BeamDyn with mutliple key point  ####### TODO PropSetID is Duplicate SubDyn and used in HydroDyn
+        NUMTAB_FROM_VAL_DETECT  = ['HtFract'  , 'TwrElev'   , 'BlFract'  , 'Genspd_TLU' , 'BlSpn'        , 'WndSpeed' , 'HvCoefID' , 'AxCoefID' , 'JointID'  , 'Dpth'      , 'FillNumM'    , 'MGDpth'    , 'SimplCd'  , 'RNodes'       , 'kp_xr'      , 'mu1'           , 'TwrHtFr'   , 'TwrRe'  ]
+        NUMTAB_FROM_VAL_DIM_VAR = ['NTwInpSt' , 'NumTwrNds' , 'NBlInpSt' , 'DLL_NumTrq' , 'NumBlNds'     , 'NumCases' , 'NHvCoef'  , 'NAxCoef'  , 'NJoints'  , 'NCoefDpth' , 'NFillGroups' , 'NMGDepths' , 1          , 'BldNodes'     , 'kp_total'   , 1               , 'NTwrHt'    , 'NTwrRe' ]
+        NUMTAB_FROM_VAL_VARNAME = ['TowProp'  , 'TowProp'   , 'BldProp'  , 'DLLProp'    , 'BldAeroNodes' , 'Cases'    , 'HvCoefs'  , 'AxCoefs'  , 'Joints'   , 'DpthProp'  , 'FillGroups'  , 'MGProp'    , 'SmplProp' , 'BldAeroNodes' , 'MemberGeom' , 'DampingCoeffs' , 'TowerProp' , 'TowerRe']
+        NUMTAB_FROM_VAL_NHEADER = [2          , 2           , 2          , 2            , 2              , 2          , 2          , 2          , 2          , 2           , 2             , 2           , 2          , 1              , 2            , 2               , 1           , 1        ]
+        NUMTAB_FROM_VAL_TYPE    = ['num'      , 'num'       , 'num'      , 'num'        , 'num'          , 'num'      , 'num'      , 'num'      , 'num'      , 'num'       , 'num'         , 'num'       , 'num'      , 'mix'          , 'num'        , 'num'           , 'num'       , 'num'    ]
         # SubDyn
         NUMTAB_FROM_VAL_DETECT  += [ 'RJointID'        , 'IJointID'        , 'COSMID'             , 'CMJointID'         ]
         NUMTAB_FROM_VAL_DIM_VAR += [ 'NReact'          , 'NInterf'         , 'NCOSMs'             , 'NCmass'            ]
         NUMTAB_FROM_VAL_VARNAME += [ 'BaseJoints'      , 'InterfaceJoints' , 'MemberCosineMatrix' , 'ConcentratedMasses']
         NUMTAB_FROM_VAL_NHEADER += [ 2                 , 2                 , 2                    , 2                   ]
         NUMTAB_FROM_VAL_TYPE    += [ 'mix'             , 'num'             , 'num'                , 'num'               ]
-
+        # FAST.Farm
+        NUMTAB_FROM_VAL_DETECT  += ['WT_X']
+        NUMTAB_FROM_VAL_DIM_VAR += ['NumTurbines']
+        NUMTAB_FROM_VAL_VARNAME += ['WindTurbines']
+        NUMTAB_FROM_VAL_NHEADER += [2 ]
+        NUMTAB_FROM_VAL_TYPE    += ['mix']
 
         # --- Tables that can be detected based on the "Label" (second entry on line)
         # NOTE: MJointID1, used by SubDyn and HydroDyn
@@ -201,6 +228,7 @@ class FASTInputFile(File):
         NUMTAB_FROM_LAB_DETECT_L = [s.lower() for s in NUMTAB_FROM_LAB_DETECT]                                         
         FILTAB_FROM_LAB_DETECT_L = [s.lower() for s in FILTAB_FROM_LAB_DETECT]
 
+        # Reset data
         self.data   = []
         self.hasNodal=False
         self.module = None
@@ -226,6 +254,7 @@ class FASTInputFile(File):
         nWrongLabels = 0
         allowSpaceSeparatedList=False
         while i<len(lines):
+
             line = lines[i]
 
             # --- Read special sections
@@ -516,8 +545,8 @@ class FASTInputFile(File):
             return val+' '+lab+' - '+descr.strip().strip('-').strip()+'\n'
 
         def beamdyn_section_mat_tostring(x,K,M):
-            def mat_tostring(M,fmt='.5e'):
-                return '\n'.join(['   '+' '.join(['{:.6E}'.format(m) for m in M[i,:]]) for i in range(np.size(M,1))])
+            def mat_tostring(M,fmt='24.16e'):
+                return '\n'.join(['   '+' '.join(['{:24.16E}'.format(m) for m in M[i,:]]) for i in range(np.size(M,1))])
             s=''
             s+='{:.6f}\n'.format(x)
             s+=mat_tostring(K)
@@ -594,7 +623,12 @@ class FASTInputFile(File):
         else:
             raise Exception('No filename provided')
 
+    def _writeSanityChecks(self):
+        """ Sanity checks before write"""
+        pass
+
     def _write(self):
+        self._writeSanityChecks()
         with open(self.filename,'w') as f:
             f.write(self.toString())
 
@@ -981,6 +1015,16 @@ def cleanAfterChar(l,c):
 def getDict():
     return {'value':None, 'label':'', 'isComment':False, 'descr':'', 'tabType':TABTYPE_NOT_A_TAB}
 
+def _merge_value(splits):
+
+    merged = splits.pop(0)
+    if merged[0] == '"':
+        while merged[-1] != '"':
+            merged += " "+splits.pop(0)
+    splits.insert(0, merged)
+
+
+
 
 def parseFASTInputLine(line_raw,i,allowSpaceSeparatedList=False):
     d = getDict()
@@ -1038,6 +1082,7 @@ def parseFASTInputLine(line_raw,i,allowSpaceSeparatedList=False):
         else:
             # It's not a list, we just use space as separators
             splits=line.split(' ')
+            _merge_value(splits)
             s=splits[0]
 
             if strIsInt(s):
@@ -1052,7 +1097,6 @@ def parseFASTInputLine(line_raw,i,allowSpaceSeparatedList=False):
             else:
                 d['value']=s
             iNext=1
-            #import pdb  ; pdb.set_trace();
 
         # Extracting label (TODO, for now only second split)
         bOK=False
@@ -1267,6 +1311,133 @@ def parseFASTFilTable(lines,n,iStart):
     except Exception as e:    
         raise Exception('Line {}: '.format(iStart+i+1)+e.args[0])
     return Tab
+
+
+
+# --------------------------------------------------------------------------------}
+# --- Predefined types (may change with OpenFAST version..)
+# --------------------------------------------------------------------------------{
+class ADBladeFile(FASTInputFile):
+    def __init__(self, filename=None, **kwargs):
+        FASTInputFile.__init__(self, filename, **kwargs)
+        if filename is None:
+            # Define a prototype for this file format
+            self.addComment('------- AERODYN BLADE DEFINITION INPUT FILE ----------------------------------------------')
+            self.addComment('Aerodynamic blade definition, written by ADBladeFile')
+            self.addComment('======  Blade Properties =================================================================')
+            self.addKeyVal('NumBlNds', 0, 'Number of blade nodes used in the analysis (-)')
+            self.addTable('BldAeroNodes', np.zeros((0,7)), tabType=1, tabDimVar='NumBlNds', cols=['BlSpn', 'BlCrvAC', 'BlSwpAC', 'BlCrvAng', 'BlTwist', 'BlChord', 'BlAFID'], units=['(m)', '(m)', '(m)', '(deg)', '(deg)', '(m)', '(-)'])
+        self.module='ADBlade'
+
+    def _writeSanityChecks(self):
+        """ Sanity checks before write"""
+        self['NumBlNds']=self['BldAeroNodes'].shape[0]
+        aeroNodes = self['BldAeroNodes']
+        # TODO double check this calculation with gradient
+        dr = np.gradient(aeroNodes[:,0])
+        dx = np.gradient(aeroNodes[:,1])
+        crvAng = np.degrees(np.arctan2(dx,dr))*np.pi/180
+        if np.mean(np.abs(crvAng-aeroNodes[:,3]))>0.1:
+            print('[WARN] BlCrvAng might not be computed correctly')
+
+
+    @property
+    def comment(self):
+        return self.data[1]['value']
+
+    @comment.setter
+    def comment(self,v):
+        self.data[1]['value']=v
+
+
+class ADPolarFile(FASTInputFile):
+    def __init__(self, filename=None, hasUA=True, numTabs=1, **kwargs):
+        FASTInputFile.__init__(self, filename, **kwargs)
+        if filename is None:
+            # Define a prototype for this file format
+            self.addComment('! ------------ AirfoilInfo Input File ------------------------------------------')
+            self.addComment('! Airfoil definition, written by ADPolarFile')
+            self.addComment('! ')
+            self.addComment('! ')
+            self.addComment('! ------------------------------------------------------------------------------')
+            self.addValKey("DEFAULT", 'InterpOrd' , 'Interpolation order to use for quasi-steady table lookup {1=linear; 3=cubic spline; "default"} [default=3]')
+            self.addValKey(        1, 'NonDimArea', 'The non-dimensional area of the airfoil (area/chord^2) (set to 1.0 if unsure or unneeded)')
+            self.addValKey(        0, 'NumCoords' , 'The number of coordinates in the airfoil shape file.  Set to zero if coordinates not included.')
+            self.addValKey( numTabs , 'NumTabs'   , 'Number of airfoil tables in this file.  Each table must have lines for Re and Ctrl.')
+            # TODO multiple tables
+            self.addComment('! ------------------------------------------------------------------------------')
+            self.addComment('! data for table {}'.format(0+1))
+            self.addComment('! ------------------------------------------------------------------------------')
+            self.addValKey(     1.0 ,    'Re'   , 'Reynolds number in millions')
+            self.addValKey(       0 ,    'Ctrl' , 'Control setting')
+            if hasUA:
+                self.addValKey(True  ,    'InclUAdata', 'Is unsteady aerodynamics data included in this table? If TRUE, then include 30 UA coefficients below this line')
+                self.addComment('!........................................')
+                self.addValKey(     np.nan   , 'alpha0'           , r"0-lift angle of attack, depends on airfoil.")
+                self.addValKey(     np.nan   , 'alpha1'           , r"Angle of attack at f=0.7, (approximately the stall angle) for AOA>alpha0. (deg)")
+                self.addValKey(     np.nan   , 'alpha2'           , r"Angle of attack at f=0.7, (approximately the stall angle) for AOA<alpha0. (deg)")
+                self.addValKey(          1   , 'eta_e'            , r"Recovery factor in the range [0.85 - 0.95] used only for UAMOD=1, it is set to 1 in the code when flookup=True. (-)")
+                self.addValKey(     np.nan   , 'C_nalpha'         , r"Slope of the 2D normal force coefficient curve. (1/rad)")
+                self.addValKey(   "DEFAULT"  , 'T_f0'             , r"Initial value of the time constant associated with Df in the expression of Df and f''. [default = 3]")
+                self.addValKey(   "DEFAULT"  , 'T_V0'             , r"Initial value of the time constant associated with the vortex lift decay process; it is used in the expression of Cvn. It depends on Re,M, and airfoil class. [default = 6]")
+                self.addValKey(   "DEFAULT"  , 'T_p'              , r"Boundary-layer,leading edge pressure gradient time constant in the expression of Dp. It should be tuned based on airfoil experimental data. [default = 1.7]")
+                self.addValKey(   "DEFAULT"  , 'T_VL'             , r"Initial value of the time constant associated with the vortex advection process; it represents the non-dimensional time in semi-chords, needed for a vortex to travel from LE to trailing edge (TE); it is used in the expression of Cvn. It depends on Re, M (weakly), and airfoil. [valid range = 6 - 13, default = 11]")
+                self.addValKey(   "DEFAULT"  , 'b1'               , r"Constant in the expression of phi_alpha^c and phi_q^c.  This value is relatively insensitive for thin airfoils, but may be different for turbine airfoils. [from experimental results, defaults to 0.14]")
+                self.addValKey(   "DEFAULT"  , 'b2'               , r"Constant in the expression of phi_alpha^c and phi_q^c.  This value is relatively insensitive for thin airfoils, but may be different for turbine airfoils. [from experimental results, defaults to 0.53]")
+                self.addValKey(   "DEFAULT"  , 'b5'               , r"Constant in the expression of K'''_q,Cm_q^nc, and k_m,q.  [from  experimental results, defaults to 5]")
+                self.addValKey(   "DEFAULT"  , 'A1'               , r"Constant in the expression of phi_alpha^c and phi_q^c.  This value is relatively insensitive for thin airfoils, but may be different for turbine airfoils. [from experimental results, defaults to 0.3]")
+                self.addValKey(   "DEFAULT"  , 'A2'               , r"Constant in the expression of phi_alpha^c and phi_q^c.  This value is relatively insensitive for thin airfoils, but may be different for turbine airfoils. [from experimental results, defaults to 0.7]")
+                self.addValKey(   "DEFAULT"  , 'A5'               , r"Constant in the expression of K'''_q,Cm_q^nc, and k_m,q. [from experimental results, defaults to 1]")
+                self.addValKey(          0   , 'S1'               , r"Constant in the f curve best-fit for alpha0<=AOA<=alpha1; by definition it depends on the airfoil. [ignored if UAMod<>1]")
+                self.addValKey(          0   , 'S2'               , r"Constant in the f curve best-fit for         AOA> alpha1; by definition it depends on the airfoil. [ignored if UAMod<>1]")
+                self.addValKey(          0   , 'S3'               , r"Constant in the f curve best-fit for alpha2<=AOA< alpha0; by definition it depends on the airfoil. [ignored if UAMod<>1]")
+                self.addValKey(          0   , 'S4'               , r"Constant in the f curve best-fit for         AOA< alpha2; by definition it depends on the airfoil. [ignored if UAMod<>1]")
+                self.addValKey(     np.nan   , 'Cn1'              , r"Critical value of C0n at leading edge separation. It should be extracted from airfoil data at a given Mach and Reynolds number. It can be calculated from the static value of Cn at either the break in the pitching moment or the loss of chord force at the onset of stall. It is close to the condition of maximum lift of the airfoil at low Mach numbers.")
+                self.addValKey(     np.nan   , 'Cn2'              , r"As Cn1 for negative AOAs.")
+                self.addValKey(   "DEFAULT"  , 'St_sh'            , r"Strouhal's shedding frequency constant.  [default = 0.19]")
+                self.addValKey(     np.nan   , 'Cd0'              , r"2D drag coefficient value at 0-lift.")
+                self.addValKey(     np.nan   , 'Cm0'              , r"2D pitching moment coefficient about 1/4-chord location, at 0-lift, positive if nose up. [If the aerodynamics coefficients table does not include a column for Cm, this needs to be set to 0.0]")
+                self.addValKey(          0   , 'k0'               , r"Constant in the \hat(x)_cp curve best-fit; = (\hat(x)_AC-0.25).  [ignored if UAMod<>1]")
+                self.addValKey(          0   , 'k1'               , r"Constant in the \hat(x)_cp curve best-fit.  [ignored if UAMod<>1]")
+                self.addValKey(          0   , 'k2'               , r"Constant in the \hat(x)_cp curve best-fit.  [ignored if UAMod<>1]")
+                self.addValKey(          0   , 'k3'               , r"Constant in the \hat(x)_cp curve best-fit.  [ignored if UAMod<>1]")
+                self.addValKey(          0   , 'k1_hat'           , r"Constant in the expression of Cc due to leading edge vortex effects.  [ignored if UAMod<>1]")
+                self.addValKey(   "DEFAULT"  , 'x_cp_bar'         , r"Constant in the expression of \hat(x)_cp^v. [ignored if UAMod<>1, default = 0.2]")
+                self.addValKey(   "DEFAULT"  , 'UACutout'         , r"Angle of attack above which unsteady aerodynamics are disabled (deg). [Specifying the string 'Default' sets UACutout to 45 degrees]")
+                self.addValKey(   "DEFAULT"  , 'filtCutOff'       , r"Reduced frequency cut-off for low-pass filtering the AoA input to UA, as well as the 1st and 2nd derivatives (-) [default = 0.5]")
+                self.addComment('!........................................')
+            else:             
+                self.addValKey(False ,    'InclUAdata', 'Is unsteady aerodynamics data included in this table? If TRUE, then include 30 UA coefficients below this line')
+            self.addComment('! Table of aerodynamics coefficients')
+            self.addValKey(0 ,    'NumAlf', '! Number of data lines in the following table')
+            self.addTable('AFCoeff', np.zeros((0,4)), tabType=2, tabDimVar='NumAlf', cols=['Alpha', 'Cl', 'Cd', 'Cm'], units=['(deg)', '(-)', '(-)', '(-)'])
+        self.module='ADPolar'
+
+    def _writeSanityChecks(self):
+        """ Sanity checks before write"""
+        self['NumAlf']=self['AFCoeff'].shape[0]
+        # Potentially compute unsteady params here
+
+    @property
+    def comment(self):
+        return '\n'.join([self.data[i]['value'] for i in self._IComment])
+
+    @comment.setter
+    def comment(self,comment):
+        splits = comment.split('\n')
+        for i,com in zip(self._IComment, splits):
+            self.data[i]['value'] = '! '+com
+
+    @property
+    def _IComment(self):
+        """ return indices of comment line"""
+        I=[]
+        for i in [1,2,3]:
+            if self.data[i]['value'].startswith('!'):
+                if not self.data[i]['value'].startswith('! ---'):
+                    I.append(i)
+        return I
+
 
 
 if __name__ == "__main__":

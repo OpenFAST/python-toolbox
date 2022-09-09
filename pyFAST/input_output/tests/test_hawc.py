@@ -111,5 +111,5 @@ class Test(unittest.TestCase):
         self.assertEqual(DF.columns[1], 'Node_[-]')
 
 if __name__ == '__main__':
-    #Test().test_HAWC2_pc()
+    #Test().test_HAWC2_st()
     unittest.main()

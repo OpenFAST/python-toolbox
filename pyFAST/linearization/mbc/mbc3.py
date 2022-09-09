@@ -44,6 +44,11 @@ def IdentifyModes(CampbellData):
 
     Original contribution by: Srinivasa B. Ramisett, ramisettisrinivas@yahoo.com, http://ramisetti.github.io
     """
+    #import pdb; pdb.set_trace()
+    #import pickle
+    #pickle.dump(CampbellData, open('C:/Work/_libs/python-toolbox/data/_CampbellData_UA4_DB2.pkl','wb'))
+
+
     # --- Looking at states descriptions (of first run, first mode), to see if we are offshore. 
     # NOTE: DescStates is likely the same for all modes
     DescStates  = CampbellData[0]['Modes'][0]['DescStates']
@@ -94,77 +99,204 @@ def IdentifyModes(CampbellData):
     nRuns = int(len(CampbellData))
     modeID_table=np.zeros((nModes,nRuns)).astype(int)
 
-    # Loop on operating points/Runs
+
+
+    def doesDescriptionMatch(description, listOfModePatterns):
+        """ loop through all mode desrption  """
+        for iModePattern, modeIDdescList in enumerate(listOfModePatterns):
+            modeIDName     = modeIDdescList[0]
+            patternList    = modeIDdescList[1:] # list of patterns for a given mode
+            found, pattern = doesDescriptionMatchPatternList(description, patternList)
+            if found:
+                return True, iModePattern, pattern
+        return False, -1, ''
+
+    def doesDescriptionMatchPatternList(description, patternList):
+        """ loop through all patterns to find a match  """
+        for pattern in patternList:
+            # Looking for targetDesc into description
+            if re.search(pattern ,description, re.IGNORECASE)!=None:
+                return True, pattern
+        return False, ''
+
+
+    verbose=False
+    Levels=[1,2,3]
+
+
+    # --- Loop on operating points/Runs
     for i in range(nRuns):
         Modes  = CampbellData[i]['Modes']
         nModes = len(Modes)
         # Array of logical, False for Modes that are not identified
-        modesIdentified = [False for i in range(nModes)]
-        modesConfidence = [0 for i in range(nModes)]
+        modesIdentified = [False] * nModes
+        modesSkipped    = [False] * nModes
+        #verbose=verbose and i==0 # only display for first mode for now..
+        #verbose=i==1
 
-        # --- TODO: find well-defined modes first. Increasing order might be problematic at times
-        #for im, mode in enumerate(Modes):
-        #    m=im+1
-        #    stateMax=np.argwhere((mode['StateHasMaxAtThisMode']==1))
-        #    if len(stateMax.flatten())==1:
-        #        maxDesc=mode['DescStates'][stateMax.flatten()[0]]
-        #        print('>>> maxdesc',maxDesc)
-        #        for modeID, modeIDdescList in enumerate(modesDesc):
-        #            modeIDName     = modeIDdescList[0]
-        #            modeIDdescList = modeIDdescList[1:]
-        #            found = False
-        #            for tartgetDesc in modeIDdescList:
-        #                # Looking for targetDesc into list of descriptions
-        #                if re.search(tartgetDesc ,maxDesc,re.IGNORECASE)!=None:
-        #                    modesIdentified[m-1] = True;
-        #                    modeID_table[modeID,i] = m # Using Matlab Indexing
-        #                    found = True;
-        #                    break;
-    
-        # Loop on modes to be identified
-        for modeID, modeIDdescList in enumerate(modesDesc):
-            modeIDName     = modeIDdescList[0]
-            modeIDdescList = modeIDdescList[1:]
+        # --- Give an index to each mode so that we can easily identify them
+        for im, mode in enumerate(Modes):
+            mode['index']=im
 
-            found = False;
-            
-            # --- Loop on all non-identified modes in increasing order
-            tryNumber = 0;
-            #print(' FOUND , Trynumber ', found, tryNumber)
-            while not found and tryNumber <= 2:
-                m = 0;
-                while not found and m < nModes:
-                    m = m + 1;
-                    if modesIdentified[m-1] or Modes[m-1]['NaturalFreq_Hz'] < 1e-5: # already identified this mode
-                        continue;
-                    # --- First, use as mode descriptions the ones where the mode has max
-                    if tryNumber == 0:
-                        stateMax=np.argwhere((Modes[m-1]['StateHasMaxAtThisMode']==1))
-                        maxDesc=[Modes[m-1]['DescStates'][smIndx] for smIndx in stateMax.flatten()]
+        # --- Skip modes based on simple criteria
+        for im, mode in enumerate(Modes):
+            if mode['NaturalFreq_Hz'] < 1e-5 or mode['DampingRatio'] > 0.98: 
+                modesSkipped[im]=True
 
-                        if len(maxDesc)==0:
-                            tryNumber = tryNumber + 1;
-                
-                    # --- Otherwise, use as mode descriptions the other ones. Seems weird
-                    if tryNumber > 0:
-                        if tryNumber < len(Modes[m-1]['DescStates']):
-                            stateMax=np.argwhere((CampbellData[i]['Modes'][m-1]['StateHasMaxAtThisMode']==0))
-                            maxDesc=[Modes[m-1]['DescStates'][smIndx] for smIndx in stateMax.flatten()]
-                        else:
-                            maxDesc = [];
-                    
+
+
+        modesDescLocal = modesDesc.copy()
+
+        # --- Level 1 - Find well-defined modes (modes which have only one Max)
+        if 1 in Levels:
+            for im, mode in enumerate(Modes):
+                if modesIdentified[im] or modesSkipped[im]:
+                    continue # skip this mode since it has already been identified
+                stateMax=np.argwhere((mode['StateHasMaxAtThisMode']==1)).flatten()
+                if len(stateMax)==1:
+                    description = mode['DescStates'][stateMax[0]]
+                    if description.startswith('AD'):
+                        # We skipp the pure "AD" modes
+                        modesSkipped[im] = True
+                        continue
+                    found, modeID, patternMatched = doesDescriptionMatch(description, modesDescLocal)
+                    if found and modeID_table[modeID,i]==0:
+                        modesDescLocal[modeID] = [None,]   # we empty this mode patternlist so that it cannot be matched again
+                        modesIdentified[im]    = True
+                        modeID_table[modeID,i] = im+1 # Using Matlab Indexing
+                        if verbose:
+                            print('L1 Mode {} identified using pattern: {}'.format(im+1,patternMatched))
+                            print('     String was: ', description)
+                    #else:
+                    #    print('>>> Cannot identify mode with description {}. Update MBC3 script.'.format(description))
+
+        # --- Level 2 - Find modes with several max - Looping on mode pattern to respect expected frequency order
+        if 2 in Levels:
+            for modeID, modeIDdescList in enumerate(modesDescLocal):
+                modeIDName     = modeIDdescList[0]
+                patternList   = modeIDdescList[1:]
+                # Skip modes already identified above
+                if modeID_table[modeID,i]>0:
+                    continue
+                if verbose:
+                    print('------------------------- LEVEL 2 - LOOKING FOR MODE ',modeIDName)
+
+                found = False;
+                # --- Loop on all non-identified modes in increasing order
+                im = 0;
+                for im, mode in enumerate(Modes):
+                    if modesIdentified[im] or modesSkipped[im]:
+                        continue # move to next mode
+                    # List of component descriptions where this mode has maximum values
+                    stateMax=np.argwhere((mode['StateHasMaxAtThisMode']==1)).flatten()
+                    descriptions     = np.array(mode['DescStates'])[stateMax]
+                    descriptions     = descriptions[:7] # we keep only the first 7 descriptions
+                    descriptionsED   = [d for d in descriptions  if d.startswith('ED')]
+                    descriptionsBD   = [d for d in descriptions  if d.startswith('BD')]
+                    descriptionsAD   = [d for d in descriptions  if d.startswith('AD')]
+                    descriptionsMisc = [d for d in descriptions  if d not in descriptionsED+descriptionsBD+descriptionsAD]
+                    descriptions     = descriptionsED+descriptionsBD+descriptionsMisc # NOTE: we skipp AD descriptions
                     j = 0;
-                    while not found and j < len(maxDesc):
-                        j = j + 1;
-                        for tartgetDesc in modeIDdescList:
-                            # Looking for targetDesc into list of descriptions
-                            if re.search(tartgetDesc ,maxDesc[j-1],re.IGNORECASE)!=None:
-                                modesIdentified[m-1] = True;
-                                #print(' GGG1 ',i,j,m, modeID, iExp, tryNumber, maxDesc[j-1], len(maxDesc))
-                                modeID_table[modeID,i] = m # Using Matlab Indexing
-                                found = True;
-                                break;
-                tryNumber = tryNumber + 1;
+                    for description in descriptions:
+                        found, pattern = doesDescriptionMatchPatternList(description, patternList)
+                        if found:
+                            if verbose:
+                                print('L2 Mode {} identified using pattern {}'.format(im+1,pattern))
+                            modeID_table[modeID,i] = im+1 # Using Matlab Indexing
+                            modesDescLocal[modeID] = [None,]   # we empty this mode patternlist so that it cannot be matched again
+                            modesIdentified[im] = True;
+                            break
+                    if found:
+                        break
+            if verbose:
+                print('>> modeIDTable',modeID_table[:,i])
+            # We disqualify modes that had max and that didn't match anything:
+            for im, mode in enumerate(Modes):
+                if modesIdentified[im] or modesSkipped[im]:
+                    continue # move to next mode
+                stateMax=np.argwhere((mode['StateHasMaxAtThisMode']==1)).flatten()
+                if len(stateMax)>=1:
+                    modesSkipped[im]=True
+                    shortdescr = CampbellData[i]['ShortModeDescr'][im]
+                    if verbose:
+                        if shortdescr.find('ED')>=0:
+                            print('>>>> short', CampbellData[i]['ShortModeDescr'][im])
+                            print('>>>> Problem in IdentifyModes. ED DOF found in level 2')
+                    #    import pdb; pdb.set_trace()
+
+        if 3 in Levels:
+            # --- Level 3 - Try our best for modes with no max
+            # Loop on modes to be identified
+            for modeID, modeIDdescList in enumerate(modesDescLocal):
+                modeIDName  = modeIDdescList[0]
+                patternList = modeIDdescList[1:]
+
+                # Skip modes already identified above
+                if modeID_table[modeID,i]>0:
+                    continue
+                if verbose:
+                    print('------------------------- LEVEL 3 - LOOKING FOR MODE ',modeIDName)
+
+                found = False;
+                # --- Loop on all non-identified modes in increasing order
+                im = 0;
+                while not found and im < nModes: # Loop on modes
+                    mode = Modes[im]
+                    if modesIdentified[im] or modesSkipped[im]:
+                        pass
+                    else:
+                        # --- Otherwise, use as mode descriptions the other ones. Seems weird
+                        stateMax=np.argwhere((mode['StateHasMaxAtThisMode']==0)).flatten()
+                        descriptions     = np.array(mode['DescStates'])[stateMax]
+                        ADcounts = np.sum([s.startswith('AD') for s in descriptions[:5]])
+
+                        descriptions2= np.array(mode['DescStates'])[mode['StateHasMaxAtThisMode']]
+                        if len(descriptions2) == 0:
+                            noMax=True
+                            descriptions3 = mode['DescStates'][:5]
+                        else:
+                            noMax=False
+#                         import pdb; pdb.set_trace()
+                        if ADcounts<5:
+                            descriptions=[d for d in descriptions if not d.startswith('AD')]
+#                                 descriptionsED   = [d for d in descriptions  if d.startswith('ED')]
+#                                 descriptionsBD   = [d for d in descriptions  if d.startswith('BD')]
+#                                 descriptionsAD   = [d for d in descriptions  if d.startswith('AD')]
+#                                 descriptionsMisc = [d for d in descriptions  if d not in descriptionsED+descriptionsBD+descriptionsAD]
+#                                 descriptions     = descriptionsED+descriptionsBD+descriptionsMisc # NOTE: we skipp AD descriptions
+                            descriptions     = descriptions[:5] # we keep only the first 7 descriptions
+                            if verbose:
+                                print('>>> Mode',mode['index'], modesIdentified[im], modesSkipped[im])
+                                print('>>>> descr', [replaceModeDescription(s) for s in descriptions])
+                                print('>>>> short', CampbellData[i]['ShortModeDescr'][im])
+                        else:
+                            descriptions=[]
+#                         #descriptions     = descriptions[:7] # we keep only the first 7 descriptions
+
+                        j = 0;
+                        while not found and j < len(descriptions):
+                            j = j + 1;
+                            if not found:
+                                for targetDesc in patternList:
+                                    # Looking for targetDesc into list of descriptions
+                                    if re.search(targetDesc ,descriptions[j-1],re.IGNORECASE)!=None:
+                                        modeID_table[modeID,i] = im+1 # Using Matlab Indexing
+                                        if verbose:
+                                            print('L3 Mode {} identified as {}'.format(im+1,targetDesc))
+                                            print('     String was: ', descriptions[j-1])
+                                        modesIdentified[im] = True;
+                                        found = True;
+                                        break;
+                    im=im+1; # increment counter
+            if verbose:
+                print('>> modeIDTable',modeID_table[:,i])
+
+        if verbose:
+            print('---------- Summary')
+            for j in np.arange(len(modeID_table)):
+                print('{:32s}  {:d}'.format(modesDesc[j][0],modeID_table[j,i]))
+            print('---------- ')
+
 
     return modeID_table,modesDesc
 
@@ -332,34 +464,26 @@ def campbell_diagram_data(mbc_data, BladeLen, TowerLen):
     
 
 
-def extractShortModeDescription(Mode):
+def extractShortModeDescription(mode):
     """ 
     Look at which modes have max, append these description, perform shortening substitution
-    The escription starts with noMax if no maximum exsits in this mode
+    The description starts with noMax if no maximum exsits in this mode
+    The ElastoDyn modes are placed first
     """
-    Desc = np.array(Mode['DescStates'])[Mode['StateHasMaxAtThisMode']]
-    DescCat = ''
-    DescCatED = ''
-    if len(Desc) == 0:
+    descriptions = np.array(mode['DescStates'])[mode['StateHasMaxAtThisMode']]
+    if len(descriptions) == 0:
         noMax=True
-        DescCat = ''
-        DescCatED = ''
-        Desc = Mode['DescStates'][:5]
+        descriptions = mode['DescStates'][:5]
     else:
         noMax=False
-    nBD = 0
-    for iD, s in enumerate(Desc):
-        s = replaceModeDescription(s)
-        if Desc[iD].startswith('BD'):
-            nBD = nBD + 1
-        elif Desc[iD].startswith('ED'):
-                DescCatED = s +' - '+DescCatED
-        else:
-            DescCat += ' - '+s
-    DescCat =DescCatED+DescCat
+    sED   = [s for s in descriptions if s.startswith('ED')]
+    sBD   = [s for s in descriptions if s.startswith('BD')]
+    sMisc = [s for s in descriptions if s not in sED+sBD]
+    sAll  = [replaceModeDescription(s) for s in sED+sBD+sMisc]
+    shortdescr = ' - '.join(sAll)
     if noMax:
-        DescCat = 'NoMax - ' + DescCat
-    return DescCat
+        shortdescr = 'NoMax - ' + shortdescr
+    return shortdescr
 
 
 def replaceModeDescription(s):
@@ -397,7 +521,11 @@ def PrettyStateDescriptions(DescStates, ndof2, performedTransformation):
     tmpDS = [DescStates[i] for i in idx]
     
     if performedTransformation:
-        key_vals=[['BD_1','Blade collective'],['BD_2','Blade cosine'],['BD_3','Blade sine'],['blade 1','blade collective'], ['blade 2','blade cosine'], ['blade 3','Blade sine '], ['PitchBearing1','Pitch bearing collective '], ['PitchBearing2','Pitch bearing cosine '], ['PitchBearing3','Pitch bearing sine ']]
+        key_vals=[['BD_1','Blade collective'],['BD_2','Blade cosine'],['BD_3','Blade sine'],['blade 1','blade collective'], ['blade 2','blade cosine'], ['blade 3','Blade sine '],
+                ['PitchBearing1','Pitch bearing collective '], ['PitchBearing2','Pitch bearing cosine '], ['PitchBearing3','Pitch bearing sine '],
+                ['at Blade', 'at blade'],
+                ['of Blade', 'of blade'],
+                ]
         # Replace Substrings from String List 
         sub = dict(key_vals)
         for key, val in sub.items(): 
@@ -465,29 +593,30 @@ def get_new_seq(rot_triplet,ntot):
         #print(new_seq)
     return new_seq,nRotTriplets,nb
 
-def eiganalysis(A, ndof2, ndof1):
+def eiganalysis(A, ndof2=None, ndof1=None):
     # this line has to be the first line for this function
     # to get the number of function arguments
-    nargin=len(locals())
 
     mbc={}
     m, ns = A.shape;
     if(m!=ns):
-        print('**ERROR: the state-space matrix is not a square matrix.');
+        raise Exception('**ERROR: the state-space matrix is not a square matrix.');
 
-    if nargin == 1:
+    if ndof2 is None:
+        # Assume that all DOF are second order
         ndof1 = 0;
-        ndof2 = ns/2;
+        ndof2 = int(ns/2)
 
         if np.mod(ns,2) != 0:
-            print('**ERROR: the input matrix is not of even order.');
-    elif nargin == 2:
+            raise Exception('**ERROR: the input matrix is not of even order.');
+    elif ndof1 is None:
+        # Assume that first order states are "reminder" 
         ndof1 = ns - 2*ndof2;
         if ndof1 < 0:
-            print('**ERROR: ndof2 must be no larger than half the dimension of the state-space matrix.');      
+            raise Exception('**ERROR: ndof2 must be no larger than half the dimension of the state-space matrix.');      
     else:
-        if ns != 2*ndof2 + ndof1:
-            print('**ERROR: the dimension of the state-space matrix must equal 2*ndof2 + ndof1.');
+        if ns != int(2*ndof2 + ndof1):
+            raise Exception('**ERROR: the dimension of the state-space matrix must equal 2*ndof2 + ndof1.');
 
     ndof = ndof2 + ndof1;
 
@@ -554,12 +683,12 @@ def eiganalysis(A, ndof2, ndof1):
     
     return mbc,EigenVects_save[:,:,0]
 
-def fx_mbc3(FileNames, verbose=True):
+def fx_mbc3(FileNames, verbose=True, removeTwrAzimuth=False):
     """ 
     Original contribution by: Srinivasa B. Ramisett, ramisettisrinivas@yahoo.com, http://ramisetti.github.io
     """
     MBC={}
-    matData, FAST_linData = gm.get_Mats(FileNames, verbose=verbose)
+    matData, FAST_linData = gm.get_Mats(FileNames, verbose=verbose, removeTwrAzimuth=removeTwrAzimuth)
 
     # print('matData[Omega] ', matData['Omega'])
     # print('matData[OmegaDot] ', matData['OmegaDot'])
@@ -577,12 +706,17 @@ def fx_mbc3(FileNames, verbose=True):
     
     #  nb = 3; % number of blades required for MBC3
     # ---------- Multi-Blade-Coordinate transformation -------------------------------------------
-    new_seq_dof2, dummy, nb = get_new_seq(matData['RotTripletIndicesStates2'],matData['ndof2']); # these are the first ndof2 states (not "first time derivative" states); these values are used to calculate matrix transformations
-    new_seq_dof1, dummy, dummy = get_new_seq(matData['RotTripletIndicesStates1'],matData['ndof1']); # these are the first-order ndof1 states; these values are used to calculate matrix transformations
+    new_seq_dof2, dummy, nb  = get_new_seq(matData['RotTripletIndicesStates2'],matData['ndof2']); # these are the first ndof2 states (not "first time derivative" states); these values are used to calculate matrix transformations
+    new_seq_dof1, dummy, nb2 = get_new_seq(matData['RotTripletIndicesStates1'],matData['ndof1']); # these are the first-order ndof1 states; these values are used to calculate matrix transformations
 
     # print('new_seq_dof2 ', new_seq_dof2)
     # print('new_seq_dof1 ', new_seq_dof1)
     # print('dummy ', dummy, ' nb ', nb)
+    nb = max(nb,nb2);
+    if (nb==0):
+        print('*** fx_mbc3: no states were found, so assuming turbine has 3 blades. ***')
+        nb = 3
+
 
     new_seq_states=np.concatenate((new_seq_dof2, new_seq_dof2+matData['ndof2']))
     if new_seq_dof1.size!=0:
@@ -599,8 +733,9 @@ def fx_mbc3(FileNames, verbose=True):
 
         if matData['n_RotTripletStates2'] + matData['n_RotTripletStates1'] < 1:
             print('*** There are no rotating states. MBC transformation, therefore, cannot be performed.');
+
         # perhaps just warn and perform eigenanalysis anyway?
-        elif (matData['n_RotTripletStates2']*nb > matData['ndof2']):
+        if (matData['n_RotTripletStates2']*nb > matData['ndof2']):
             print('**ERROR: the rotating second-order dof exceeds the total num of second-order dof');
         elif (matData['n_RotTripletStates1']*nb > matData['ndof1']):
             print('**ERROR: the rotating first-order dof exceeds the total num of first-order dof');
@@ -677,15 +812,15 @@ def fx_mbc3(FileNames, verbose=True):
             #---    
             T1q = np.eye(n_FixFrameStates1);               # Eq. 11 for first-order states (eq. 8 in MBC3 Update document)
             for ii in range(matData['n_RotTripletStates1']):
-                T1q = blkdiag(T1q, tt);
+                T1q = scp.block_diag(T1q, tt);
 
             T1qv = np.eye(n_FixFrameStates1);              # inverse of T1q
             for ii in range(matData['n_RotTripletStates1']):
-                T1qv = blkdiag(T1qv, ttv);
+                T1qv = scp.block_diag(T1qv, ttv);
 
             T2q = np.zeros([n_FixFrameStates1,n_FixFrameStates1]);             # Eq. 14 for first-order states (eq.  9 in MBC3 Update document)
             for ii in range(matData['n_RotTripletStates1']):
-                T2q = blkdiag(T2q, tt2);
+                T2q = scp.block_diag(T2q, tt2);
 
             #print('T1q, T1qv, T2q ',T1q.shape, T1qv.shape, T2q.shape)
             #     T1qc = np.eye(matData.NumHDInputs);            # inverse of T1q
@@ -711,11 +846,13 @@ def fx_mbc3(FileNames, verbose=True):
             #print('Before ',T1c)
     
             if 'A' in matData:
+                #A =  matData['A'][:,:,iaz]
+                #A_reordered =  A[np.ix_(new_seq_states, new_seq_states)]
                 # Eq. 29
                 L1=np.concatenate((T1, np.zeros([matData['ndof2'],matData['ndof2']]), np.zeros([matData['ndof2'], matData['ndof1']])), axis=1)
                 L2=np.concatenate((matData['Omega'][iaz]*T2,T1,np.zeros([matData['ndof2'], matData['ndof1']])), axis=1)
                 L3=np.concatenate((np.zeros([matData['ndof1'], matData['ndof2']]),np.zeros([matData['ndof1'], matData['ndof2']]), T1q), axis=1)            
-                L=np.matmul(matData['A'][new_seq_states[:,None],new_seq_states,iaz],np.concatenate((L1,L2,L3),axis=0))
+                L=np.matmul(matData['A'][new_seq_states[:,None],new_seq_states,iaz], np.concatenate((L1,L2,L3),axis=0))
 
                 R1=np.concatenate((matData['Omega'][iaz]*T2, np.zeros([matData['ndof2'],matData['ndof2']]), np.zeros([matData['ndof2'], matData['ndof1']])), axis=1)
                 R2=np.concatenate((OmegaSquared*T3 + matData['OmegaDot'][iaz]*T2,  2*matData['Omega'][iaz]*T2, np.zeros([matData['ndof2'], matData['ndof1']])),axis=1)
@@ -818,7 +955,7 @@ def fx_mbc3(FileNames, verbose=True):
     return MBC, matData, FAST_linData
 
 
-def runMBC(FileNames,NLinTimes=None):
+def runMBC(FileNames, NLinTimes=None, removeTwrAzimuth=False):
     CampbellData={}
     HubRad=None;TipRad=None;
     BladeLen=None; TowerHt=None
@@ -861,7 +998,7 @@ def runMBC(FileNames,NLinTimes=None):
         linFileNames=[basename+'.'+format(x, 'd')+'.lin' for x in range(1,NLinTimes+1)]
 
         print('Processing ', FileNames[i], ' file!')
-        MBC_data,getMatData,FAST_linData=fx_mbc3(linFileNames)
+        MBC_data,getMatData,FAST_linData=fx_mbc3(linFileNames, removeTwrAzimuth=removeTwrAzimuth)
         print('Multi-Blade Coordinate transformation completed!');
         print('  ');
         CampbellData[i]=campbell_diagram_data(MBC_data,BladeLen,TowerHt)

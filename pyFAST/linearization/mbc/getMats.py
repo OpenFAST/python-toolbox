@@ -20,61 +20,39 @@ def _isbool(str):
     return flag
 
 
-def findBladeTriplets_EDstate(rotFrame,Desc):
-    # descriptions of ED states contain the blade number twice. This is the old
-    # method of comparing strings.
-    #   frame:
-    NTriplets = 0;                  # first initialize to zero 
-    Triplets = [];
-    for i in range(len(rotFrame)):  # loop through all active (enabled) DOFs 
-        if rotFrame[i]:  # this is a state in the rotating frame 
-
-            col = int(Desc[i].find('blade'))              # find the starting index of the string 'blade'
-            if col!=-1:                             # true if the Desc{i} contains the string 'blade' 
-                k = int(Desc[i][col+6]);          # save the blade number for the initial blade
-                Tmp = -1*np.ones(3);
-                #Tmp = np.zeros(3);                        # first initialize to zero 
-                Tmp[k-1] = int(i);                              # save the index for the initial blade 
-
-                # find the other match values
-
-                for j in range((i+1),len(rotFrame)):           # loop through all remaining active (enabled) DOFs 
-                    if Desc[j][:col]==Desc[i][:col]:      # true if we have the same state from a different blade 
-                        k = int(Desc[j][col+6]);  # save the blade numbers for the remaining blades 
-
-                        Tmp[k-1] = int(j);                      # save the indices for the remaining blades
-                        TmpTmp=Tmp+1
-                        if ( (Tmp>-1).all() ):
-                        #if ( np.all(TmpTmp+1) ):                  # true if all the elements of Tmp are nonzero; thus, we found a triplet of rotating indices 
-                            NTriplets = NTriplets + 1;   # this  is  the number  of  state triplets in the rotating frame 
-                            Triplets.append(Tmp); # these are the indices for state triplets in the rotating frame
-                            break
-    
-    return Triplets,NTriplets;
-
-
-def findBladeTriplets(rotFrame,Desc, verbose=True):
+def findBladeTriplets(rotFrame, Desc, verbose=True):
 
     # Find the number of, and indices for, triplets in the rotating frame:
     chkStr = [r'[Bb]lade \d', r'[Bb]lade [Rr]oot \d', r'BD_\d', r'[Bb]\d', r'[Bb]lade\d', r'PitchBearing\d', r'\d']
 
+    origDesc = Desc;
+
+    # hack for ElastoDyn state names (remove unnecessary text in parenthesis)
+    for i in range(len(rotFrame)):
+        if Desc[i] is None:
+            raise Exception('Description not defined, likely a bug.')
+        ix = Desc[i].find('(internal DOF index = ')
+        if ix>0:
+            ix2 = Desc[i].find(')')
+            Desc[i] = Desc[i][:ix]+Desc[i][ix2+1:]
+
+
     NTriplets = 0;              # first initialize to zero
     Triplets = [];
-    for i in range(len(rotFrame)):  # loop through inputs/outputs
+    for i in range(len(rotFrame)):  # loop through inputs/outputs/states
         if rotFrame[i] == 'T':          # this is in the rotating frame
             Tmp = -1*np.ones(3)
             foundTriplet = False
-            foundIt = False
+            foundBladeNumber = False
             for chk in chkStr:
                 BldNoCol = re.search(chk,Desc[i])
                 if BldNoCol!=None:
-                    foundIt = True
+                    foundBladeNumber = True
 
                     Bldstr=BldNoCol.group()
                     # create another regular expression to find the
                     # exact match on a different blade:
                     strng = re.split(Bldstr,Desc[i],1)  #this should return the strings before and after the match
-                    #print(strng[1])
 
                     
                     FirstStr = strng[0] + Bldstr[:len(Bldstr)-1] + '.'
@@ -83,25 +61,22 @@ def findBladeTriplets(rotFrame,Desc, verbose=True):
                     #we need to get rid of the special characters that
                     #may exist in Desc{}:
                     checkThisStr=checkThisStr.replace(')',r'\)').replace('(', r'\(').replace('^',r'\^')
+                    FirstStr   = FirstStr.    replace(')',r'\)').replace('(', r'\(').replace('^',r'\^')
 
                     k = int(Bldstr[len(Bldstr)-1])
-                    #print(Bldstr[len(Bldstr)-1], checkThisStr)
                     Tmp[k-1] = int(i)
-                    #print(Tmp,k,i,len(rotFrame),foundIt)
-                    #exit()
                     break
 
                 #print(Tmp,j)
             
             # find the other match values
-            if foundIt:
+            if foundBladeNumber:
                 for j in range((i+1),len(rotFrame)):           # loop through all remaining control inputs
                     #print(i, j)
                     if rotFrame[j]:                       # this is in the rotating frame
                         BldNoCol = re.search(checkThisStr, Desc[j])
                         if BldNoCol!=None:
                             Num = re.search(FirstStr,Desc[j]).group();
-                            #Num = regexp(Desc{j},FirstStr,'match'); # match all but the blade number
                             k = int(Num[len(Num)-1]);
                             Tmp[k-1] = int(j);                             # save the indices for the remaining blades
                             #TmpTmp=Tmp+1
@@ -163,7 +138,6 @@ def getStateOrderingIndx(matData):
     #StateOrderingIndx={}
     StateOrderingIndx = np.arange(0,matData['NumStates'])
     lastModName = '';
-    checkEDstates = True;
     lastModOrd  = 0;
     mod_nDOFs   = 0;    # number of DOFs in each module
     sum_nDOFs2  = 0;    # running total of second-order DOFs
@@ -174,15 +148,9 @@ def getStateOrderingIndx(matData):
 
         tmp=(matData['DescStates'][i]); # name of the module whose states we are looking at
         modName = tmp.split(' ')[0]
+        ModOrd  = matData['StateDerivOrder'][i]
 
-        #print('indx ', i)
-        # ED has the blade number in the state description twice, so we
-        # have to check the strings differently. We'll check here if a  
-        # different module is used for the blade DOFs:
-        if modName[:2] =='BD' or modName[:3]=='MBD':
-            checkEDstates = False;
-
-        if lastModName!=modName:
+        if lastModName!=modName or lastModOrd!= ModOrd:
             # this is the start of a new set of DOFs, so we'll set the
             # indices for the last matrix
             if lastModOrd == 2:
@@ -198,7 +166,7 @@ def getStateOrderingIndx(matData):
                 
                 sum_nDOFs1 = sum_nDOFs1 + mod_nDOFs;
             
-            # reset for a new module
+            # reset for a new module (or new 1st-order states in the same module)
             mod_nDOFs = 0;
             
             indx_start = i; #start of this module
@@ -218,7 +186,7 @@ def getStateOrderingIndx(matData):
         StateOrderingIndx[indx_start:(indx_start+mod_nDOFs)] = sum_nDOFs1 + matData['NumStates2'] + np.arange(0,mod_nDOFs); # q1 starts at matData.NumStates2 + 1
 
     #print(StateOrderingIndx)
-    return StateOrderingIndx, checkEDstates
+    return StateOrderingIndx
 
 def readOP(fid, n, defaultDerivOrder=2):
     OP=[]
@@ -420,15 +388,32 @@ def ReadFASTLinear(filename):
             raise
 
 
-def get_Mats(FileNames, verbose=True):
-    matData={}
-    matData['NAzimStep']= len(FileNames);
-    data=[None]*matData['NAzimStep']
-    NAzimStep=matData['NAzimStep']
-    #print('NAzimStep : ', matData['NAzimStep'])
+def get_Mats(FileNames, verbose=True, removeTwrAzimuth=False):
+    NAzimStep = len(FileNames)
+    data     = [None]*NAzimStep
+    # --- Read all files
+    for iFile, filename in enumerate(FileNames):
+        data[iFile],_= ReadFASTLinear(FileNames[iFile]);
+    Azimuth  = np.array([d['Azimuth'] for d in data])*180/np.pi
+    # --- Sort by azimuth, not required, but filenames are not sorted, nor are the lin times azimuth
+    ISort = np.argsort(Azimuth)
+    Azimuth   = Azimuth[ISort]
+    data      = [data[i]      for i in ISort]
+    FileNames = [FileNames[i] for i in ISort]
+    if removeTwrAzimuth:
+        IDiscard = [i  for i,a in enumerate(Azimuth) if np.any(np.abs(np.array([60,180,300])-a)<4)  ]
+        n=len(FileNames[0]); sfmt='{:'+str(n+2)+'s}'
+        for i in IDiscard:
+            print('          discard: '+sfmt.format(FileNames[i]) + '  (psi={:5.1f})'.format(Azimuth[i]))
+        data      = [d for i,d in enumerate(data)      if i not in IDiscard]
+        NAzimStep= len(data)
 
+
+    matData={}
+    matData['NAzimStep']= NAzimStep;
+
+    # --- Using last azimuth to initial some of the "matData" variables
     # Input data from linearization files
-    data[NAzimStep-1],info     = ReadFASTLinear(FileNames[NAzimStep-1]);
     matData['NumStates']       = int(data[NAzimStep-1]['n_x']);
     matData['NumStates2']      = int(data[NAzimStep-1]['n_x2']);
 
@@ -441,11 +426,9 @@ def get_Mats(FileNames, verbose=True):
     matData['NumOutputs']      = int(data[NAzimStep-1]['n_y']);
 
     # allocate space for these variables
-    
     matData['Azimuth']   = np.zeros(NAzimStep);
     matData['Omega']     = np.zeros(NAzimStep);
     matData['OmegaDot']  = np.zeros(NAzimStep);
-
     matData['WindSpeed'] = np.zeros(NAzimStep)*np.nan;
 
     if matData['NumStates'] > 0:
@@ -457,13 +440,13 @@ def get_Mats(FileNames, verbose=True):
 
     if matData['NumInputs'] > 0:
         matData['DescCntrlInpt'] = data[NAzimStep-1]['u_desc'];    
-        matData['u_op']             = np.zeros((matData['NumInputs'],NAzimStep))
+        matData['u_op']          = np.zeros((matData['NumInputs'],NAzimStep))
         if matData['NumStates']>0:
             matData['B'] = np.zeros((matData['NumStates'], matData['NumInputs'],NAzimStep))
 
     if matData['NumOutputs'] > 0:
         matData['DescOutput']    = data[NAzimStep-1]['y_desc']
-        matData['y_op']             = np.zeros((matData['NumOutputs'],NAzimStep))
+        matData['y_op']          = np.zeros((matData['NumOutputs'],NAzimStep))
 
         if matData['NumStates'] > 0:
             matData['C']         = np.zeros((matData['NumOutputs'], matData['NumStates'], NAzimStep))
@@ -475,7 +458,7 @@ def get_Mats(FileNames, verbose=True):
     if matData['NumStates'] > 0:
         # keep StateOrderingIndx for applying inverse of MBC3 later
         # (to visualize mode shapes)
-        matData['StateOrderingIndx'],checkEDstates    = getStateOrderingIndx(matData)
+        matData['StateOrderingIndx'] = getStateOrderingIndx(matData)
 
         sortedIndx=matData['StateOrderingIndx']
         #print(sortedIndx)
@@ -483,12 +466,10 @@ def get_Mats(FileNames, verbose=True):
         matData['DescStates'] = reOrderByIdx_1D(data[NAzimStep-1]['x_desc'],sortedIndx)
         matData['StateDerivOrder'] = reOrderByIdx_1D(data[NAzimStep-1]['x_DerivOrder'],sortedIndx)
 
+    # --- Store file data into matData
     for iFile in np.arange(0,NAzimStep):
-        
-        data[iFile],info     = ReadFASTLinear(FileNames[iFile]);
-        matData['Omega'][iFile]   = data[iFile]['RotSpeed'];
-        matData['Azimuth'][iFile] = data[iFile]['Azimuth']*180/np.pi;
-
+        matData['Omega'][iFile]     = data[iFile]['RotSpeed']         ; 
+        matData['Azimuth'][iFile]   = data[iFile]['Azimuth']*180/np.pi; 
         matData['WindSpeed'][iFile] = data[iFile]['WindSpeed']
     
         if 'A' in data[iFile]:
@@ -567,10 +548,7 @@ def get_Mats(FileNames, verbose=True):
     # Find the indices for, state triplets in the rotating frame
     #  (note that we avoid the "first time derivative" states)
     if matData['ndof2'] > 0:
-        if checkEDstates:
-            matData['RotTripletIndicesStates2'], matData['n_RotTripletStates2'] = findBladeTriplets_EDstate(x_rotFrame[0:matData['ndof2']],matData['DescStates'][0:matData['ndof2']])
-        else:
-            matData['RotTripletIndicesStates2'], matData['n_RotTripletStates2'] = findBladeTriplets(x_rotFrame[0:matData['ndof2']],matData['DescStates'][0:matData['ndof2']], verbose=verbose)
+        matData['RotTripletIndicesStates2'], matData['n_RotTripletStates2'] = findBladeTriplets(x_rotFrame[0:matData['ndof2']],matData['DescStates'][0:matData['ndof2']], verbose=verbose)
     else:
         matData['RotTripletIndicesStates2'] = [];
         matData['n_RotTripletStates2'] = 0;
@@ -594,6 +572,8 @@ def get_Mats(FileNames, verbose=True):
     else:
         matData['RotTripletIndicesOutput'] = [];
         matData['n_RotTripletOutputs'] = 0;
+
+
         
     return matData, data
 

@@ -1,4 +1,3 @@
-# --- For cmd.py
 from __future__ import division, print_function
 import os
 import collections
@@ -13,6 +12,7 @@ import re
 import pyFAST.input_output.fast_input_file as fi
 import pyFAST.case_generation.runner as runner
 import pyFAST.input_output.postpro as postpro
+from pyFAST.input_output.fast_wind_file import FASTWndFile
 
 # --------------------------------------------------------------------------------}
 # --- Template replace 
@@ -345,7 +345,7 @@ def paramsStiff(p=None):
     p['EDFile|PtfmYDOF']  = 'False'
     return p
 
-def paramsWS_RPM_Pitch(WS, RPM, Pitch, baseDict=None, FlatInputs=False):
+def paramsWS_RPM_Pitch(WS, RPM, Pitch, baseDict=None, flatInputs=False):
     """ 
     Generate OpenFAST "parameters" (list of dictionaries with "address")
     chaing the inputs in ElastoDyn, InflowWind for different wind speed, RPM and Pitch
@@ -442,7 +442,6 @@ def paramsLinearTrim(p=None):
 # ---  
 # --------------------------------------------------------------------------------{
 def createStepWind(filename,WSstep=1,WSmin=3,WSmax=25,tstep=100,dt=0.5,tmin=0,tmax=999):
-    from pyFAST.input_output.fast_wind_file import FASTWndFile
     f = FASTWndFile()
     Steps= np.arange(WSmin,WSmax+WSstep,WSstep)
     print(Steps)
@@ -534,7 +533,7 @@ def CPCT_LambdaPitch(refdir,main_fastfile,Lambda=None,Pitch=np.linspace(-10,40,5
 
     # --- Creating set of parameters to be changed
     # TODO: verify that RtAeroCp and RtAeroCt are present in AeroDyn outlist
-    PARAMS = paramsWS_RPM_Pitch(WS_flat,RPM_flat,Pitch_flat,baseDict=baseDict, FlatInputs=True)
+    PARAMS = paramsWS_RPM_Pitch(WS_flat,RPM_flat,Pitch_flat,baseDict=baseDict, flatInputs=True)
 
     # --- Generating all files in a workDir
     workDir = refdir.strip('/').strip('\\')+'_CPLambdaPitch'
