@@ -534,7 +534,7 @@ def plotCampbell(OP, Freq, Damp, sx='WS_[m/s]', UnMapped=None, fig=None, axes=No
         axes[0].plot(OP[sx].values,  p*freq_1p, ':',color=(0.7,0.7,0.7), lw=1.0)
 
     # Plot mapped modes
-    Markers = ['', '+', 'o', '^', 's', 'd', 'x', '.']
+    Markers = ['+', 'o', '^', 's', 'd', 'x', '.']
     iModeValid=0
     xPlot=[]; yPlot=[]
     for iMode,lbl in enumerate(Freq.columns.values):
