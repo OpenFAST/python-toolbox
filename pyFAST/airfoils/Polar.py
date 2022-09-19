@@ -55,7 +55,8 @@ class Polar(object):
         cm : ndarray
             moment coefficient
         """
-        self._radians=False 
+        self._unsteadyParams = None
+        self._radians        = False
         if isinstance(FileName_or_Re,str):
             alpha, cl, cd, cm, Re = loadPolarFile(FileName_or_Re, fformat=fformat, to_radians=False)
         else:
@@ -129,14 +130,50 @@ class Polar(object):
         return self._linear_slope * (alpha - self._alpha0)
 
     @property
+    def alpha_rad(self):
+        if self._radians:
+            return self.alpha
+        else:
+            return self.alpha * np.pi/180
+
+    @property
+    def alpha_deg(self):
+        if self._radians:
+            return self.alpha * 180/np.pi
+        else:
+            return self.alpha
+
+    @property
     def cn(self):
         """ returns  : Cl cos(alpha) +  Cd      sin(alpha)
                   NOT: Cl cos(alpha) + (Cd-Cd0) sin(alpha)
         """ 
+        alpha = self.alpha_rad
+        return self.cl * np.cos(alpha) + self.cd * np.sin(alpha)
+
+    @property
+    def cn_lin(self):
+        if self._unsteadyParams is None:
+            raise Exception('Compute unsteady parameters first')
+        P=self._unsteadyParams
         if self._radians:
-            return self.cl * np.cos(self.alpha) + self.cd * np.sin(self.alpha)
+            cn_lin = P['cnSlope']*(self.alpha-P['alpha0'])
         else:
-            return self.cl * np.cos(self.alpha * np.pi / 180) + self.cd * np.sin(self.alpha * np.pi / 180)
+            cn_lin = P['cnSlope']*(self.alpha-P['alpha0'])*np.pi/180
+        cn_lin[self.alpha_deg<-20] = np.nan
+        cn_lin[self.alpha_deg> 30] = np.nan
+        return cn_lin
+
+    @property
+    def alpha_201(self):
+        if self._unsteadyParams is None:
+            raise Exception('Compute unsteady parameters first')
+        P=self._unsteadyParams
+        return [P['alpha2'], P['alpha0'], P['alpha1']]
+
+    @property
+    def cn_201(self):
+        return self.cn_interp(self.alpha_201)
 
     @property
     def cl_lin(self):
@@ -680,6 +717,8 @@ class Polar(object):
             cnSlope = cnSlope
         else:
             cnSlope = cnSlope * 180 / np.pi
+        # Store in Object
+        self._unsteadyParams =  {'alpha0':alpha0, 'alpha1':alpha1, 'alpha2':alpha2, 'cnSlope':cnSlope, 'cn1':cn1, 'cn2':cn2, 'cd0':cd0, 'cm0':cm0}
         return (alpha0, alpha1, alpha2, cnSlope, cn1, cn2, cd0, cm0)
 
     def unsteadyparam(self, alpha_linear_min=-5, alpha_linear_max=5):
