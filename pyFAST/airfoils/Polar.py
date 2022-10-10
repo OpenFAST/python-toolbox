@@ -309,8 +309,8 @@ class Polar(object):
         # Blending
         if blending_method == "linear_25_45":
             # We adjust fully between +/- 25 deg, linearly to +/- 45
-            adj_alpha = np.radians([-180, -45, -25, 25, 45, 180])
-            adj_value = np.array([0, 0, 1, 1, 0, 0])
+            adj_alpha = np.radians([-180,-45,-25,25,45,180])
+            adj_value = np.array  ([0   ,0  ,1  ,1 ,0 ,0]  )
             adj = np.interp(alpha, adj_alpha, adj_value)
         elif blending_method == "heaviside":
             # Apply (arbitrary!) smoothing function to smoothen the 3D corrections and zero them out away from alpha_max_corr

@@ -579,7 +579,7 @@ def plotCampbell(OP, Freq, Damp, sx='WS_[m/s]', UnMapped=None, fig=None, axes=No
 
 
 def plotCampbellDataFile(xls_or_csv, ws_or_rpm='rpm', sheetname=None, ylim=None, WS_legacy=None, to_csv=False, suffix='', returnData=False, 
-        fig=None, axes=None, legend=True, plotUnMapped=True):
+        fig=None, axes=None, legend=True, plotUnMapped=True, ps=[1,3,6,9]):
     """ 
     Wrapper for plotCampbell, takes an Excel or csv file as argument. Returns a figure.
 
@@ -610,7 +610,7 @@ def plotCampbellDataFile(xls_or_csv, ws_or_rpm='rpm', sheetname=None, ylim=None,
         raise Exception('Extension should be csv or xlsx, got {} instead.'.format(ext),)
 
     # --- Plot
-    fig, axes = plotCampbell(OP, Freq, Damp, sx=sx, UnMapped=UnMapped, ylim=ylim, fig=fig, axes=axes, legend=legend, plotUnMapped=plotUnMapped)
+    fig, axes = plotCampbell(OP, Freq, Damp, sx=sx, UnMapped=UnMapped, ylim=ylim, fig=fig, axes=axes, legend=legend, plotUnMapped=plotUnMapped, ps=ps)
     figName = os.path.join(baseDir,basename+'_'+ws_or_rpm)
 
     if to_csv:
