@@ -8,6 +8,8 @@ import numpy as np
 import os
 import struct
 import time
+import xarray as xr
+from multiprocessing import Pool, shared_memory
 
 try:
     from .file import File, EmptyFileError
@@ -679,6 +681,47 @@ class TurbSimFile(File):
 
 
     # Useful converters
+    def fromAMRWind(self, filename, dt, nt):
+        """
+        Convert current TurbSim file into one generated from AMR-Wind LES sampling data in .nc format
+        Assumes:
+             u, v, w (nt, nx * ny * nz)
+
+        INPUTS:
+          - filename: full path to .nc sampling data file
+        """
+        # read in sampling data plane
+        ds = xr.open_dataset(filename,
+                              engine='netcdf4',
+                              group='p_sw2')
+        ny, nz, _ = ds.attrs['ijk_dims']
+        noffsets  = len(ds.attrs['offsets'])
+        t         = np.arange(0, dt*(nt-0.5), dt)
+        y         = np.linspace(-150.,150.,ny) # to do: generalize
+        z         = np.linspace(-150.,150.,nz) 
+        print('t = ', t)
+        
+        shm = shared_memory.SharedMemory(create=True, size=(3 * nt * ny * nz * 8))
+        
+        self['u']=np.ndarray((3,nt,ny,nz), buffer=shm.buf)
+        self['u'][0,:,:,:] = ds['velocityx'].isel(num_time_steps=slice(0,nt)).values.reshape(nt,ny,nz,noffsets)[:,:,:,1] # last index = 1 refers to 2nd offset plane at -1200 m
+        self['u'][1,:,:,:] = ds['velocityy'].isel(num_time_steps=slice(0,nt)).values.reshape(nt,ny,nz,noffsets)[:,:,:,1]
+        self['u'][2,:,:,:] = ds['velocityz'].isel(num_time_steps=slice(0,nt)).values.reshape(nt,ny,nz,noffsets)[:,:,:,1]
+        self['t']  = t
+        self['y']  = y
+        self['z']  = z
+        self['dt'] = dt
+        # TODO
+        self['ID'] = 7 # ...
+        self['info'] = 'Converted from AMRWind fields {:s}.'.format(time.strftime('%d-%b-%Y at %H:%M:%S', time.localtime()))
+#         self['zTwr'] = np.array([])
+#         self['uTwr'] = np.array([])
+        self['zRef'] = None
+        self['uRef'] = None
+        self['zRef'], self['uRef'], bHub = self.hubValues()
+        shm.close()
+        shm.unlink()
+
     def fromMannBox(self, u, v, w, dx, U, y, z, addU=None):
         """ 
         Convert current TurbSim file into one generated from MannBox
