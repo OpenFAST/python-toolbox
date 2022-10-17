@@ -8,7 +8,6 @@ import numpy as np
 import os
 import struct
 import time
-import xarray as xr
 from multiprocessing import Pool, shared_memory
 
 try:
@@ -690,6 +689,8 @@ class TurbSimFile(File):
         INPUTS:
           - filename: full path to .nc sampling data file
         """
+        import xarray as xr
+        
         # read in sampling data plane
         ds = xr.open_dataset(filename,
                               engine='netcdf4',
@@ -701,9 +702,9 @@ class TurbSimFile(File):
         z         = np.linspace(-150.,150.,nz) 
         print('t = ', t)
         
-        shm = shared_memory.SharedMemory(create=True, size=(3 * nt * ny * nz * 8))
+        #shm = shared_memory.SharedMemory(create=True, size=(3 * nt * ny * nz * 8))
         
-        self['u']=np.ndarray((3,nt,ny,nz), buffer=shm.buf)
+        self['u']=np.ndarray((3,nt,ny,nz)) #, buffer=shm.buf)
         self['u'][0,:,:,:] = ds['velocityx'].isel(num_time_steps=slice(0,nt)).values.reshape(nt,ny,nz,noffsets)[:,:,:,1] # last index = 1 refers to 2nd offset plane at -1200 m
         self['u'][1,:,:,:] = ds['velocityy'].isel(num_time_steps=slice(0,nt)).values.reshape(nt,ny,nz,noffsets)[:,:,:,1]
         self['u'][2,:,:,:] = ds['velocityz'].isel(num_time_steps=slice(0,nt)).values.reshape(nt,ny,nz,noffsets)[:,:,:,1]
@@ -719,8 +720,8 @@ class TurbSimFile(File):
         self['zRef'] = None
         self['uRef'] = None
         self['zRef'], self['uRef'], bHub = self.hubValues()
-        shm.close()
-        shm.unlink()
+#        shm.close()
+#        shm.unlink()
 
     def fromMannBox(self, u, v, w, dx, U, y, z, addU=None):
         """ 
