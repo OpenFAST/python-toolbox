@@ -8,7 +8,6 @@ import numpy as np
 import os
 import struct
 import time
-from multiprocessing import Pool, shared_memory
 
 try:
     from .file import File, EmptyFileError
