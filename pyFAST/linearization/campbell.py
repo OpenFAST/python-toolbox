@@ -18,7 +18,7 @@ try:
     import pyFAST.linearization.mbc.mbc3 as mbc
 except ImportError:
     import weis.control.mbc.mbc3 as mbc
-from .tools import MBC_OF
+from pyFAST.linearization.tools import MBC_OF
 
 
 

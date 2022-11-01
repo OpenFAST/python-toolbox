@@ -113,6 +113,7 @@ venv.bak/
 *.ech
 *.out
 *.outb
+*.viz
 
 #  Hidding files starting with underscore except init
 _*

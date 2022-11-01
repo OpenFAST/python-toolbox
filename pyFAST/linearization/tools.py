@@ -6,16 +6,16 @@ import re
 import os
 import glob
 
-try:
-    import pyFAST.linearization.mbc.mbc3 as mbc
-except ImportError:
-    import weis.control.mbc.mbc3 as mbc
-
 
 def MBC_OF(fstfile, verbose=False, **kwargs):
     """ 
     Run necessary MBC for an OpenFAST file (one operating point)
     """
+    try:
+        import pyFAST.linearization.mbc.mbc3 as mbc
+    except ImportError:
+        import weis.control.mbc.mbc3 as mbc
+
     fullpathbase, ext = os.path.splitext(fstfile)
     filebase = os.path.basename(fullpathbase)
 

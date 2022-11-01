@@ -3,13 +3,13 @@
 #############################################################
 #!/usr/bin/env python
 
-import pyFAST.linearization.mbc.getMats as gm
 import numpy as np
 import scipy.linalg as scp
 import mmap
 import re,os
 import pandas as pd
 # import plotCampbellData as pCD
+import pyFAST.linearization.mbc.getMats as gm
 
 def getScaleFactors(DescStates, TowerLen, BladeLen):
     
@@ -699,6 +699,7 @@ def fx_mbc3(FileNames, modesFilename=None, verbose=True, removeTwrAzimuth=False)
 
     Original contribution by: Srinivasa B. Ramisett, ramisettisrinivas@yahoo.com, http://ramisetti.github.io
     """
+
     MBC={}
     matData, FAST_linData = gm.get_Mats(FileNames, verbose=verbose, removeTwrAzimuth=removeTwrAzimuth)
 
