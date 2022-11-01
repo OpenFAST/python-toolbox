@@ -1,5 +1,8 @@
 """ 
-Generic functions to help setup a Campbell diagram
+
+Generic functions to help setup a Campbell diagram with OpenFAST
+These are high level functions.
+For more granularity, see pyFAST.linearization.tools.py
 
 def postproMBC(xlsFile=None, csvBase=None, sortedSuffix=None, csvModesID=None, xlssheet=None):
   Generate Cambell diagram data from an xls file, or a set of csv files
@@ -15,6 +18,8 @@ try:
     import pyFAST.linearization.mbc.mbc3 as mbc
 except ImportError:
     import weis.control.mbc.mbc3 as mbc
+from .tools import MBC_OF
+
 
 
 def postproCampbell(out_or_fstfiles, BladeLen=None, TowerLen=None, verbose=True, nFreqOut=15, WS_legacy=None, removeTwrAzimuth=False):
@@ -87,34 +92,12 @@ def run_pyMBC(out_or_fstfiles, verbose=True, removeTwrAzimuth=False):
     INPUTS:
       - out_or_fstfiles
     """
-    import re
-    def glob_re(pattern, strings):
-        return list(filter(re.compile(pattern).match, strings))
 
     if verbose:
         print('run_pyMBC:')
     MBC = [None]*len(out_or_fstfiles)
     for i_lin, fstfile in enumerate(out_or_fstfiles):
-        filebase, ext = os.path.splitext(fstfile)
-        # NOTE: the code below is problematic for module lin files ED.1.lin 
-        # So we do a re search to filter these out
-        # First use glob
-        lin_file_fmt    = '{}.*.lin'.format(filebase)
-        lin_files       = glob.glob(lin_file_fmt)
-        #print(lin_files)
-        # Then use re for stricter search
-        lin_file_fmt_re    = r'.*\.[0-9]+\.lin'
-        lin_files = glob_re(lin_file_fmt_re, lin_files)
-        #print(lin_files)
-
-        # --- run MBC3 and campbell post_pro on lin files 
-        if len(lin_files)>0:
-            if verbose:
-                print('       Lin. files: {} ({})'.format(lin_file_fmt, len(lin_files)))
-            MBC[i_lin], matData, FAST_linData = mbc.fx_mbc3(lin_files, verbose=False, removeTwrAzimuth=removeTwrAzimuth)
-        else:
-            if verbose:
-                print('[WARN] Lin. files: {} ({})'.format(lin_file_fmt, len(lin_files)))
+        MBC[i_lin], matData, FAST_linData = MBC_OF(fstfile, verbose=verbose)
 
     return MBC
 

@@ -44,7 +44,6 @@ def IdentifyModes(CampbellData):
 
     Original contribution by: Srinivasa B. Ramisett, ramisettisrinivas@yahoo.com, http://ramisetti.github.io
     """
-    #import pdb; pdb.set_trace()
     #import pickle
     #pickle.dump(CampbellData, open('C:/Work/_libs/python-toolbox/data/_CampbellData_UA4_DB2.pkl','wb'))
 
@@ -222,7 +221,6 @@ def IdentifyModes(CampbellData):
                         if shortdescr.find('ED')>=0:
                             print('>>>> short', CampbellData[i]['ShortModeDescr'][im])
                             print('>>>> Problem in IdentifyModes. ED DOF found in level 2')
-                    #    import pdb; pdb.set_trace()
 
         if 3 in Levels:
             # --- Level 3 - Try our best for modes with no max
@@ -256,7 +254,6 @@ def IdentifyModes(CampbellData):
                             descriptions3 = mode['DescStates'][:5]
                         else:
                             noMax=False
-#                         import pdb; pdb.set_trace()
                         if ADcounts<5:
                             descriptions=[d for d in descriptions if not d.startswith('AD')]
 #                                 descriptionsED   = [d for d in descriptions  if d.startswith('ED')]
@@ -620,6 +617,16 @@ def eiganalysis(A, ndof2=None, ndof1=None):
 
     ndof = ndof2 + ndof1;
 
+    # Matlab code - KEEP ME
+    #[origEigenVects, origEvals] = eig(A,'vector'); %,'nobalance'
+    #positiveImagEvals = find( imag(origEvals) > 0);
+    #mbc.Evals             = origEvals(positiveImagEvals);
+    #mbc.EigenVects        = origEigenVects([1:ndof2  (ndof2*2+1):ns],positiveImagEvals); % save q2 and q1, throw away q2_dot
+    #    EigenVects_save   = origEigenVects(:,positiveImagEvals); % save these for VTK visualization;
+    #real_Evals = real(mbc.Evals);
+    #imag_Evals = imag(mbc.Evals);
+    #mbc.NaturalFrequencies = sqrt( real_Evals.^2 + imag_Evals.^2 );
+
     origEvals, origEigenVects = np.linalg.eig(A); #,'nobalance'
     # errorInSolution = norm(A * mbc.EigenVects - mbc.EigenVects* diag(mbc.EigenVals) )
     # these eigenvalues aren't sorted, so we just take the ones with
@@ -683,8 +690,13 @@ def eiganalysis(A, ndof2=None, ndof1=None):
     
     return mbc,EigenVects_save[:,:,0]
 
-def fx_mbc3(FileNames, verbose=True, removeTwrAzimuth=False):
+def fx_mbc3(FileNames, modesFilename=None, verbose=True, removeTwrAzimuth=False):
     """ 
+    FileNames: list of lin files for a given operating point
+    modesFilename: if present, a .postMBC file will be written for OpenFAST to generate VTK files
+
+
+
     Original contribution by: Srinivasa B. Ramisett, ramisettisrinivas@yahoo.com, http://ramisetti.github.io
     """
     MBC={}
@@ -704,18 +716,18 @@ def fx_mbc3(FileNames, verbose=True, removeTwrAzimuth=False):
     # print('ndof2 ', MBC['ndof2'])
     # print(matData['RotTripletIndicesStates2'])
     
-    #  nb = 3; % number of blades required for MBC3
+    # TODO infer number of blades from ElastoDyn
+    # TODO differentiate between number of blades, and the "nb" for MBC
+    #  nb = 3; % number of blades required for MBC3 
     # ---------- Multi-Blade-Coordinate transformation -------------------------------------------
     new_seq_dof2, dummy, nb  = get_new_seq(matData['RotTripletIndicesStates2'],matData['ndof2']); # these are the first ndof2 states (not "first time derivative" states); these values are used to calculate matrix transformations
     new_seq_dof1, dummy, nb2 = get_new_seq(matData['RotTripletIndicesStates1'],matData['ndof1']); # these are the first-order ndof1 states; these values are used to calculate matrix transformations
 
-    # print('new_seq_dof2 ', new_seq_dof2)
-    # print('new_seq_dof1 ', new_seq_dof1)
-    # print('dummy ', dummy, ' nb ', nb)
     nb = max(nb,nb2);
     if (nb==0):
-        print('*** fx_mbc3: no states were found, so assuming turbine has 3 blades. ***')
-        nb = 3
+        #print('*** fx_mbc3: no states were found, so assuming turbine has 3 blades. ***')
+        #nb = 3 # TODO, somehow in the past, we assumed 3 blades.
+        print('*** fx_mbc3: no states were found. Setting number of blades to 0. Skipping MBC3 ***')
 
 
     new_seq_states=np.concatenate((new_seq_dof2, new_seq_dof2+matData['ndof2']))
@@ -918,18 +930,11 @@ def fx_mbc3(FileNames, verbose=True, removeTwrAzimuth=False):
     if 'A' in MBC:
         MBC['AvgA'] = np.mean(MBC['A'],axis=2); # azimuth-average of azimuth-dependent MBC.A matrices
         MBC['eigSol'], EigenVects_save = eiganalysis(MBC['AvgA'],matData['ndof2'], matData['ndof1']);
-        
-        # ffname='AAA_avg'+'.txt'
-        # with open(ffname, "a") as f:
-        #     np.savetxt(f,MBC['AvgA'],fmt='%5.4f')
-        #     f.write('\n')
 
-    
-    # save eigenvectors (doing inverse of MBC3) for VTK visualization in FAST
-    # if nargout > 3 or nargin > 1:
-    #     [VTK] = GetDataForVTK(MBC, matData, nb, EigenVects_save);
-    #     if nargin > 1
-    #         WriteDataForVTK(VTK, ModeVizFileName)
+
+        if modesFilename is not None:
+            VTK = GetDataForVTKViz(MBC, matData, nb, EigenVects_save)
+            WriteDataForVTKViz(VTK, modesFilename)
 
     if 'B' in MBC:
         MBC['AvgB'] = np.mean(MBC['B'],axis=2); # azimuth-average of azimuth-dependent MBC.B matrices
@@ -953,6 +958,117 @@ def fx_mbc3(FileNames, verbose=True, removeTwrAzimuth=False):
         #     f.write('\n')
 
     return MBC, matData, FAST_linData
+
+
+#%% ------------------------------------------------------------------------
+def GetDataForVTKViz(MBC, matData, nb, EigenVects_save):
+    """ 
+    get data required for VTK visualization:
+        MBC.eigSol.EigenVects_save(:,SortedFreqIndx)       
+    """
+    nAzimuth = len(matData['Azimuth'])
+    nStates, nModes = EigenVects_save.shape
+
+    SortedFreqIndx = np.argsort((MBC['eigSol']['NaturalFreqs_Hz']).flatten(),kind="heapsort")
+
+    #put these in order of natural frequency:
+    VTK = dict()
+    VTK['NaturalFreq_Hz'] = MBC['eigSol']['NaturalFreqs_Hz'][  SortedFreqIndx] # nModes
+    VTK['DampedFreq_Hz']  = MBC['eigSol']['DampedFreqs_Hz'][   SortedFreqIndx] # nModes
+    VTK['DampingRatio']   = MBC['eigSol']['DampRatios'][       SortedFreqIndx] # nModes
+    x_eig                 =             EigenVects_save[:,     SortedFreqIndx] # nStates x nModes
+    # Adopt a convention such that the real part of the first state is positive (arbitrary)
+    S=np.sign(np.real(x_eig[0,:]))
+    x_eig = S * x_eig
+    VTK['x_eig'] = np.tile(x_eig, nAzimuth).reshape((x_eig.shape[0],x_eig.shape[1],nAzimuth))
+
+    if MBC['performedTransformation']:
+        # inverse MBC3 (Eq. 4, to move from collective, sine, cosine back to blade 1, blade 2, blade 3):
+        dof1_offset = MBC['ndof2']*2
+        for iaz, azimuth in enumerate(matData['Azimuth']):
+            # MBC3 transformation matrices
+            az = azimuth*np.pi/180.0 + 2*np.pi/nb* np.arange(nb)# % Eq. 1, azimuth in radians
+            az = az.reshape((-1,1)) # column vector
+            tt = np.column_stack( (np.ones((nb,1)), np.cos(az), np.sin(az))) #% Eq. 9, t_tilde
+            # MBC on second order states
+            I3_2nd = np.array(matData['RotTripletIndicesStates2']).astype(int)
+            for i2 in range(I3_2nd.shape[0]):
+                i3x   = I3_2nd[i2,:]
+                i3xdot= I3_2nd[i2,:]+MBC['ndof2']
+                VTK['x_eig'][i3x   , :, iaz] = tt.dot(x_eig[i3x   ,:])
+                VTK['x_eig'][i3xdot, :, iaz] = tt.dot(x_eig[i3xdot,:])
+            # MBC on first order states
+            I3_1st = np.array(matData['RotTripletIndicesStates1']).astype(int)
+            for i1 in range(I3_1st.shape[0]):
+                  i3x = I3_1st[i1] + dof1_offset
+                  VTK['x_eig'][i3x, :, iaz] = tt.dot(x_eig[i3x,:])
+    # put this in order states are stored in FAST
+    I = matData['StateOrderingIndx'] 
+    VTK['x_desc'] = np.array(MBC['DescStates'])[I]
+    VTK['x_eig']  = VTK['x_eig'][I,:,:]             # nStates x nModes x nAzimuth
+    VTK['x_eig_magnitude'] = np.abs(  VTK['x_eig']) # nStates x nModes x nAzimuth
+    VTK['x_eig_phase']     = np.angle(VTK['x_eig']) # nStates x nModes x nAzimuth
+    return VTK
+
+# ------------------------------------------------------------------------
+def WriteDataForVTKViz(VTK, modesFilename):
+    """ 
+    write binary file that will be read by OpenFAST to export modes to VTK
+    """
+    import struct
+    def fwrite(fid, data, type):
+        """ Mimic the matlab function fwrite"""
+        # @ is used for packing in native byte order
+        #  B - unsigned integer 8 bits
+        #  h - integer 16 bits
+        #  i - integer 32 bits
+        #  f - float 32 bits
+        #  d - float 64 bits
+        fmt, _ = {'uint8': ('B', 1), 'int16':('h', 2), 'int32':('i', 4), 'float32':('f', 4), 'float64':('d', 8)}[type]
+        if hasattr(data, '__len__'):
+            data = data.flatten(order='F')
+            n=len(data)
+            fid.write(struct.pack('@'+str(n)+fmt, *data))
+        else:
+            fid.write(struct.pack('@'+fmt, data))
+
+    fileFmt = 'float64' #8-byte real numbers
+    nStates, nModes, nLinTimes = VTK['x_eig_magnitude'].shape
+
+    #------- HACK
+    #VTK['NaturalFreq_Hz'] =VTK['NaturalFreq_Hz'][:19]*0 + 1
+    #VTK['DampingRatio']   =VTK['DampingRatio']  [:19]*0 + 2
+    #VTK['DampedFreq_Hz']  =VTK['DampedFreq_Hz'] [:19]*0 + 3
+    #     for iMode in range(nModes):
+    #         VTK['x_eig_magnitude'][:,iMode,:] = np.zeros((nStates,nLinTimes)) + iMode+1
+    #         VTK['x_eig_phase']    [:,iMode,:] = np.zeros((nStates,nLinTimes)) + iMode+1
+    #         VTK['x_eig_magnitude'][2,iMode,:] = 12
+    #         VTK['x_eig_phase']    [4,iMode,:] = 11
+    #nModes=1
+    # ------END HACK
+    # --- Reduce differences python/Matlab by rounding
+    #VTK['NaturalFreq_Hz']  = np.round(VTK['NaturalFreq_Hz']  *1000)/1000
+    #VTK['DampingRatio']    = np.round(VTK['DampingRatio']    *1000)/1000
+    #VTK['DampedFreq_Hz']   = np.round(VTK['DampedFreq_Hz']   *1000)/1000
+    #VTK['x_eig_magnitude'] = np.round(VTK['x_eig_magnitude'] *1000)/1000
+    #VTK['x_eig_phase'    ] = np.round(VTK['x_eig_phase']     *1000)/1000
+
+    # --- Write to disk
+    with open(modesFilename, 'wb') as fid:
+        fwrite(fid, 1,        'int32' )# write a file identifier in case we ever change this format
+        fwrite(fid, nModes,   'int32' )# number of modes (for easier file reading)
+        fwrite(fid, nStates,  'int32' )# number of states (for easier file reading)
+        fwrite(fid, nLinTimes,'int32' )# number of azimuths (i.e., LinTimes) (for easier file reading)
+        # Freq and damping (not used in the FAST visualization algorithm)
+        fwrite(fid, VTK['NaturalFreq_Hz'], fileFmt)
+        fwrite(fid, VTK['DampingRatio'],   fileFmt)
+        fwrite(fid, VTK['DampedFreq_Hz'],  fileFmt)
+        # Writing data mode by mode
+        for iMode in range(nModes):
+            fwrite(fid, VTK['x_eig_magnitude'][:,iMode,:], fileFmt)
+            fwrite(fid, VTK['x_eig_phase']    [:,iMode,:], fileFmt)
+    print('Written: ', modesFilename)
+
 
 
 def runMBC(FileNames, NLinTimes=None, removeTwrAzimuth=False):

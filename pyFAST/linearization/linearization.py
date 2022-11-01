@@ -82,7 +82,7 @@ def campbell(templateFstFile, operatingPointsFile, workDir, toolboxDir, fastExe,
 
     # --- Postprocess linearization outputs (MBC + modes ID)
     if runMBC:
-        OP, Freq, Damp, _, _, modeID_file = lin.postproCampbell(FSTfilenames, removeTwrAzimuth=removeTwrAzimuth, suffix=suffix)
+        OP, Freq, Damp, _, _, modeID_file = postproCampbell(FSTfilenames, removeTwrAzimuth=removeTwrAzimuth, suffix=suffix)
 
     # ---  Plot Campbell
     fig, axes = plotCampbell(OP, Freq, Damp, sx='WS_[m/s]', UnMapped=UnMapped, ylim=ylim)

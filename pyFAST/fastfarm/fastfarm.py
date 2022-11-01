@@ -498,13 +498,13 @@ def spanwiseColFastFarm(Cols, nWT=9, nD=9):
     """ Return column info, available columns and indices that contain AD spanwise data"""
     FFSpanMap=dict()
     for i in np.arange(nWT):
-        FFSpanMap['^CtT{:d}N(\d*)_\[-\]'.format(i+1)]='CtT{:d}_[-]'.format(i+1)
+        FFSpanMap[r'^CtT{:d}N(\d*)_\[-\]'.format(i+1)]='CtT{:d}_[-]'.format(i+1)
     for i in np.arange(nWT):
         for k in np.arange(nD):
-            FFSpanMap['^WkDfVxT{:d}N(\d*)D{:d}_\[m/s\]'.format(i+1,k+1) ]='WkDfVxT{:d}D{:d}_[m/s]'.format(i+1, k+1)  
+            FFSpanMap[r'^WkDfVxT{:d}N(\d*)D{:d}_\[m/s\]'.format(i+1,k+1) ]='WkDfVxT{:d}D{:d}_[m/s]'.format(i+1, k+1)  
     for i in np.arange(nWT):
         for k in np.arange(nD):
-            FFSpanMap['^WkDfVrT{:d}N(\d*)D{:d}_\[m/s\]'.format(i+1,k+1) ]='WkDfVrT{:d}D{:d}_[m/s]'.format(i+1, k+1)  
+            FFSpanMap[r'^WkDfVrT{:d}N(\d*)D{:d}_\[m/s\]'.format(i+1,k+1) ]='WkDfVrT{:d}D{:d}_[m/s]'.format(i+1, k+1)  
 
     return fastlib.find_matching_columns(Cols, FFSpanMap)
 
@@ -513,16 +513,16 @@ def diameterwiseColFastFarm(Cols, nWT=9):
     FFDiamMap=dict()
     for i in np.arange(nWT):
         for x in ['X','Y','Z']:
-            FFDiamMap['^WkAxs{}T{:d}D(\d*)_\[-\]'.format(x,i+1)]   ='WkAxs{}T{:d}_[-]'.format(x,i+1) 
+            FFDiamMap[r'^WkAxs{}T{:d}D(\d*)_\[-\]'.format(x,i+1)]   ='WkAxs{}T{:d}_[-]'.format(x,i+1) 
     for i in np.arange(nWT):
         for x in ['X','Y','Z']:
-            FFDiamMap['^WkPos{}T{:d}D(\d*)_\[m\]'.format(x,i+1)]   ='WkPos{}T{:d}_[m]'.format(x,i+1)
+            FFDiamMap[r'^WkPos{}T{:d}D(\d*)_\[m\]'.format(x,i+1)]   ='WkPos{}T{:d}_[m]'.format(x,i+1)
     for i in np.arange(nWT):
         for x in ['X','Y','Z']:
-            FFDiamMap['^WkVel{}T{:d}D(\d*)_\[m/s\]'.format(x,i+1)] ='WkVel{}T{:d}_[m/s]'.format(x,i+1) 
+            FFDiamMap[r'^WkVel{}T{:d}D(\d*)_\[m/s\]'.format(x,i+1)] ='WkVel{}T{:d}_[m/s]'.format(x,i+1) 
     for i in np.arange(nWT):
         for x in ['X','Y','Z']:
-            FFDiamMap['^WkDiam{}T{:d}D(\d*)_\[m\]'.format(x,i+1)]  ='WkDiam{}T{:d}_[m]'.format(x,i+1)
+            FFDiamMap[r'^WkDiam{}T{:d}D(\d*)_\[m\]'.format(x,i+1)]  ='WkDiam{}T{:d}_[m]'.format(x,i+1)
     return fastlib.find_matching_columns(Cols, FFDiamMap)
 
 def SensorsFARMRadial(nWT=3,nD=10,nR=30,signals=None):
@@ -579,11 +579,11 @@ def spanwisePostProFF(fastfarm_input,avgMethod='constantwindow',avgParam=30,D=1,
     # --- Opening input file and extracting inportant variables
     if fastfarm_input is None:
         # We don't have an input file, guess numbers of turbine, diameters, Nodes...
-        cols, sIdx = fastlib.find_matching_pattern(df.columns.values, 'T(\d+)')
+        cols, sIdx = fastlib.find_matching_pattern(df.columns.values, r'T(\d+)')
         nWT = np.array(sIdx).astype(int).max()
-        cols, sIdx = fastlib.find_matching_pattern(df.columns.values, 'D(\d+)')
+        cols, sIdx = fastlib.find_matching_pattern(df.columns.values, r'D(\d+)')
         nD = np.array(sIdx).astype(int).max()
-        cols, sIdx = fastlib.find_matching_pattern(df.columns.values, 'N(\d+)')
+        cols, sIdx = fastlib.find_matching_pattern(df.columns.values, r'N(\d+)')
         nr = np.array(sIdx).astype(int).max()
         vr=None
         vD=None
