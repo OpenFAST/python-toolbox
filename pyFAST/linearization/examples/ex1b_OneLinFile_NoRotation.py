@@ -1,5 +1,5 @@
 """ 
-Standalone script to post-process one linearization file from OpenFAST.
+Script to postprocess one linearization file from OpenFAST.
 NOTE: this should not be used if the rotor is turning.
 This script would typically be used for a standstill analysis (no rotation),
 or to compute modes of when only isolated degrees of freedom are turned on (and no rotation).
@@ -10,12 +10,12 @@ import os
 import numpy as np
 import pyFAST.linearization.mbc.mbc3 as mbc # TODO will be moved in the future
 
-MyDir = os.path.dirname(__file__)
+scriptDir = os.path.dirname(__file__)
 
 ## Script Parameters
 BladeLen     = 40.04                # Blade length, used to tune relative modal energy [m]
 TowerLen     = 55.59                # Tower length, used to tune relative modal energy [m]
-lin_file     = os.path.join(MyDir,'../../../data/example_files/Standstill.1.lin') # Linearization file
+lin_file     = os.path.join(scriptDir,'../../../data/example_files/Standstill.1.lin') # Linearization file
 #lin_file     = '../../../data/example_files/Standstill_old.1.lin' # Linearization file
 nModesMax    = 10                   # Maximum number of modes to be shown
 nCharMaxDesc = 50                   # Maximum number of characters for description written to screen
@@ -23,6 +23,7 @@ nCharMaxDesc = 50                   # Maximum number of characters for descripti
 ## Derived parameters
 lin_files = np.array([lin_file])
 
+# TODO Simplify interface
 # Performing MBC (NOTE: not stricly necessary without rotation)
 mbc_data, matData, FAST_linData = mbc.fx_mbc3(lin_files, verbose=False)
 CD = mbc.campbell_diagram_data(mbc_data,BladeLen,TowerLen)
@@ -37,6 +38,7 @@ for i in np.arange(nModesMax):
     # Extracting description the best we can
     Desc = mbc.extractShortModeDescription(Mode)
     print('{:3d} ,{:12.3f}, {:8.5f}       , {:7.4f},  {:s}'.format(i+1,Mode['NaturalFreq_Hz'],Mode['DampingRatio'],Mode['DampingRatio']*100*2*np.pi, Desc[:min(nCharMaxDesc,len(Desc))]))
+
 
 if __name__=='__main__':
     pass
