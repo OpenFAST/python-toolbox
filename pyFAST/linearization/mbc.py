@@ -120,10 +120,12 @@ def eiganalysis(A, ndof2=None, ndof1=None):
 # --------------------------------------------------------------------------------}
 # --- Main function 
 # --------------------------------------------------------------------------------{
-def fx_mbc3(FileNames, modesFilename=None, verbose=True, removeTwrAzimuth=False):
+def fx_mbc3(FileNames, verbose=True, removeTwrAzimuth=False):
     """ 
     FileNames: list of lin files for a given operating point
-    modesFilename: if present, a .postMBC file will be written for OpenFAST to generate VTK files
+
+    NOTE: unlike the matlab function, fx_mbc3 does not write the modes for VTK visualization
+          Instead use the wrapper function def getCDDOP from pyFAST.linearization.tools
 
 
 
@@ -361,6 +363,8 @@ def fx_mbc3(FileNames, modesFilename=None, verbose=True, removeTwrAzimuth=False)
     if 'A' in MBC:
         MBC['AvgA'] = np.mean(MBC['A'],axis=2); # azimuth-average of azimuth-dependent MBC.A matrices
         MBC['eigSol'], EigenVects_save = eiganalysis(MBC['AvgA'], matData['ndof2'], matData['ndof1']);
+        MBC['EigenVects_save'] = EigenVects_save
+        MBC['nb'] = nb
 
     if 'B' in MBC:
         MBC['AvgB'] = np.mean(MBC['B'],axis=2); # azimuth-average of azimuth-dependent MBC.B matrices
@@ -383,18 +387,11 @@ def fx_mbc3(FileNames, modesFilename=None, verbose=True, removeTwrAzimuth=False)
         #     np.savetxt(f,MBC['AvgD'],fmt='%5.4f')
         #     f.write('\n')
 
-    # --- Write Modes TODO remove me from fx_mbc3
-    if 'A' in MBC:
-        from pyFAST.linearization.tools import writeModes # TODO remove me (circular dependency)
-        if modesFilename is not None:
-            VTK = formatModesForOpenFAST(MBC, matData, nb, EigenVects_save)
-            writeModes(VTK, modesFilename)
-
     return MBC, matData
 
 
 #%% ------------------------------------------------------------------------
-def formatModesForOpenFAST(MBC, matData, nb, EigenVects_save):
+def formatModesForViz(MBC, matData, nb, EigenVects_save):
     """ 
     get data required for VTK visualization:
         MBC.eigSol.EigenVects_save(:,SortedFreqIndx)       

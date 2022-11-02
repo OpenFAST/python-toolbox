@@ -20,14 +20,19 @@ import os
 import pandas as pd
 # import re
 import numpy as np
-from pyFAST.linearization.tools import getMBCOP
+from pyFAST.linearization.tools import getMBCOPs
+from pyFAST.linearization.tools import getCampbellDataOPs
 from pyFAST.linearization.tools import estimateLengths
 
 from pyFAST.linearization.campbell_data import campbell_diagram_data_oneOP, campbellData2CSV, campbellData2TXT
 from pyFAST.linearization.campbell_data import IdentifyModes
 
 
-def postproCampbell(fstfiles, BladeLen=None, TowerLen=None, verbose=True, nFreqOut=15, WS_legacy=None, removeTwrAzimuth=False):
+def postproCampbell(fstFiles, BladeLen=None, TowerLen=None, verbose=True, nFreqOut=15, 
+        WS_legacy=None, removeTwrAzimuth=False,
+        writeModes=None,
+        **kwargs
+        ):
     """ 
     Postprocess linearization files to extract Campbell diagram (linearization at different Operating points)
     - Run MBC
@@ -36,41 +41,33 @@ def postproCampbell(fstfiles, BladeLen=None, TowerLen=None, verbose=True, nFreqO
     - Export to disk
 
     INPUTS:
-     - fstfiles: list of fst files
+     - fstFiles: list of fst files
+     - writeModes: if True, a binary file and a .viz file is written to disk for OpenFAST VTK visualization.
+                   if None, the binary file is written only if a checkpoint file is present.
+                          For instance, if the main file is     : 'main.fst', 
+                          the binary file will be               : 'main.ModeShapeVTK.pyPostMBC'
+                          the viz file will be                  : 'main.ModeShapeVTK.viz'
+                          the checkpoint file is expected to be : 'main.ModeShapeVTK.chkp'
+     - **kwargs: list of key/values to be passed to writeVizFile (see function below)
+           VTKLinModes=15, VTKLinScale=10, VTKLinTim=1, VTKLinTimes1=True, VTKLinPhase=0, VTKModes=None
     """ 
-    if len(fstfiles)==0:
+    if len(fstFiles)==0:
         raise Exception('postproCampbell requires a list of at least one .fst')
 
-    if len(fstfiles)==1 and os.path.splitext(fstfiles[0])[1]=='.pkl':
+    if len(fstFiles)==1 and os.path.splitext(fstFiles[0])[1]=='.pkl':
         # Temporary hack for debugging, using a pickle file
         import pickle
-        CD = pickle.load(open(fstfiles[0],'rb'))
+        CD = pickle.load(open(fstFiles[0],'rb'))
     else:
-        # --- Run MBC for all operating points
-        MBC = run_pyMBC(fstfiles, verbose, removeTwrAzimuth=removeTwrAzimuth)
-
         # --- Attemps to extract Blade Length and TowerLen from first file...
-        filebase, ext = os.path.splitext(fstfiles[0])
-        if BladeLen is None:
-            fstFile = filebase+'.fst'
-            BladeLen, TowerLen = estimateLengths(fstFile)
-
-        # --- Transform data into "CampbellData" (similar to matlab)
-        CD = [None]*len(MBC)
-        for i_lin, mbc_ in enumerate(MBC):
-            if mbc_ is not None:
-                CD[i_lin] = campbell_diagram_data_oneOP(mbc_, BladeLen, TowerLen)
-
-        CD = [cd for cd in CD if cd is not None]
-        if len(CD)==0:
-            raise Exception('No linearization file found')
+        CD, MBC = getCampbellDataOPs(fstFiles, writeModes=writeModes, BladeLen=BladeLen, TowerLen=TowerLen, removeTwrAzimuth=removeTwrAzimuth, verbose=verbose, **kwargs)
 
     # --- Identify modes
     modeID_table,modesDesc=IdentifyModes(CD)
 
     # --- Write files to disk
     # Write csv file for manual identification step..
-    baseName    = os.path.join(os.path.dirname(fstfiles[0]), 'Campbell')
+    baseName    = os.path.join(os.path.dirname(fstFiles[0]), 'Campbell')
     modeID_file = campbellData2CSV(baseName, CD, modeID_table, modesDesc)
     # Write summary txt file to help manual identification step..
     txtFileName = baseName+'_Summary.txt'
@@ -78,26 +75,9 @@ def postproCampbell(fstfiles, BladeLen=None, TowerLen=None, verbose=True, nFreqO
 
     # --- Return nice dataframes (assuming the identification is correct)
     # TODO, for now we reread the files...
-    OP, Freq, Damp, UnMapped, ModeData = postproMBC(csvModesIDFile=modeID_file, verbose=False, WS_legacy=WS_legacy)
+    OP, Freq, Damp, UnMapped, ModeData = postproMBC(csvModesIDFile=modeID_file, verbose=verbose, WS_legacy=WS_legacy)
     
     return OP, Freq, Damp, UnMapped, ModeData, modeID_file
-
-
-
-def run_pyMBC(fstfiles, verbose=True, TowerLen=None, BladeLen=None, removeTwrAzimuth=False):
-    """
-    Run MBC transform on set of openfast linear outputs
-
-    INPUTS:
-      - fstfiles: list of .fst files
-    """
-    if verbose:
-        print('run_pyMBC:')
-    MBC = [None]*len(fstfiles)
-    for i_lin, fstfile in enumerate(fstfiles):
-        # MBC for a given operating point (OP)
-        MBC[i_lin], matData = getMBCOP(fstfile, verbose=verbose)
-    return MBC
 
 # --------------------------------------------------------------------------------}
 # --- Postprocessing 

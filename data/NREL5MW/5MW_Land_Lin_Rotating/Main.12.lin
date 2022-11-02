@@ -2,7 +2,7 @@
 Linearized model: Predictions were generated on 01-Nov-2022 at 16:01:32 using OpenFAST, compiled as a 64-bit application using single precision at commit v3.3.0-dirty
  linked with  NWTC Subroutine Library; ElastoDyn; InflowWind; AeroDyn; ServoDyn
 
-Description from the FAST input file: NREL Wind Turbine - Linearization using Trim solution for a rotational speed of 9 RPM
+Description from the FAST input file: NREL Wind Turbine - linearization using trim solution for a rotational speed of 9 RPM
 
 Simulation information:
    Simulation time:                   121.9500 s

@@ -1,5 +1,5 @@
 ------- OpenFAST example INPUT FILE -------------------------------------------
-FAST Certification Test #18: NREL 5.0 MW Baseline Wind Turbine (Onshore)
+NREL 5.0 MW Baseline Wind Turbine (Onshore)
 ---------------------- SIMULATION CONTROL --------------------------------------
 False          Echo            - Echo input data to <RootName>.ech (flag)
 "FATAL"       AbortLevel      - Error level when simulation should abort (string) {"WARNING", "SEVERE", "FATAL"}
@@ -18,6 +18,17 @@ False          Echo            - Echo input data to <RootName>.ech (flag)
           0   CompSub         - Compute sub-structural dynamics (switch) {0=None; 1=SubDyn; 2=External Platform MCKF}
           0   CompMooring     - Compute mooring system (switch) {0=None; 1=MAP++; 2=FEAMooring; 3=MoorDyn; 4=OrcaFlex}
           0   CompIce         - Compute ice loads (switch) {0=None; 1=IceFloe; 2=IceDyn}
+0                      MHK           - MHK turbine type (switch) {0=Not an MHK turbine; 1=Fixed MHK turbine; 2=Floating MHK turbine}
+---------------------- ENVIRONMENTAL CONDITIONS --------------------------------
+9.80665                Gravity       - Gravitational acceleration (m/s^2)
+1.225                  AirDens       - Air density (kg/m^3)
+0                      WtrDens       - Water density (kg/m^3)
+1.464e-05              KinVisc       - Kinematic viscosity of working fluid (m^2/s)
+335                    SpdSound      - Speed of sound in working fluid (m/s)
+103500                 Patm          - Atmospheric pressure (Pa) [used only for an MHK turbine cavitation check]
+1700                   Pvap          - Vapour pressure of working fluid (Pa) [used only for an MHK turbine cavitation check]
+0                      WtrDpth       - Water depth (m)
+0                      MSL2SWL       - Offset between still-water level and mean sea level (m) [positive upward]
 ---------------------- INPUT FILES ---------------------------------------------
 "NRELOffshrBsline5MW_Onshore_ElastoDyn.dat"    EDFile          - Name of file containing ElastoDyn input parameters (quoted string)
 "unused"    BDBldFile(1)    - Name of file containing BeamDyn input parameters for blade 1 (quoted string)
@@ -43,10 +54,10 @@ True          TabDelim        - Use tab delimiters in text tabular output file? 
 False         Linearize       - Linearization analysis (flag)
 False         CalcSteady    - Calculate a steady-state periodic operating point before linearization (-) (switch)
 2             TrimCase - Controller parameter to be trimmed {1:yaw; 2:torque; 3:pitch} [used only when CalcSteady=True]
-0.0001        TrimTol - Tolerance for the rotational speed convergence [>eps] [used only when CalcSteady=True]
+0.0001        TrimTol - Tolerance for the rotational speed convergence [>eps] [used only if CalcSteady=True]
 0.001         TrimGain - Proportional gain for the rotational speed error (rad/(rad/s) or Nm/(rad/s)) [>0] [used only when CalcSteady=True]
-0.0           Twr_Kdmp - Damping factor for the tower (N/(m/s)) [>=0] [used only when CalcSteady=True]
-0.0           Bld_Kdmp - Damping factor for the blade (N/(m/s)) [>=0] [used only when CalcSteady=True]
+0.0           Twr_Kdmp - Damping factor for the tower (N/(m/s)) [>=0] [used only if CalcSteady=True]
+0.0           Bld_Kdmp - Damping factor for the blades (N/(m/s)) [>=0] [used only if CalcSteady=True]
 1             NLinTimes     - Number of times to linearize (-) [>=1] [unused if Linearize=False]
 100 LinTimes - List of times at which to linearize (s) [1 to NLinTimes] [unused if Linearize=False]
           0   LinInputs       - Inputs included in linearization (switch) {0=none; 1=standard; 2=all module inputs (debug)} [unused if Linearize=False]

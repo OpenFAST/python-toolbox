@@ -114,6 +114,7 @@ venv.bak/
 *.out
 *.outb
 *.viz
+*.pyPostMBC
 
 #  Hidding files starting with underscore except init
 _*

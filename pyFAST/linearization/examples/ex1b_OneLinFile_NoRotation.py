@@ -10,19 +10,20 @@ import os
 import numpy as np
 import pyFAST.linearization as lin
 
+# Get current directory so this script can be called from any location
 scriptDir = os.path.dirname(__file__)
 
-## Script Parameters
+# Script Parameters
 BladeLen     = 40.04                # Blade length, used to tune relative modal energy [m]
 TowerLen     = 55.59                # Tower length, used to tune relative modal energy [m]
 lin_file     = os.path.join(scriptDir,'../../../data/example_files/Standstill.1.lin') # Linearization file
 
 # Get Campbell Diagram Data for one Operating Point (CDDOP) given a .lin file
 # Performing MBC (NOTE: not stricly necessary without rotation)
-CDDOP, MBC = lin.getCDDOP([lin_file], BladeLen=BladeLen, TowerLen=TowerLen)
+CDDOP, MBC = lin.getCampbellDataOP([lin_file], BladeLen=BladeLen, TowerLen=TowerLen)
 
 # Outputs to screen
-Freq,Damp = lin.printCDDOP(CDDOP, nModesMax=10, nCharMaxDesc=50)
+Freq,Damp = lin.printCampbellDataOP(CDDOP, nModesMax=10, nCharMaxDesc=50)
 
 if __name__=='__main__':
     pass

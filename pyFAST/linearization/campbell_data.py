@@ -172,12 +172,18 @@ def getScaleFactors(DescStates, TowerLen, BladeLen):
     return ScalingFactor
 
 
-def printCDDOP(CDDOP, nModesMax=15, nCharMaxDesc=50) :
+def printCampbellDataOP(CDDOP, nModesMax=15, nCharMaxDesc=50) :
     """ 
-    Print campbell diagram data at one operating points
+    Print frequencies, damping and mode description for Campbell diagram data at one operating points (CDDOP)
+    INPUTS:
     - CDDOP: dictionary as returned by campbell_diagram_data_oneOP
     - nModesMax   : Maximum number of modes to be shown
     - nCharMaxDesc: Maximum number of characters for description written to screen
+    OUTPUTS
+     - Freq: frequencies for each modes
+     - Damp: Damping for each modes
+
+    See matlab-toolbox/Campbell/printCDDDOP.m
     """
     nModesMax = np.min([len(CDDOP['Modes']),nModesMax])
     Freq = np.array([CDDOP['Modes'][i]['NaturalFreq_Hz'] for i in np.arange(nModesMax)])

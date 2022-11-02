@@ -6,6 +6,7 @@
 import os
 import matplotlib.pyplot as plt
 
+# Get current directory so this script can be called from any location
 scriptDir=os.path.dirname(__file__)
 
 # --- Create an AeroDyn polar from a CSV file

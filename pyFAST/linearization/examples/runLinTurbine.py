@@ -99,7 +99,8 @@ if __name__ == '__main__':
     # 1. Run linearizations
     fastfiles = run_linearization()
     # 2. Do MBC
-    MBC = lin.run_pyMBC(fastfiles)
+    #MBC = lin.run_pyMBC(fastfiles)
+    MBC = lin.getMBCOPs(fastfiles)
 
     # Check natural frequencies against matlab
     for mbc in MBC:
