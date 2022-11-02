@@ -5,9 +5,9 @@ False         Echo               - Echo the input to "<rootname>.AD.ech"?  (flag
 "default"     DTAero             - Time interval for aerodynamic calculations {or "default"} (s)
           1   WakeMod            - Type of wake/induction model (switch) {0=none, 1=BEMT, 2=DBEMT, 3=OLAF} [WakeMod cannot be 2 or 3 when linearizing]
           1   AFAeroMod          - Type of blade airfoil aerodynamics model (switch) {1=steady model, 2=Beddoes-Leishman unsteady model} [AFAeroMod must be 1 when linearizing]
-          1   TwrPotent          - Type tower influence on wind based on potential flow around the tower (switch) {0=none, 1=baseline potential flow, 2=potential flow with Bak correction}
+          0   TwrPotent          - Type tower influence on wind based on potential flow around the tower (switch) {0=none, 1=baseline potential flow, 2=potential flow with Bak correction}
           0   TwrShadow          - Calculate tower influence on wind based on downstream tower shadow (switch) {0=none, 1=Powles model, 2=Eames model}
-True          TwrAero            - Calculate tower aerodynamic loads? (flag)
+False         TwrAero            - Calculate tower aerodynamic loads? (flag)
 True          FrozenWake         - Assume frozen wake during linearization? (flag) [used only when WakeMod=1 and when linearizing]
 False         CavitCheck         - Perform cavitation check? (flag) [AFAeroMod must be 1 when CavitCheck=true]
 False         CompAA             - Flag to compute AeroAcoustics calculation [used only when WakeMod = 1 or 2]
@@ -76,13 +76,19 @@ TwrElev        TwrDiam        TwrCd          TwrTI
 8.5268000E+01  3.8700000E+00  1.0000000E+00  0.1
 8.7600000E+01  3.8700000E+00  1.0000000E+00  0.1
 ======  Outputs  ====================================================================================
-False          SumPrint            - Generate a summary file listing input options and interpolated properties to "<rootname>.AD.sum"?  (flag)
+False         SumPrint            - Generate a summary file listing input options and interpolated properties to "<rootname>.AD.sum"?  (flag)
           0   NBlOuts             - Number of blade node outputs [0 - 9] (-)
-          1,          9,         19    BlOutNd             - Blade nodes whose values will be output  (-)
+          1   BlOutNd             - Blade nodes whose values will be output  (-)
           0   NTwOuts             - Number of tower node outputs [0 - 9]  (-)
-          1,          2,          6    TwOutNd             - Tower nodes whose values will be output  (-)
-                   OutList             - The next line(s) contains a list of output parameters.  See OutListParameters.xlsx for a listing of available output channels, (-)
+          1   TwOutNd             - Tower nodes whose values will be output  (-)
+              OutList             - The next line(s) contains a list of output parameters.  See OutListParameters.xlsx for a listing of available output channels, (-)
+"RtAeroPwr"
 "RtAeroCp"
 "RtAeroCt"
+END of input file (the word "END" must appear in the first 3 columns of this last OutList line)
+====== Outputs for all blade stations (same ending as above for B1N1.... =========================== [optional section]
+   0              BldNd_BladesOut     - Number of blades to output all node information at.  Up to number of blades on turbine. (-)
+   "All"          BldNd_BlOutNd       - Future feature will allow selecting a portion of the nodes to output.  Not implemented yet. (-)
+                  OutListAD           - The next line(s) contains a list of output parameters.  See OutListParameters.xlsx for a listing of available output channels, (-)
 END of input file (the word "END" must appear in the first 3 columns of this last OutList line)
 ---------------------------------------------------------------------------------------

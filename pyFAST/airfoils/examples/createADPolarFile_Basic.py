@@ -58,3 +58,8 @@ except:
 if __name__ == '__main__':
     plt.show()
 
+if __name__ == '__test__':
+    try:
+        os.remove('_AeroDyn_Polar_DU21_A17.dat')
+    except:
+        pass

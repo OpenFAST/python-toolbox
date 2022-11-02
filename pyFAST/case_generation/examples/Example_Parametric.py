@@ -92,5 +92,6 @@ if __name__=='__main__':
     plt.show()
 
 if __name__=='__test__':
-    # Need openfast.exe, doing nothing
-    pass
+    # Need openfast.exe, not running
+    import shutil
+    shutil.rmtree(work_dir)

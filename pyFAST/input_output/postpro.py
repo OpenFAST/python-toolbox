@@ -1404,8 +1404,7 @@ def averagePostPro(outFiles,avgMethod='periods',avgParam=None,ColMap=None,ColKee
     # Loop trough files and populate result
     for i,f in enumerate(outFiles):
         try:
-            df=weio.read(f).toDataFrame()
-            #df=FASTOutputFile(f).toDataFrame()A # For pyFAST
+            df=FASTOutputFile(f).toDataFrame() # For pyFAST
         except:
             invalidFiles.append(f)
             continue
@@ -1417,16 +1416,15 @@ def averagePostPro(outFiles,avgMethod='periods',avgParam=None,ColMap=None,ColKee
             result = pd.DataFrame(np.nan, index=np.arange(len(outFiles)), columns=columns)
         result.iloc[i,:] = MeanValues.copy().values
 
-    if ColSort is not None:
-        # Sorting 
-        result.sort_values([ColSort],inplace=True,ascending=True)
-        result.reset_index(drop=True,inplace=True) 
-
     if len(invalidFiles)==len(outFiles):
         raise Exception('None of the files can be read (or exist)!. For instance, cannot find: {}'.format(invalidFiles[0]))
     elif len(invalidFiles)>0:
         print('[WARN] There were {} missing/invalid files: \n {}'.format(len(invalidFiles),'\n'.join(invalidFiles)))
 
+    if ColSort is not None:
+        # Sorting 
+        result.sort_values([ColSort],inplace=True,ascending=True)
+        result.reset_index(drop=True,inplace=True) 
 
     return result 
 

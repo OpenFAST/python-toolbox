@@ -12,7 +12,7 @@ from pyFAST.input_output.fast_linearization_file import FASTLinearizationFile
 scriptDir = os.path.dirname(__file__)
 
 # --- Open lin File
-linFile = os.path.join(scriptDir, '../../../data/NREL5MW/5MW_Lan_Lin_BladeOnly/Main.1.lin')
+linFile = os.path.join(scriptDir, '../../../data/NREL5MW/5MW_Land_Lin_BladeOnly/Main.1.lin')
 lin = FASTLinearizationFile(linFile)
 print('Keys available:',lin.keys())
 

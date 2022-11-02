@@ -26,7 +26,7 @@ scriptDir = os.path.dirname(__file__)
 fstFiles = glob.glob(os.path.join(scriptDir,'../../../data/linearization_outputs/*.fst')) # list of fst files where linearization were run, lin file will be looked for
 # fstFiles = glob.glob(os.path.join(scriptDir,'../../../data/NREL5MW/5MW_Land_Lin_Rotating/*.fst')) # list of fst files where linearization were run, lin file will be looked for
 
-# --- Step 3: Run MBC, identify Modes, generate CSV files
+# --- Step 3: Run MBC, identify Modes, generate CSV files, and binary modes
 # Find lin files, perform MBC, and try to identify modes. A csv file is written with the mode IDs.
 OP, Freq, Damp, UnMapped, ModeData, modeID_file = lin.postproCampbell(fstFiles, writeModes=True, verbose=True)
 
@@ -39,23 +39,23 @@ fig, axes, figName =  lin.plotCampbellDataFile(modeID_file, 'ws', ylim=None)
 
 
 
-# --- Step 5: Generate visualization data (advanced users)
+# --- Step 5: Generate visualization data (for advanced users)
 
 # --- Step 5a: Write viz files (Only useful if OpenFAST was run with WrVTK=3)
-vizDict = {'VTKLinModes':2, 'VTKLinScale':10}  # Options for .viz file. Default values are:
+vizDict = {'VTKLinModes':2, 'VTKLinScale':10}  # Options for .viz file. Default values are: VTKLinModes=15, VTKLinScale=10, VTKLinTim=1, VTKLinTimes1=True, VTKLinPhase=0, VTKModes=None
 vizFiles = lin.writeVizFiles(fstFiles, verbose=True, **vizDict)
 
 # --- Step 5b: Run FAST with VIZ files to generate VTKs
 import pyFAST.case_generation.runner as runner
 simDir = os.path.dirname(fstFiles[0])
 fastExe = '../../../data/openfast3.3_x64s.exe'
-# Option 1 write a batch file and run it
+### Option 1 write a batch file and run it
 # batchfile = runner.writeBatch(os.path.join(simDir,'_RUNViz.bat'), vizFiles, fastExe=fastExe, flags='-VTKLin')
 # runner.runBatch(batchfile)
-# Option 2: direct calls
+### Option 2: direct calls
 # runner.run_cmds(vizFiles, fastExe, showOutputs=True, flags=['-VTKLin'])
 
-# --- Step 5c: Convert VTKs to AVI
+# --- Step 5c: Convert VTKs to AVI - TODO
 # %       Also, this is experimental and users might need to adapt the inputs and batchfile content
 #     pvPython          = 'pvpython'; % path to paraview-python binary
 #     pythonPlotScript  = 'C:/Work/FAST/matlab-toolbox/Campbell/plotModeShapes.py'; % path to python plot script

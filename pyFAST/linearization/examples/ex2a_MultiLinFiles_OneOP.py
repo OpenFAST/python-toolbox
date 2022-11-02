@@ -17,8 +17,7 @@ scriptDir = os.path.dirname(__file__)
 # --- Script Parameters
 simDir      = os.path.join(scriptDir,'../../../data/NREL5MW/5MW_Land_Lin_Rotating/') # Simulation directory
 fstFile     = os.path.join(simDir,'./Main.fst') # fstFile, lin files will be assumed to be basename.i.lin
-vizDict = {'VTKLinModes':15, 'VTKLinScale':10}  # Options for .viz file. Default values are:
-                                                # VTKLinModes=15, VTKLinScale=10, VTKLinTim=1, VTKLinTimes1=True, VTKLinPhase=0, VTKModes=None
+vizDict = {'VTKLinModes':15, 'VTKLinScale':10}  # Options for .viz file. Default values are: VTKLinModes=15, VTKLinScale=10, VTKLinTim=1, VTKLinTimes1=True, VTKLinPhase=0, VTKModes=None
 
 
 # --- Get Campbell Diagram Data for one Operating Point (CDDOP) given an OpenFAST input file

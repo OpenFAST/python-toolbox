@@ -1,5 +1,5 @@
 ------- FAST v8.16.* INPUT FILE ------------------------------------------------
-FAST Certification Test #24: NREL 5.0 MW Baseline Wind Turbine with OC3 Hywind Configuration, for use in offshore analysis
+NREL 5.0 MW Baseline Wind Turbine Onshore
 ---------------------- SIMULATION CONTROL --------------------------------------
 False         Echo            - Echo input data to <RootName>.ech (flag)
 "FATAL"       AbortLevel      - Error level when simulation should abort (string) {"WARNING", "SEVERE", "FATAL"}
@@ -18,20 +18,31 @@ False         Echo            - Echo input data to <RootName>.ech (flag)
           0   CompSub         - Compute sub-structural dynamics (switch) {0=None; 1=SubDyn}
           0   CompMooring     - Compute mooring system (switch) {0=None; 1=MAP++; 2=FEAMooring; 3=MoorDyn; 4=OrcaFlex}
           0   CompIce         - Compute ice loads (switch) {0=None; 1=IceFloe; 2=IceDyn}
+0                      MHK           - MHK turbine type (switch) {0=Not an MHK turbine; 1=Fixed MHK turbine; 2=Floating MHK turbine}
+---------------------- ENVIRONMENTAL CONDITIONS --------------------------------
+9.80665                Gravity       - Gravitational acceleration (m/s^2)
+1.225                  AirDens       - Air density (kg/m^3)
+0                      WtrDens       - Water density (kg/m^3)
+1.464e-05              KinVisc       - Kinematic viscosity of working fluid (m^2/s)
+335                    SpdSound      - Speed of sound in working fluid (m/s)
+103500                 Patm          - Atmospheric pressure (Pa) [used only for an MHK turbine cavitation check]
+1700                   Pvap          - Vapour pressure of working fluid (Pa) [used only for an MHK turbine cavitation check]
+0                      WtrDpth       - Water depth (m)
+0                      MSL2SWL       - Offset between still-water level and mean sea level (m) [positive upward]
 ---------------------- INPUT FILES ---------------------------------------------
-"onshore/NREL5MW_ED_Onshore.dat"    EDFile          - Name of file containing ElastoDyn input parameters (quoted string)
+"onshore/ElastoDyn.dat"     EDFile           - Name of file containing ElastoDyn input parameters (quoted string)
 "5MW_Baseline/NRELOffshrBsline5MW_BeamDyn.dat"    BDBldFile(1)    - Name of file containing BeamDyn input parameters for blade 1 (quoted string)
 "5MW_Baseline/NRELOffshrBsline5MW_BeamDyn.dat"    BDBldFile(2)    - Name of file containing BeamDyn input parameters for blade 2 (quoted string)
 "5MW_Baseline/NRELOffshrBsline5MW_BeamDyn.dat"    BDBldFile(3)    - Name of file containing BeamDyn input parameters for blade 3 (quoted string)
-"onshore/NREL5MW_IW.dat"    InflowFile      - Name of file containing inflow wind input parameters (quoted string)
-"onshore/NREL5MW_AD.dat"    AeroFile        - Name of file containing aerodynamic input parameters (quoted string)
-"onshore/NREL5MW_SvD_Simple.dat"    ServoFile       - Name of file containing control and electrical-drive input parameters (quoted string)
-"NA"    HydroFile       - Name of file containing hydrodynamic input parameters (quoted string)
-"NA"      SubFile         - Name of file containing sub-structural input parameters (quoted string)
-"NA"    MooringFile     - Name of file containing mooring system input parameters (quoted string)
-"NA"      IceFile         - Name of file containing ice input parameters (quoted string)
+"onshore/InflowWind.dat"           InflowFile      - Name of file containing inflow wind input parameters (quoted string)
+"onshore/AeroDyn.dat"              AeroFile        - Name of file containing aerodynamic input parameters (quoted string)
+"onshore/ServoDyn_Simple.dat"      ServoFile       - Name of file containing control and electrical-drive input parameters (quoted string)
+"unused"      HydroFile       - Name of file containing hydrodynamic input parameters (quoted string)
+"unused"      SubFile         - Name of file containing sub-structural input parameters (quoted string)
+"unused"      MooringFile     - Name of file containing mooring system input parameters (quoted string)
+"unused"      IceFile         - Name of file containing ice input parameters (quoted string)
 ---------------------- OUTPUT --------------------------------------------------
-False          SumPrint        - Print summary data to "<RootName>.sum" (flag)
+False         SumPrint        - Print summary data to "<RootName>.sum" (flag)
           1   SttsTime        - Amount of time between screen status messages (s)
       99999   ChkptTime       - Amount of time between creating checkpoint files for potential restart (s)
      0.100    DT_Out          - Time step for tabular output (s) (or "default")

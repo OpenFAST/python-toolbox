@@ -72,3 +72,6 @@ if __name__ == '__test__':
     np.testing.assert_almost_equal(df_st['K55'].values[10]        , 7009180000.0      )
     np.testing.assert_almost_equal(df_st['K66'].values[10]        , 1002120000.0      )
     np.testing.assert_almost_equal(df_st['K11']                   , df_st['K22'].values)
+
+    os.remove(H2_htcfile_new)
+    os.remove(H2_stfile)

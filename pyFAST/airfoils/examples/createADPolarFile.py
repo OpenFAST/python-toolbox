@@ -109,9 +109,6 @@ if __name__ == '__main__':
     plt.show()
 
 if __name__ == '__test__':
-    ADpol,polar = main_ReWriteADFile()
-    ADpol,polar = main_WriteADPolar()
-    ADpol,polar = main_WriteADPolar()
     try:
         os.remove('_Polar_out.dat.ignore')
     except:

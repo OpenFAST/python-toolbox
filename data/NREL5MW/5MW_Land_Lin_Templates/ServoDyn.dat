@@ -1,5 +1,5 @@
 ------- SERVODYN v1.05.* INPUT FILE --------------------------------------------
-NREL 5.0 MW Baseline Wind Turbine for Use in Offshore Analysis. Properties from Dutch Offshore Wind Energy Converter (DOWEC) 6MW Pre-Design (10046_009.pdf) and REpower 5M 5MW (5m_uk.pdf)
+NREL 5.0 MW Baseline Wind Turbine for Use in OnShore Analysis. 
 ---------------------- SIMULATION CONTROL --------------------------------------
 False         Echo         - Echo input data to <RootName>.ech (flag)
 "default"     DT           - Communication interval for controllers (s) (or "default")
@@ -9,9 +9,9 @@ False         Echo         - Echo input data to <RootName>.ech (flag)
      9999.9   TPitManS(1)  - Time to start override pitch maneuver for blade 1 and end standard pitch control (s)
      9999.9   TPitManS(2)  - Time to start override pitch maneuver for blade 2 and end standard pitch control (s)
      9999.9   TPitManS(3)  - Time to start override pitch maneuver for blade 3 and end standard pitch control (s) [unused for 2 blades]
-          2   PitManRat(1) - Pitch rate at which override pitch maneuver heads toward final pitch angle for blade 1 (deg/s)
-          2   PitManRat(2) - Pitch rate at which override pitch maneuver heads toward final pitch angle for blade 2 (deg/s)
-          2   PitManRat(3) - Pitch rate at which override pitch maneuver heads toward final pitch angle for blade 3 (deg/s) [unused for 2 blades]
+          8   PitManRat(1) - Pitch rate at which override pitch maneuver heads toward final pitch angle for blade 1 (deg/s)
+          8   PitManRat(2) - Pitch rate at which override pitch maneuver heads toward final pitch angle for blade 2 (deg/s)
+          8   PitManRat(3) - Pitch rate at which override pitch maneuver heads toward final pitch angle for blade 3 (deg/s) [unused for 2 blades]
           0   BlPitchF(1)  - Blade 1 final pitch for pitch maneuvers (degrees)
           0   BlPitchF(2)  - Blade 2 final pitch for pitch maneuvers (degrees)
           0   BlPitchF(3)  - Blade 3 final pitch for pitch maneuvers (degrees) [unused for 2 blades]
@@ -57,6 +57,11 @@ True          GenTiStp     - Method to stop the generator {T: timed using TimGen
      9999.9   TYawManS     - Time to start override yaw maneuver and end standard yaw control (s)
           2   YawManRat    - Yaw maneuver rate (in absolute value) (deg/s)
           0   NacYawF      - Final yaw angle for override yaw maneuvers (degrees)
+---------------------- AERODYNAMIC FLOW CONTROL --------------------------------
+          0   AfCmode      - Airfoil control mode {0: none, 1: cosine wave cycle, 4: user-defined from Simulink/Labview, 5: user-defined from Bladed-style DLL} (switch)
+          0   AfC_Mean     - Mean level for cosine cycling or steady value (-) [used only with AfCmode==1]
+          0   AfC_Amp      - Amplitude for for cosine cycling of flap signal (-) [used only with AfCmode==1]
+          0   AfC_Phase    - Phase relative to the blade azimuth (0 is vertical) for for cosine cycling of flap signal (deg) [used only with AfCmode==1]
 ---------------------- STRUCTURAL CONTROL --------------------------------------
 0             NumBStC      - Number of blade structural controllers (integer)
 "unused"      BStCfiles    - Name of the files for blade structural controllers (quoted strings) [unused when NumBStC==0]
@@ -66,6 +71,8 @@ True          GenTiStp     - Method to stop the generator {T: timed using TimGen
 "unused"      TStCfiles    - Name of the files for tower structural controllers (quoted strings) [unused when NumTStC==0]
 0             NumSStC      - Number of substructure structural controllers (integer)
 "unused"      SStCfiles    - Name of the files for substructure structural controllers (quoted strings) [unused when NumSStC==0]
+---------------------- CABLE CONTROL -------------------------------------------
+          0   CCmode       - Cable control mode {0: none, 4: user-defined from Simulink/Labview, 5: user-defined from Bladed-style DLL} (switch)
 ---------------------- BLADED INTERFACE ---------------------------------------- [used only with Bladed Interface]
 "../5MW_Baseline/ServoData/DISCON.dll"    DLL_FileName - Name/location of the dynamic library {.dll [Windows] or .so [Linux]} in the Bladed-DLL format (-) [used only with Bladed Interface]
 "DISCON.IN"    DLL_InFile   - Name of input file sent to the DLL (-) [used only with Bladed Interface]
