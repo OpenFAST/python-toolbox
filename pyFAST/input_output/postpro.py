@@ -138,7 +138,6 @@ def AD_BldGag(AD,AD_bld,chordOut=False):
     if hasattr(AD_bld,'startswith'): # if string
         AD_bld = FASTInputFile(AD_bld)
     #print(AD_bld.keys())
-
     nOuts=AD['NBlOuts']
     if nOuts<=0:
         if chordOut:
@@ -158,14 +157,13 @@ def BD_BldStations(BD, BDBld):
         - Defines where BeamDyn outputs are provided.
         - Used by BeamDyn for the Input Mesh  u%DistrLoad
                           and the Output Mesh y%BldMotion
-
     NOTE: This should match the quadrature points in the summary file of BeamDyn for a straight beam
           This will NOT match the "Initial Nodes" reported  in the summary file.
-
     INPUTS:
        - BD: either:
-           - a filename of a ElastoDyn input file
+           - a filename of a BeamDyn input file
            - an instance of FileCl, as returned by reading the file, BD = weio.read(BD_filename)
+       - BDBld: same as BD but for the BeamDyn blade file
     OUTPUTS:
         - r_nodes: spanwise position from the balde root of the Blade stations
     """
@@ -181,9 +179,11 @@ def BD_BldStations(BD, BDBld):
     # --- Extract relevant info from BD files
     z_kp = BD['MemberGeom'][:,2]
     R    = z_kp[-1]-z_kp[0]
+
     nStations      = BDBld['station_total']
     rStations      = BDBld['BeamProperties']['span']*R
-    quad           = BD['quadrature']
+    quad = BD['quadrature']
+
     refine         = BD['refine']
     nodes_per_elem = BD['order_elem'] + 1
     if 'default' in str(refine).lower():
@@ -208,7 +208,7 @@ def BD_BldStations(BD, BDBld):
         r    = np.concatenate( (rStations, rmid))
         r    = np.unique(np.sort(r))
     else:
-        raise NotImplementedError('BeamDyn with Gaussian quadrature points')
+        raise NotImplementedError('Only Gauss and Trap quadrature implemented')
     return r
 
 def BD_BldGag(BD):
@@ -1307,7 +1307,7 @@ def averageDF(df,avgMethod='periods',avgParam=None,ColMap=None,ColKeep=None,ColS
             raise Exception('The sensor `Azimuth_[deg]` does not appear to be in the output file. You cannot use the averaging method by `periods`, use `constantwindow` instead.')
         # NOTE: potentially we could average over each period and then average
         psi=df['Azimuth_[deg]'].values
-        _,iBef = _zero_crossings(psi-psi[-10],direction='up')
+        _,iBef = _zero_crossings(psi-psi[-2],direction='up')
         if len(iBef)==0:
             _,iBef = _zero_crossings(psi-180,direction='up')
         if len(iBef)==0:
@@ -1397,11 +1397,14 @@ def averagePostPro(outFiles,avgMethod='periods',avgParam=None,ColMap=None,ColKee
                    Default: None, full simulation length is used
     """
     result=None
+    if len(outFiles)==0:
+        raise Exception('No outFiles provided')
+
     invalidFiles =[]
     # Loop trough files and populate result
     for i,f in enumerate(outFiles):
         try:
-            df=FASTOutputFile(f).toDataFrame()
+            df=FASTOutputFile(f).toDataFrame() # For pyFAST
         except:
             invalidFiles.append(f)
             continue
@@ -1413,16 +1416,15 @@ def averagePostPro(outFiles,avgMethod='periods',avgParam=None,ColMap=None,ColKee
             result = pd.DataFrame(np.nan, index=np.arange(len(outFiles)), columns=columns)
         result.iloc[i,:] = MeanValues.copy().values
 
+    if len(invalidFiles)==len(outFiles):
+        raise Exception('None of the files can be read (or exist)!. For instance, cannot find: {}'.format(invalidFiles[0]))
+    elif len(invalidFiles)>0:
+        print('[WARN] There were {} missing/invalid files: \n {}'.format(len(invalidFiles),'\n'.join(invalidFiles)))
+
     if ColSort is not None:
         # Sorting 
         result.sort_values([ColSort],inplace=True,ascending=True)
         result.reset_index(drop=True,inplace=True) 
-
-    if len(invalidFiles)==len(outFiles):
-        raise Exception('None of the files can be read (or exist)!')
-    elif len(invalidFiles)>0:
-        print('[WARN] There were {} missing/invalid files: {}'.format(len(invalidFiles),invalidFiles))
-
 
     return result 
 

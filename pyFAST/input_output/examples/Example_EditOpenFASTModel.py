@@ -24,7 +24,7 @@ MyDir=os.path.dirname(__file__)
 # --- ElastoDyn file (geometry, inertias, etc.)
 # Read some geometrical data, modify them, write a new file
 print('------------------- ElastoDyn -------------------------------------')
-EDFilename = os.path.join(MyDir,'../../../data/NREL5MW/onshore/NREL5MW_ED_Onshore.dat')
+EDFilename = os.path.join(MyDir,'../../../data/NREL5MW/onshore/ElastoDyn.dat')
 ED = FASTInputFile(EDFilename)
 print('> Keys:',ED.keys())
 print('> Hub radius: ',ED['HubRad'])

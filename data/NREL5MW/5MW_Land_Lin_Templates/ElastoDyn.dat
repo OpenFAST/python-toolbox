@@ -1,11 +1,9 @@
-------- ELASTODYN v1.03.* INPUT FILE -------------------------------------------
+------- ELASTODYN v3.2 INPUT FILE ----------------------------------------------
 NREL 5.0 MW Baseline Wind Turbine for Use in Offshore Analysis. Properties from Dutch Offshore Wind Energy Converter (DOWEC) 6MW Pre-Design (10046_009.pdf) and REpower 5M 5MW (5m_uk.pdf)
 ---------------------- SIMULATION CONTROL --------------------------------------
 False         Echo        - Echo input data to "<RootName>.ech" (flag)
           3   Method      - Integration method: {1: RK4, 2: AB4, or 3: ABM4} (-)
 "DEFAULT"     DT          - Integration time step (s)
----------------------- ENVIRONMENTAL CONDITION ---------------------------------
-    9.80665   Gravity     - Gravitational acceleration (m/s^2)
 ---------------------- DEGREES OF FREEDOM --------------------------------------
 True          FlapDOF1    - First flapwise blade mode DOF (flag)
 True          FlapDOF2    - Second flapwise blade mode DOF (flag)
@@ -13,7 +11,7 @@ True          EdgeDOF     - First edgewise blade mode DOF (flag)
 False         TeetDOF     - Rotor-teeter DOF (flag) [unused for 3 blades]
 True          DrTrDOF     - Drivetrain rotational-flexibility DOF (flag)
 False         GenDOF      - Generator DOF (flag)
-True          YawDOF      - Yaw DOF (flag)
+False         YawDOF      - Yaw DOF (flag)
 True          TwFADOF1    - First fore-aft tower bending-mode DOF (flag)
 True          TwFADOF2    - Second fore-aft tower bending-mode DOF (flag)
 True          TwSSDOF1    - First side-to-side tower bending-mode DOF (flag)
@@ -109,55 +107,39 @@ False         Furling     - Read in additional model properties for furling turb
          20   TwrNodes    - Number of tower nodes used for analysis (-)
 "../5MW_Baseline/NRELOffshrBsline5MW_Onshore_ElastoDyn_Tower.dat"    TwrFile     - Name of file containing tower properties (quoted string)
 ---------------------- OUTPUT --------------------------------------------------
-False          SumPrint    - Print summary data to "<RootName>.sum" (flag)
+False         SumPrint    - Print summary data to "<RootName>.sum" (flag)
           1   OutFile     - Switch to determine where output will be placed: {1: in module output file only; 2: in glue code output file only; 3: both} (currently unused)
 True          TabDelim    - Use tab delimiters in text tabular output file? (flag) (currently unused)
 "ES10.3E2"    OutFmt      - Format used for text tabular output (except time).  Resulting field should be 10 characters. (quoted string) (currently unused)
           0   TStart      - Time to begin tabular output (s) (currently unused)
           1   DecFact     - Decimation factor for tabular output {1: output every time step} (-) (currently unused)
           0   NTwGages    - Number of tower nodes that have strain gages for output [0 to 9] (-)
-         10,         19,         28    TwrGagNd    - List of tower nodes that have strain gages [1 to TwrNodes] (-) [unused if NTwGages=0]
-          3   NBlGages    - Number of blade nodes that have strain gages for output [0 to 9] (-)
-          5,          9,         13    BldGagNd    - List of blade nodes that have strain gages [1 to BldNodes] (-) [unused if NBlGages=0]
+          0   TwrGagNd    - List of tower nodes that have strain gages [1 to TwrNodes] (-) [unused if NTwGages=0]
+          0   NBlGages    - Number of blade nodes that have strain gages for output [0 to 9] (-)
+          5,  BldGagNd        - List of blade nodes that have strain gages [1 to BldNodes] (-) [unused if NBlGages=0]
               OutList     - The next line(s) contains a list of output parameters.  See OutListParameters.xlsx for a listing of available output channels, (-)
+"OoPDefl1"                - Blade 1 out-of-plane and in-plane deflections and tip twist
+"IPDefl1"                 - Blade 1 out-of-plane and in-plane deflections and tip twist
+"BldPitch1"               - Blade 1 pitch angle
 "Azimuth"                 - Blade 1 azimuth angle
 "RotSpeed"                - Low-speed shaft and high-speed shaft speeds
 "GenSpeed"                - Low-speed shaft and high-speed shaft speeds
 "TTDspFA"                 - Tower fore-aft and side-to-side displacements and top twist
 "TTDspSS"                 - Tower fore-aft and side-to-side displacements and top twist
-"TTDspTwst"               - Tower fore-aft and side-to-side displacements and top twist
-"RootFxb1"                - Out-of-plane shear, in-plane shear, and axial forces at the root of blade 1
-"RootFyb1"                - Out-of-plane shear, in-plane shear, and axial forces at the root of blade 1
-"RootFzb1"                - Out-of-plane shear, in-plane shear, and axial forces at the root of blade 1
-"RootMxb1"                - In-plane bending, out-of-plane bending, and pitching moments at the root of blade 1
-"RootMyb1"                - In-plane bending, out-of-plane bending, and pitching moments at the root of blade 1
-"RootMzb1"                - In-plane bending, out-of-plane bending, and pitching moments at the root of blade 1
-"RootFxb2"                - Out-of-plane shear, in-plane shear, and axial forces at the root of blade 1
-"RootFyb2"                - Out-of-plane shear, in-plane shear, and axial forces at the root of blade 1
-"RootFzb2"                - Out-of-plane shear, in-plane shear, and axial forces at the root of blade 1
-"RootMxb2"                - In-plane bending, out-of-plane bending, and pitching moments at the root of blade 1
-"RootMyb2"                - In-plane bending, out-of-plane bending, and pitching moments at the root of blade 1
-"RootMzb2"                - In-plane bending, out-of-plane bending, and pitching moments at the root of blade 1
-"RootFxb3"                - Out-of-plane shear, in-plane shear, and axial forces at the root of blade 1
-"RootFyb3"                - Out-of-plane shear, in-plane shear, and axial forces at the root of blade 1
-"RootFzb3"                - Out-of-plane shear, in-plane shear, and axial forces at the root of blade 1
-"RootMxb3"                - In-plane bending, out-of-plane bending, and pitching moments at the root of blade 1
-"RootMyb3"                - In-plane bending, out-of-plane bending, and pitching moments at the root of blade 1
-"RootMzb3"                - In-plane bending, out-of-plane bending, and pitching moments at the root of blade 1
-"RotTorq"                 - Rotor torque and low-speed shaft 0- and 90-bending moments at the main bearing
-"LSSGagMya"               - Rotor torque and low-speed shaft 0- and 90-bending moments at the main bearing
-"LSSGagMza"               - Rotor torque and low-speed shaft 0- and 90-bending moments at the main bearing
-"YawBrFxp"                - Fore-aft shear, side-to-side shear, and vertical forces at the top of the tower (not rotating with nacelle yaw)
-"YawBrFyp"                - Fore-aft shear, side-to-side shear, and vertical forces at the top of the tower (not rotating with nacelle yaw)
-"YawBrFzp"                - Fore-aft shear, side-to-side shear, and vertical forces at the top of the tower (not rotating with nacelle yaw)
-"YawBrMxp"                - Side-to-side bending, fore-aft bending, and yaw moments at the top of the tower (not rotating with nacelle yaw)
-"YawBrMyp"                - Side-to-side bending, fore-aft bending, and yaw moments at the top of the tower (not rotating with nacelle yaw)
-"YawBrMzp"                - Side-to-side bending, fore-aft bending, and yaw moments at the top of the tower (not rotating with nacelle yaw)
+"RootMyc1"                - In-plane bending, out-of-plane bending, and pitching moments at the root of blade 1
+"RotThrust"               - Rotor thrust                                at the main bearing
+"RotTorq"                 - Rotor torque                                at the main bearing
+"RotPwr"                  - Rotor power (this is equivalent to the low-speed shaft power)
 "TwrBsFxt"                - Fore-aft shear, side-to-side shear, and vertical forces at the base of the tower (mudline)
 "TwrBsFyt"                - Fore-aft shear, side-to-side shear, and vertical forces at the base of the tower (mudline)
 "TwrBsFzt"                - Fore-aft shear, side-to-side shear, and vertical forces at the base of the tower (mudline)
 "TwrBsMxt"                - Side-to-side bending, fore-aft bending, and yaw moments at the base of the tower (mudline)
 "TwrBsMyt"                - Side-to-side bending, fore-aft bending, and yaw moments at the base of the tower (mudline)
 "TwrBsMzt"                - Side-to-side bending, fore-aft bending, and yaw moments at the base of the tower (mudline)
+END of input file (the word "END" must appear in the first 3 columns of this last OutList line)
+---------------------- NODE OUTPUTS --------------------------------------------
+         0    BldNd_BladesOut  - Blades to output
+         99   BldNd_BlOutNd    - Blade nodes on each blade (currently unused)
+              OutListED        - The next line(s) contains a list of output parameters.  See OutListParameters.xlsx, ElastoDyn_Nodes tab for a listing of available output channels, (-)
 END of input file (the word "END" must appear in the first 3 columns of this last OutList line)
 ---------------------------------------------------------------------------------------

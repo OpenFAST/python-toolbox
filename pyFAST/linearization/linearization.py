@@ -30,9 +30,7 @@ def defaultFilenames(OP, rpmSweep=None):
 import os, glob
 import pandas as pd
 import numpy as np
-import pyFAST.linearization.mbc.mbc3 as mbc
-# Making interface from campbell available here
-from pyFAST.linearization.campbell import postproMBC, postproCampbell, plotCampbell, plotCampbellDataFile, run_pyMBC
+from pyFAST.linearization.campbell import postproCampbell, plotCampbell
 
 # TODO Alternative, Aeroelastic SE
 #--- Used for functions campbell, 
@@ -82,7 +80,7 @@ def campbell(templateFstFile, operatingPointsFile, workDir, toolboxDir, fastExe,
 
     # --- Postprocess linearization outputs (MBC + modes ID)
     if runMBC:
-        OP, Freq, Damp, _, _, modeID_file = lin.postproCampbell(FSTfilenames, removeTwrAzimuth=removeTwrAzimuth, suffix=suffix)
+        OP, Freq, Damp, _, _, modeID_file = postproCampbell(FSTfilenames, removeTwrAzimuth=removeTwrAzimuth, suffix=suffix)
 
     # ---  Plot Campbell
     fig, axes = plotCampbell(OP, Freq, Damp, sx='WS_[m/s]', UnMapped=UnMapped, ylim=ylim)

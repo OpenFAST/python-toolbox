@@ -13,16 +13,16 @@ import pyFAST.input_output.postpro as postpro
 def main():
 
     # Get current directory so this script can be called from any location
-    MyDir=os.path.dirname(__file__)
+    scriptDir=os.path.dirname(__file__)
 
     # --- Step 1: Read an openfast output file
-    outFile = os.path.join(MyDir,'../../../data/example_files/fastout_allnodes.outb')
+    outFile = os.path.join(scriptDir,'../../../data/example_files/fastout_allnodes.outb')
     df = io.fast_output_file.FASTOutputFile(outFile).toDataFrame()
 
     # --- Step2 : Average data and extrat the radial stations
     # Averaging here is done over 1 period (avgParam=1, avgMethod='periods')
     # To get the output radial stations, a .fst file is needed
-    fstFile = os.path.join(MyDir,'../../../data/NREL5MW/Main_Onshore.fst')
+    fstFile = os.path.join(scriptDir,'../../../data/NREL5MW/Main_Onshore.fst')
     dfRad_ED, dfRad_AD, dfRad_BD = postpro.spanwisePostPro(FST_In=fstFile, avgMethod='periods', avgParam=1, df=df)
 
     # --- Step1&2 at once (when .outb and .fst are next to each other in same folder, with same name)

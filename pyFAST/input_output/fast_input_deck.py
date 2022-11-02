@@ -1,12 +1,3 @@
-from __future__ import division
-from __future__ import unicode_literals
-from __future__ import print_function
-from __future__ import absolute_import
-from io import open
-from builtins import range
-from builtins import str
-from future import standard_library
-standard_library.install_aliases()
 import os
 import numpy as np
 import re
@@ -40,8 +31,6 @@ class FASTInputDeck(dict):
         self.filename = fullFstPath
         self.verbose  = verbose
         self.readlist = readlist
-
-
         if not type(self.readlist) is list:
             self.readlist=[readlist]
         if 'all' in self.readlist:

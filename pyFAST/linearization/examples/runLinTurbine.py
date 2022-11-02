@@ -86,20 +86,21 @@ def run_linearization():
 
     # --- Simple Postprocessing
     # (averaging each signal over the last period for each simulation)
-    outFiles = [os.path.splitext(f)[0]+'.outb' for f in fastfiles]
+    #outFiles = [os.path.splitext(f)[0]+'.outb' for f in fastfiles]
     # avg_results = postpro.averagePostPro(outFiles, avgMethod='periods', avgParam=1, ColMap = {'WS_[m/s]':'Wind1VelX_[m/s]'},ColSort='WS_[m/s]')
     # avg_results.drop('Time_[s]',axis=1, inplace=True)
 
-    return outFiles
+    return fastfiles
 
 
 
 if __name__ == '__main__':
 
     # 1. Run linearizations
-    outfiles = run_linearization()
+    fastfiles = run_linearization()
     # 2. Do MBC
-    MBC = lin.run_pyMBC(outfiles)
+    #MBC = lin.run_pyMBC(fastfiles)
+    MBC = lin.getMBCOPs(fastfiles)
 
     # Check natural frequencies against matlab
     for mbc in MBC:

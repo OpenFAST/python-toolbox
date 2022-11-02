@@ -117,3 +117,11 @@ if __name__ == "__main__":
 
 if __name__=='__test__':
     main()
+    try:
+        os.remove('_MyNewTurbBox.bts')
+        os.remove('_MyNewTurbBox_198x3x4.u')
+        os.remove('_MyNewTurbBox_198x3x4.v')
+        os.remove('_MyNewTurbBox_198x3x4.w')
+        os.remove('_Probes.csv')
+    except:
+        pass
