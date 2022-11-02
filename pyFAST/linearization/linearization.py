@@ -30,9 +30,7 @@ def defaultFilenames(OP, rpmSweep=None):
 import os, glob
 import pandas as pd
 import numpy as np
-import pyFAST.linearization.mbc.mbc3 as mbc
-# Making interface from campbell available here
-from pyFAST.linearization.campbell import postproMBC, postproCampbell, plotCampbell, plotCampbellDataFile, run_pyMBC
+from pyFAST.linearization.campbell import postproCampbell, plotCampbell
 
 # TODO Alternative, Aeroelastic SE
 #--- Used for functions campbell, 

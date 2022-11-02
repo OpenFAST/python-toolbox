@@ -2,9 +2,8 @@ import unittest
 import os
 import glob
 import numpy as np
-import pyFAST
-# import pyFAST.lin import TurbSimFile
-import pyFAST.linearization.mbc.mbc3 as mbc
+import pyFAST.linearization.mbc as mbc
+import pyFAST.linearization.campbell as camp
 
 
 MyDir=os.path.join(os.path.dirname(__file__))
@@ -20,8 +19,8 @@ class Test(unittest.TestCase):
         lin_files = np.array([lin_file])
 
         # Performing MBC (NOTE: not stricly necessary without rotation)
-        mbc_data, matData, FAST_linData = mbc.fx_mbc3(lin_files, verbose=False)
-        CD = mbc.campbell_diagram_data(mbc_data,BladeLen,TowerLen)
+        mbc_data, matData = mbc.fx_mbc3(lin_files, verbose=False)
+        CD = camp.campbell_diagram_data_oneOP(mbc_data,BladeLen,TowerLen)
 
         nModesMax = np.min([len(CD['Modes']),10])
         Freq = np.array([CD['Modes'][i]['NaturalFreq_Hz'] for i in np.arange(nModesMax)])
@@ -30,13 +29,13 @@ class Test(unittest.TestCase):
         return Freq, Damp, LogDec
 
     def test_mbc3_standstill(self):
-        lin_file     = os.path.join(MyDir,'../../../../data/example_files/Standstill.1.lin') 
+        lin_file     = os.path.join(MyDir,'../../../data/example_files/Standstill.1.lin') 
         Freq, Damp, LogDec = self.mbc3_standstill(lin_file)
         np.testing.assert_almost_equal(Freq[:3]  ,[0.427, 0.450, 0.669], 3)
         np.testing.assert_almost_equal(LogDec[:3],[1.9505,2.1309,5.0649], 4)
 
     def test_mbc3_standstill_old(self):
-        lin_file = os.path.join(MyDir, '../../../../data/example_files/Standstill_old.1.lin')
+        lin_file = os.path.join(MyDir, '../../../data/example_files/Standstill_old.1.lin')
         Freq, Damp, LogDec = self.mbc3_standstill(lin_file)
         np.testing.assert_almost_equal(Freq[:3]  ,[0.427, 0.449, 0.667], 3)
         np.testing.assert_almost_equal(LogDec[:3],[1.9497,2.1162,5.0113], 4)
@@ -46,11 +45,11 @@ class Test(unittest.TestCase):
         # Script Parameters
         BladeLen     = 61.5  # Blade length, used to tune relative modal energy [m] 
         TowerLen     = 87.6  # Tower length, used to tune relative modal energy [m] 
-        lin_files = glob.glob(os.path.join(MyDir,'../../../../data/linearization_outputs/ws03.0*.lin'))
+        lin_files = glob.glob(os.path.join(MyDir,'../../../data/linearization_outputs/ws03.0*.lin'))
 
         # Performing MBC
-        mbc_data, matData, FAST_linData = mbc.fx_mbc3(lin_files, verbose=False)
-        CD = mbc.campbell_diagram_data(mbc_data,BladeLen,TowerLen)
+        mbc_data, matData = mbc.fx_mbc3(lin_files, verbose=False)
+        CD = camp.campbell_diagram_data_oneOP(mbc_data,BladeLen,TowerLen)
 
         nModesMax = np.min([len(CD['Modes']),10])
         Freq = np.array([CD['Modes'][i]['NaturalFreq_Hz'] for i in np.arange(nModesMax)])
@@ -63,11 +62,11 @@ class Test(unittest.TestCase):
         # Script Parameters
         BladeLen     = 61.5  # Blade length, used to tune relative modal energy [m]
         TowerLen     = 87.6  # Tower length, used to tune relative modal energy [m]
-        lin_files = [os.path.join(MyDir,'../../../../data/example_files/StandstillSemi_ForID_EDHD.1.lin')] 
+        lin_files = [os.path.join(MyDir,'../../../data/example_files/StandstillSemi_ForID_EDHD.1.lin')] 
 
         # Performing MBC
-        mbc_data, matData, FAST_linData = mbc.fx_mbc3(lin_files, verbose=False)
-        CD = mbc.campbell_diagram_data(mbc_data,BladeLen,TowerLen)
+        mbc_data, matData = mbc.fx_mbc3(lin_files, verbose=False)
+        CD = camp.campbell_diagram_data_oneOP(mbc_data,BladeLen,TowerLen)
 
         nModesMax = np.min([len(CD['Modes']),10])
         Freq = np.array([CD['Modes'][i]['NaturalFreq_Hz'] for i in np.arange(nModesMax)])
@@ -83,11 +82,11 @@ class Test(unittest.TestCase):
         # Script Parameters
         BladeLen     = 100.0  # Blade length, used to tune relative modal energy [m]
         TowerLen     = 100.0  # Tower length, used to tune relative modal energy [m]
-        lin_files = [os.path.join(MyDir,'../../../../data/example_files/BAR_URC_EDBD.1.lin')] 
+        lin_files = [os.path.join(MyDir,'../../../data/example_files/BAR_URC_EDBD.1.lin')] 
 
         # Performing MBC
-        mbc_data, matData, FAST_linData = mbc.fx_mbc3(lin_files, verbose=False)
-        CD = mbc.campbell_diagram_data(mbc_data,BladeLen,TowerLen)
+        mbc_data, matData = mbc.fx_mbc3(lin_files, verbose=False)
+        CD = camp.campbell_diagram_data_oneOP(mbc_data,BladeLen,TowerLen)
 
         nModesMax = np.min([len(CD['Modes']),10])
         Freq = np.array([CD['Modes'][i]['NaturalFreq_Hz'] for i in np.arange(nModesMax)])

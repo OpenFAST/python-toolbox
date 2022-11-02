@@ -2,9 +2,7 @@ import unittest
 import os
 import numpy as np
 import pyFAST
-import pyFAST.linearization
-import pyFAST.linearization.mbc.mbc3 as mbc
-import pyFAST.linearization.campbell as camp
+import pyFAST.linearization as lin
 
 MyDir = os.path.dirname(__file__)
 
@@ -18,11 +16,11 @@ class Test(unittest.TestCase):
         TowerLen=55
         lin_files = [os.path.join(MyDir,'../../../data/example_files/Standstill_ForID_ED.1.lin')]
 
-        mbc_data, matData, FAST_linData = mbc.fx_mbc3(lin_files, verbose=False)
-        CD = mbc.campbell_diagram_data(mbc_data,BladeLen,TowerLen)
+        mbc_data, matData = lin.fx_mbc3(lin_files, verbose=False)
+        CD = lin.campbell_diagram_data_oneOP(mbc_data,BladeLen,TowerLen)
 
-        modeID_table,modesDesc = mbc.IdentifyModes([CD])
-        modeIDs= mbc.IdentifiedModesDict([CD], modeID_table, modesDesc)[0]
+        modeID_table,modesDesc = lin.IdentifyModes([CD])
+        modeIDs= lin.IdentifiedModesDict([CD], modeID_table, modesDesc)[0]
         #for k,v in modeIDs.items():
         #    print(k,v)
 
@@ -54,12 +52,12 @@ class Test(unittest.TestCase):
         TowerLen=55
         lin_files = [os.path.join(MyDir,'../../../data/example_files/StandstillSemi_ForID_EDHD.1.lin')]
 
-        mbc_data, matData, FAST_linData = mbc.fx_mbc3(lin_files, verbose=False)
-        CD = mbc.campbell_diagram_data(mbc_data,BladeLen,TowerLen)
-        sSummary = camp.campbellData2TXT(CD, nFreqOut=65)
+        mbc_data, matData = lin.fx_mbc3(lin_files, verbose=False)
+        CD = lin.campbell_diagram_data_oneOP(mbc_data,BladeLen,TowerLen)
+        sSummary = lin.campbellData2TXT(CD, nFreqOut=65)
 
-        modeID_table,modesDesc = mbc.IdentifyModes([CD])
-        modeIDs= mbc.IdentifiedModesDict([CD], modeID_table, modesDesc)[0]
+        modeID_table,modesDesc = lin.IdentifyModes([CD])
+        modeIDs= lin.IdentifiedModesDict([CD], modeID_table, modesDesc)[0]
 
 #         print(sSummary)
 # 

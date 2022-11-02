@@ -17,7 +17,7 @@ import os
 import glob
 import numpy as np
 import matplotlib.pyplot as plt
-import pyFAST.linearization.linearization as lin
+import pyFAST.linearization as lin
 
 MyDir = os.path.dirname(__file__)
 
