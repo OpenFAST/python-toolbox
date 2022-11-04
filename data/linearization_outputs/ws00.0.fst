@@ -19,7 +19,7 @@ False         Echo          - Echo input data to <RootName>.ech (flag)
 0             CompMooring   - Compute mooring system (switch) {0=None; 1=MAP++; 2=FEAMooring; 3=MoorDyn; 4=OrcaFlex}
 0             CompIce       - Compute ice loads (switch) {0=None; 1=IceFloe; 2=IceDyn}
 ---------------------- INPUT FILES ---------------------------------------------
-"NRELOffshrBsline5MW_Onshore_ElastoDyn_ws00.0.dat" EDFile        - Name of file containing ElastoDyn input parameters (quoted string)
+"ws00.0_ED.dat" EDFile        - Name of file containing ElastoDyn input parameters (quoted string)
 "unused"      BDBldFile(1)  - Name of file containing BeamDyn input parameters for blade 1 (quoted string)
 "unused"      BDBldFile(2)  - Name of file containing BeamDyn input parameters for blade 2 (quoted string)
 "unused"      BDBldFile(3)  - Name of file containing BeamDyn input parameters for blade 3 (quoted string)
