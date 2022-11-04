@@ -8,7 +8,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 import pyFAST.input_output as io 
-import pyFAST.input_output.postpro as postpro
+import pyFAST.postpro as postpro
 
 def main():
 

@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import os
 # Local 
 import pyFAST.input_output as io 
-import pyFAST.input_output.postpro as postpro
+import pyFAST.postpro as postpro
 
 if __name__ == '__main__':
     ColumnMap={

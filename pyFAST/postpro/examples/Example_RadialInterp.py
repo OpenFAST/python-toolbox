@@ -9,7 +9,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 import pyFAST.input_output as io 
-import pyFAST.input_output.postpro as postpro
+import pyFAST.postpro as postpro
 
 def main():
     # Get current directory so this script can be called from any location
