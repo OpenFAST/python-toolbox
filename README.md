@@ -22,7 +22,8 @@ pytest
 
 The repository contains a set of small packages:
 
-- input\_output: read/write OpenFAST/FAST.Farm/OLAF input and output files (see [README](pyFAST/input_output)) and postprocess OpenFAST outputs (see [examples](pyFAST/input_output/examples))
+- input\_output: read/write OpenFAST/FAST.Farm/OLAF input and output files (see [README](pyFAST/input_output)) 
+- postpro: postprocess OpenFAST outputs (extract radial data, compute fatigue loads) (see [examples](pyFAST/postpro/examples))
 - linearization: tools to deal with OpenFAST linearization, e.g. generate a Campbell diagram (see [examples](pyFAST/linearization/examples/))
 - aeroacoustics: tools for aeroacoustics (generate BL files and plot outputs)
 - case\_generation: tools to generate and run a set of input of OpenFAST input files (see [examples](pyFAST/case_generation/examples))
@@ -75,6 +76,14 @@ ADpol = polar.toAeroDyn('AeroDyn_Polar_DU21_A17.dat')
 ### Write a set of OpenFAST input file for multiple simulations
 Find examples scripts in this [folder](pyFAST/case_generation/examples).
 
+### Postprocessing
+
+Below are different scripts to manipulate OpenFAST outputs:
+
+- [Extract average radial data](pyFAST/postpro/examples/Example_RadialPostPro.py).
+- [Interpolate data at different radial positions](pyFAST/postpro/examples/Example_RadialInterp.py).
+- [Compute damage equivalent loads](pyFAST/postpro/examples/Example_EquivalentLoad.py).
+- [Change column names and units](pyFAST/postpro/examples/Example_Remap.py).
 
 
 ## Future work and friend projects
