@@ -4,9 +4,10 @@
 - Compute damage equivalent load for a given Wohler exponent
 """
 import os
+import numpy as np
 import matplotlib.pyplot as plt
 from pyFAST.input_output import FASTOutputFile
-from pyFAST.tools.fatigue import equivalent_load
+from pyFAST.postpro import equivalent_load
 
 # Get current directory so this script can be called from any location
 scriptDir = os.path.dirname(__file__)
@@ -26,3 +27,5 @@ print('Leq ',Leq)
 
 if __name__ == '__main__':
     plt.show()
+if __name__ == '__test__':
+    np.testing.assert_almost_equal(Leq , 284.30398, 3)
