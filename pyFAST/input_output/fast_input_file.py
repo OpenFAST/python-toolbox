@@ -764,8 +764,10 @@ class FASTInputFileBase(File):
             elif d['tabType']==TABTYPE_NUM_SUBDYNOUT:
                 data = d['value']
                 s+='{}\n'.format(' '.join(['{:15s}'.format(s) for s in d['tabColumnNames']]))
-                s+='{}\n'.format(' '.join(['{:15s}'.format(s) for s in d['tabUnits']]))
-                s+='\n'.join('\t'.join('{:15.0f}'.format(x) for x in y) for y in data)
+                s+='{}'.format(' '.join(['{:15s}'.format(s) for s in d['tabUnits']]))
+                if np.size(d['value'],0) > 0 :
+                    s+='\n'
+                    s+='\n'.join('\t'.join('{:15.0f}'.format(x) for x in y) for y in data)
             else:
                 raise Exception('Unknown table type for variable {}'.format(d))
             if i<len(self.data)-1:
