@@ -1444,7 +1444,7 @@ class ADBladeFile(FASTInputFileBase):
         # TODO double check this calculation with gradient
         dr = np.gradient(aeroNodes[:,0])
         dx = np.gradient(aeroNodes[:,1])
-        crvAng = np.degrees(np.arctan2(dx,dr))*np.pi/180
+        crvAng = np.degrees(np.arctan2(dx,dr))
         if np.mean(np.abs(crvAng-aeroNodes[:,3]))>0.1:
             print('[WARN] BlCrvAng might not be computed correctly')
 
