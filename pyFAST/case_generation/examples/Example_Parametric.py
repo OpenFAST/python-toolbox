@@ -22,15 +22,26 @@ import os
 import pyFAST.case_generation.case_gen as case_gen
 import pyFAST.case_generation.runner as runner
 import pyFAST.input_output.postpro as postpro
+from pyFAST.input_output.fast_input_file import FASTInputFile
 
 # Get current directory so this script can be called from any location
 scriptDir=os.path.dirname(__file__)
 
 # --- Parameters for this script
-FAST_EXE  = os.path.join(scriptDir, '../../../data/NREL5MW/openfast3.2.1_x64s.exe') # Location of a FAST exe (and dll)
+FAST_EXE  = os.path.join(scriptDir, '../../../data/openfast.exe') # Location of a FAST exe (and dll)
 ref_dir   = os.path.join(scriptDir, '../../../data/NREL5MW/')  # Folder where the fast input files are located (will be copied)
 main_file = 'Main_Onshore.fst'  # Main file in ref_dir, used as a template
 work_dir  = '_NREL5MW_Parametric/'     # Output folder (will be created)
+
+
+# --- Reading some reference files/tables to be able to modify tables
+# BDBld_ref = FASTInputFile('BeamDyn_Blade_ref.dat')
+# print(BDBld_ref.keys())
+# BP_ref = BDBld_ref['BeamProperties']
+#
+# HD_ref = FASTInputFile('HD_ref.dat')
+# print(HD_ref.keys())
+# SmplProp_ref = HD_ref['SmplProp'] 
 
 # --- Defining the parametric study  (list of dictionnaries with keys as FAST parameters)
 WS    = [4   , 5   , 10   , 12   , 14  , 16]
@@ -45,7 +56,7 @@ PARAMS=[]
 for i,(wsp,rpm,pitch) in enumerate(zip(WS,RPM,PITCH)): # NOTE: same length of WS and RPM otherwise do multiple for loops
     p=BaseDict.copy()
 
-	# --- Changing typical parameters (operating ocnditions)
+    # --- Changing typical parameters (operating ocnditions)
     p['EDFile|RotSpeed']       = rpm
     p['EDFile|BlPitch(1)']     = pitch
     p['EDFile|BlPitch(2)']     = pitch
@@ -60,11 +71,15 @@ for i,(wsp,rpm,pitch) in enumerate(zip(WS,RPM,PITCH)): # NOTE: same length of WS
     #  p['EDFile|BldFile(1)|AdjBlMs'] =1.1
     #  p['EDFile|BldFile(2)|AdjBlMs'] =1.1
     #  p['EDFile|BldFile(3)|AdjBlMs'] =1.1
-	# Changing BeamDyn properties
-	#         BP_ref = fBD['BeamProperties']
-	#         BP     = BP_ref.copy()
-	#         BP['K']= BP['K']*i
-	#         p['BDBldFile(1)|BldFile|BeamProperties'] =BP
+    # Changing BeamDyn properties
+    #  BP     = BP_ref.copy() # Make a copy to be safe
+    #  BP['K']= BP['K']*i   # Modify stiffness
+    #  p['BDBldFile(1)|BldFile|BeamProperties'] = BP # Use the updated stiffness for this case
+    # Changing HydroDyn properties
+    #  SmplProp = SmplProp_ref.copy() # Make a copy to be safe
+    #  SmplProp[0,0] = Cd[i]  # Change Cd value
+    #  p['HDFile|SmplProp'] = SmplProp # Use the updated table for this case,s
+
     PARAMS.append(p)
 
 # --- Generating all files in a workdir
