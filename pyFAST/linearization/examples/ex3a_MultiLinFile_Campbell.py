@@ -25,6 +25,7 @@ scriptDir = os.path.dirname(__file__)
 # --- Script Parameters
 fstFiles = glob.glob(os.path.join(scriptDir,'../../../data/linearization_outputs/*.fst')) # list of fst files where linearization were run, lin file will be looked for
 # fstFiles = glob.glob(os.path.join(scriptDir,'../../../data/NREL5MW/5MW_Land_Lin_Rotating/*.fst')) # list of fst files where linearization were run, lin file will be looked for
+fstFiles.sort() # Important for unittest
 
 # --- Step 3: Run MBC, identify Modes, generate CSV files, and binary modes
 # Find lin files, perform MBC, and try to identify modes. A csv file is written with the mode IDs.
@@ -72,4 +73,3 @@ if __name__=='__test__':
     np.testing.assert_almost_equal(Damp['1st_Tower_FA'][:2], [0.00352, 0.06034],4)
     np.testing.assert_almost_equal(OP['WS_[m/s]'], [0, 3],2)
     np.testing.assert_almost_equal(OP['RotSpeed_[rpm]'], [0, 6.972],2)
-
