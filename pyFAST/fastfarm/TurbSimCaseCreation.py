@@ -14,7 +14,7 @@ import numpy as np
 class TSCaseCreation:
     
     def __init__(self, D, HubHt, Vhub, TI, PLexp, x, y, z=None, zbot=1.0, cmax=5.0, fmax=5.0,
-                 Cmeander=1.9, boxType='highres', high_ext=1.2, low_ext=None):
+                 Cmeander=1.9, boxType='highres', high_ext=1.2, low_ext=None, ds_low=None):
         """
         Instantiate the object. 
         
@@ -41,7 +41,7 @@ class TSCaseCreation:
                     box type, either 'lowres' or 'highres'. Sets the appropriate dt, dy, and dz for discretization
                     Defaults to `highres` for backward compatibility
         high_ext :   float
-                    extent of the high-res box around individual turbines (in D) 
+                    extent of the high-res box around individual turbines (in D). This is the total length
         low_ext  :  list of floats [xmin, xmax, ymin, ymax, zabovehub]
                     extents for the low-res box. All values should be positive  If not specified, resorts to
                     computations by the manual
@@ -56,17 +56,23 @@ class TSCaseCreation:
         else:
             manual_mode = True
 
+        if ds_low is None:
+            manual_ds_low = False
+        else:
+            manual_ds_low = True
+
         # Set parameters for convenience
         self.Cmeander = Cmeander
         self.boxType  = boxType
         self.high_ext = high_ext
         self.low_ext  = low_ext
+        self.ds_low   = ds_low
         # Turbine parameters
         self.Turb(D, HubHt, cmax, fmax)
         # Turbine location
         self.turbLocs(x,y,z)
         # Discretization
-        self.discretization(Vhub, TI, PLexp)
+        self.discretization(Vhub, TI, PLexp, manual_ds_low)
         # Setup domain size
         self.domainSize(zbot=zbot, manual_mode=manual_mode)
         # Determine origin
@@ -111,7 +117,7 @@ class TSCaseCreation:
         else:
             self.z     = np.asarray(z)
 
-    def discretization(self, Vhub, TI, Shear):
+    def discretization(self, Vhub, TI, Shear, manual_ds_low=False):
         '''
         Specify discretization for both the high-res and low-res boxes. Follows guidelines present at
         https://openfast.readthedocs.io/en/main/source/user/fast.farm/ModelGuidance.html#low-resolution-domain
@@ -126,6 +132,8 @@ class TSCaseCreation:
         if self.boxType == 'lowres':
             self.dt = self.Cmeander*self.D/(10*Vhub)
             ds_low  = self.Cmeander*self.D*Vhub/150
+            if manual_ds_low:
+                ds_low = self.ds_low
             ds_high = self.cmax
             self.dy = np.floor(ds_low/ds_high)*ds_high
             self.dz = np.floor(ds_low/ds_high)*ds_high
@@ -156,6 +164,13 @@ class TSCaseCreation:
 
             self.ny = np.ceil(Ydist_Low/self.dy)+1
             self.nz = np.ceil(Zdist_Low/self.dz)+1
+
+            # We need to make sure the number of points is odd.
+            if self.ny%2 == 0:
+                self.ny += 1
+            if self.nz%2 == 0:
+                self.nz += 1
+               
             
             self.Width  = self.dy*(self.ny-1)
             self.Height = self.dz*(self.nz-1)
@@ -167,11 +182,17 @@ class TSCaseCreation:
 
         elif self.boxType=='highres':
             Ydist_high = self.high_ext*self.D
-            Zdist_high = self.RefHt + self.high_ext*self.D/2.0 - zbot
+            Zdist_high = self.RefHt + self.high_ext*self.D/2 - zbot
            
             self.ny = np.ceil(Ydist_high/self.dy)+1
             self.nz = np.ceil(Zdist_high/self.dz)+1
            
+            # We need to make sure the number of points is odd.
+            if self.ny%2 == 0:
+                self.ny += 1
+            if self.nz%2 == 0:
+                self.nz += 1
+
             self.Width  = self.dy*(self.ny-1)
             self.Height = self.dz*(self.nz-1)
            
@@ -187,6 +208,7 @@ class TSCaseCreation:
     def originLoc(self):
         raise NotImplementedError
         
+
 
     def plotSetup(self, fig=None, ax=None):
         """ Plot a figure showing the turbine locations and the extent of the turbulence box"""
@@ -213,22 +235,33 @@ class TSCaseCreation:
         fig.tight_layout
         return fig, ax
 
-    def writeTSFile(self, fileIn, fileOut, NewFile=True, tpath=None, tmax=50):
+    def writeTSFile(self, fileIn, fileOut, NewFile=True, tpath=None, tmax=50, turb=None):
         """ Write a TurbSim primary input file, 
         See WriteTSFile below.
         """
-        WriteTSFile(fileIn, fileOut, self, NewFile=NewFile, tpath=tpath, tmax=tmax)
+        WriteTSFile(fileIn, fileOut, self, NewFile=NewFile, tpath=tpath, tmax=tmax, turb=turb)
 
 
         
-def WriteTSFile(fileIn, fileOut, params, NewFile=True, tpath=None, tmax=50):
+def WriteTSFile(fileIn, fileOut, params, NewFile=True, tpath=None, tmax=50, turb=None):
     """ Write a TurbSim primary input file, 
 
         tpath:     string,
                    path to base turbine location (.fst)
                    only used if NewFile is False
+        boxType:   string,
+                   Box type, either 'lowres' or 'highres'. Writes the proper `TurbModel`
+                   if boxType=='highres', `turb` needs to be specified
+        turb:      int,
+                   turbine number to be printed on the time series file. Only needed
+                   if boxType='highres'
 
     """
+
+    if params.boxType=='highres' and not isinstance(turb, int):
+        raise ValueError("turb needs to be an integer when boxType is 'highres'")
+    if params.boxType=='lowres' and turb is not None:
+        print("WARNING: `turb` is not used when boxType is 'lowres'. Remove `turb` to dismiss this warning.")
 
     if NewFile == True:
         print('Writing a new {0} file from scratch'.format(fileOut))
@@ -264,8 +297,14 @@ def WriteTSFile(fileIn, fileOut, params, NewFile=True, tpath=None, tmax=50):
             f.write('0\tHFlowAng\t\t- Horizontal mean flow (skew) angle [degrees]\n')
             f.write('\n')
             f.write('--------Meteorological Boundary Conditions-------------------\n')
-            f.write('"IECKAI"\tTurbModel\t\t- Turbulence model ("IECKAI","IECVKM","GP_LLJ","NWTCUP","SMOOTH","WF_UPW","WF_07D","WF_14D","TIDAL","API","IECKAI","TIMESR", or "NONE")\n')
-            f.write('"unused"\tUserFile\t\t- Name of the file that contains inputs for user-defined spectra or time series inputs (used only for "IECKAI" and "TIMESR" models)\n')
+            if params.boxType=='lowres':
+                f.write('"IECKAI"\tTurbModel\t\t- Turbulence model ("IECKAI","IECVKM","GP_LLJ","NWTCUP","SMOOTH","WF_UPW","WF_07D","WF_14D","TIDAL","API","IECKAI","TIMESR", or "NONE")\n')
+                f.write('"unused"\tUserFile\t\t- Name of the file that contains inputs for user-defined spectra or time series inputs (used only for "IECKAI" and "TIMESR" models)\n')
+            elif params.boxType=='highres':
+                f.write( '"TIMESR"\tTurbModel\t\t- Turbulence model ("IECKAI","IECVKM","GP_LLJ","NWTCUP","SMOOTH","WF_UPW","WF_07D","WF_14D","TIDAL","API","IECKAI","TIMESR", or "NONE")\n')
+                f.write(f'"USRTimeSeries_T{turb}.txt"\tUserFile\t\t- Name of the file that contains inputs for user-defined spectra or time series inputs (used only for "IECKAI" and "TIMESR" models)\n')
+            else:
+                raise ValueError("boxType can only be 'lowres' or 'highres'. Stopping.")
             f.write('1\tIECstandard\t\t- Number of IEC 61400-x standard (x=1,2, or 3 with optional 61400-1 edition number (i.e. "1-Ed2") )\n')
             f.write('"{:.3f}\t"\tIECturbc\t\t- IEC turbulence characteristic ("A", "B", "C" or the turbulence intensity in percent) ("KHTEST" option with NWTCUP model, not used for other models)\n'.format(params.TI))
             f.write('"NTM"\tIEC_WindType\t\t- IEC turbulence type ("NTM"=normal, "xETM"=extreme turbulence, "xEWM1"=extreme 1-year wind, "xEWM50"=extreme 50-year wind, where x=wind turbine class 1, 2, or 3)\n')
@@ -326,3 +365,28 @@ def WriteTSFile(fileIn, fileOut, params, NewFile=True, tpath=None, tmax=50):
                         newline =str('{:.3f}\t\t{:.3f}\t\t{:.3f}\t\t{}_WT{:d}.fst"\t{:.3f}\t\t{:.3f}\t\t{:.3f}\t\t{:.3f}\t\t{:.3f}\t\t{:.3f}\n'.format(params.x[wt],params.y[wt],params.z[wt],tpath,wt+1,params.X0_High[wt],params.Y0_High[wt],params.Z0_High,params.dX_High,params.dY_High,params.dZ_High))
                         wt+=1
                     new_file.write(newline)
+
+
+def writeTimeSeriesFile(fileOut,yloc,zloc,u,v,w,time):
+    """ Write a TurbSim primary input file, 
+
+    """
+
+    print('Writing {0}'.format(fileOut))
+    # --- Writing TurbSim user-defined time series file
+    with open(fileOut, 'w') as f:
+        f.write( '--------------TurbSim v2.00.* User Time Series Input File-----------------------\n')
+        f.write( '     Time series input from low-res turbsim run\n')
+        f.write( '--------------------------------------------------------------------------------\n')
+        f.write( '          3 nComp - Number of velocity components in the file\n')
+        f.write( '          1 nPoints - Number of time series points contained in this file (-)\n')
+        f.write( '          1 RefPtID - Index of the reference point (1-nPoints)\n')
+        f.write( '     Pointyi Pointzi ! nPoints listed in order of increasing height\n')
+        f.write( '       (m)     (m)\n')
+        f.write(f'       {yloc:.5f}   {zloc:.5f}\n')
+        f.write( '--------Time Series-------------------------------------------------------------\n')
+        f.write( 'Elapsed Time         Point01u             Point01v           Point01w\n')
+        f.write( '         (s)            (m/s)                (m/s)              (m/s)\n')
+        for i in range(len(time)):
+            f.write(f'\t{time[i]:.2f}\t\t\t  {u[i]:.5f}\t\t\t  {v[i]:.5f}\t\t\t {w[i]:.5f}\n')
+
