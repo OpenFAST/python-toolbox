@@ -51,6 +51,9 @@ class Test(unittest.TestCase):
         np.testing.assert_almost_equal(df_st['K16'].values[10]/1e6    ,-33.9432  ,3)
         np.testing.assert_almost_equal(df_st['K26'].values[10]/1e6    ,211.6052  ,3)
 
+        os.remove(H2_htcfile_new)
+        os.remove(H2_stfile)
+
 
 if __name__ == '__main__':
 

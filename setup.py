@@ -38,6 +38,7 @@ setup(
         "chardet",
         "scipy",
         "sympy",
+        "openpyxl",
         "pytest"
     ],
     test_suite="pytest",

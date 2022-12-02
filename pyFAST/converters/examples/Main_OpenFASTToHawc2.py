@@ -40,3 +40,8 @@ FAST2Hawc2(fstIn, htcTemplate, htcOut, OPfile=OPfile, TwrFAFreq=0.1, TwrSSFreq=0
 
 if __name__ == '__main__':
     pass
+if __name__ == '__test__':
+    try:
+        os.remove(htc_out)
+    except:
+        pass

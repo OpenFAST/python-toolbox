@@ -40,3 +40,6 @@ if __name__=='__main__':
 
 if __name__=='__test__':
     main() 
+    import shutil
+    os.remove('_NREL5MW_AD_bld.dat')
+    shutil.rmtree('_Polars')

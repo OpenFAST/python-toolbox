@@ -1,8 +1,3 @@
-from __future__ import division,unicode_literals,print_function,absolute_import
-from builtins import map, range, chr, str
-from io import open
-from future import standard_library
-standard_library.install_aliases()
 import os
 
 from .file import File, WrongFormatError
@@ -74,7 +69,7 @@ class CSVFile(File):
             return lines
 
         def readline(iLine):
-            with open(self.filename,'r') as f: #,encoding=self.encoding) as f:
+            with open(self.filename,'r',encoding=self.encoding) as f:
                 for i, line in enumerate(f):
                     if i==iLine:
                         return line.strip()
@@ -117,14 +112,14 @@ class CSVFile(File):
         self.header = []
         if len(self.commentLines)>0:
             # We read the lines
-            with open(self.filename,'r') as f: #,encoding=self.encoding) as f:
+            with open(self.filename,'r',encoding=self.encoding) as f:
                 for i in range(max(self.commentLines)+1):
                     l = f.readline()
                     if i in self.commentLines:
                         self.header.append(l.strip())
         elif self.commentChar is not None:
             # we detect the comments lines that start with comment char
-            with open(self.filename,'r') as f: #,encoding=self.encoding) as f:
+            with open(self.filename,'r',encoding=self.encoding) as f:
                 n=0
                 while n<100:
                     l = f.readline().strip()
@@ -140,7 +135,7 @@ class CSVFile(File):
             if len(line)>0 and line[0] in COMMENT_CHAR:
                 self.commentChar=line[0]
                 # Nasty copy paste from above
-                with open(self.filename,'r') as f: #,encoding=self.encoding) as f:
+                with open(self.filename,'r',encoding=self.encoding) as f:
                     n=0
                     while n<100:
                         l = f.readline().strip()
@@ -155,7 +150,7 @@ class CSVFile(File):
         if self.sep is None:
             # Detecting separator by reading first lines of the file
             try:
-                with open(self.filename,'r') as f: #,encoding=self.encoding) as f:
+                with open(self.filename,'r',encoding=self.encoding) as f:
                     dummy=[next(f).strip() for x in range(iStartLine)]
                     head=[next(f).strip() for x in range(2)]
                 # comma, semi columns or tab
@@ -240,7 +235,7 @@ class CSVFile(File):
         #print(skiprows)
         try:
 #             self.data = pd.read_csv(self.filename,sep=self.sep,skiprows=skiprows,header=None,comment=self.commentChar,encoding=self.encoding)
-            with open(self.filename,'r') as f: #,encoding=self.encoding) as f:
+            with open(self.filename,'r',encoding=self.encoding) as f:
                 self.data = pd.read_csv(f,sep=self.sep,skiprows=skiprows,header=None,comment=self.commentChar)
         except pd.errors.ParserError as e:
             raise WrongFormatError('CSV File {}: '.format(self.filename)+e.args[0])
@@ -277,7 +272,7 @@ class CSVFile(File):
     def __repr__(self):
         s = 'CSVFile: {}\n'.format(self.filename)
         s += 'sep=`{}` commentChar=`{}`\ncolNamesLine={}'.format(self.sep,self.commentChar,self.colNamesLine)
-        #s += ', encoding={}'.format(self.encoding)+'\n'
+        s += ', encoding={}'.format(self.encoding)+'\n'
         s += 'commentLines={}'.format(self.commentLines)+'\n'
         s += 'colNames={}'.format(self.colNames)
         s += '\n'

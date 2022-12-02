@@ -3,10 +3,10 @@ import os
 import glob
 import matplotlib.pyplot as plt
 # Local
-from linearization import plotCampbellDataFile
+from pyFAST.linearization.linearization import plotCampbellDataFile
 
 
-if len(sys.argv) not in [3,3,4]:
+if len(sys.argv) not in [2,3,4]:
     print(""" 
 usage:
     plotCampbellData XLS_OR_CSV [WS_OR_RPM] [sheetname] 

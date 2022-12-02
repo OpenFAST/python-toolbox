@@ -186,6 +186,8 @@ def AE_PC_C2_toAD(ae_filename, pc_filename, blade_c2def, r_AD=None, ADbldFilenam
         M, t, pc_set, thicknesses = interpH2Polar(ae.data, pc.data, r, alpha=vAlpha, ae_set_nr=ae_set_nr)
         comment = 'Thickness: {} - pc_set:{} - thicknesses:{}\nGenerated using HAWC2 inputs: AE:{} PC:{}'.format(t, pc_set, thicknesses, ae_base, pc_base)
         Re = 1.0 # TODO
+        # Ensure that first value match new value
+        M[-1,1:] = M[0,1:]
         # Create an instance of Polar class for convenience
         P = Polar(Re, alpha=vAlpha, cl=M[:,1], cd=M[:,2], cm=M[:,3], radians=False)
         # Apply 3D correction
