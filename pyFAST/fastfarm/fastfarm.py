@@ -5,7 +5,7 @@ import pandas as pd
 from pyFAST.input_output.fast_input_file import FASTInputFile
 from pyFAST.input_output.fast_output_file import FASTOutputFile
 from pyFAST.input_output.turbsim_file import TurbSimFile
-import pyFAST.input_output.postpro as fastlib
+import pyFAST.postpro as fastlib
 
 # --------------------------------------------------------------------------------}
 # --- Small helper functions
