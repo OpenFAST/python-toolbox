@@ -98,11 +98,11 @@ class TurbSimFile(File):
                 self['uTwr'] = uTwr
         self['info'] = info
         self['ID']   = ID
-        self['dt']   = dt
+        self['dt']   = np.round(dt,3) # dt is stored in single precision in the TurbSim output
         self['y']    = np.arange(ny)*dy 
         self['y']   -= np.mean(self['y']) # y always centered on 0
         self['z']    = np.arange(nz)*dz +zBottom
-        self['t']    = np.arange(nt)*dt
+        self['t']    = np.round(np.arange(nt)*dt, 3)
         self['zTwr'] =-np.arange(nTwr)*dz + zBottom
         self['zRef'] = zHub
         self['uRef'] = uHub
