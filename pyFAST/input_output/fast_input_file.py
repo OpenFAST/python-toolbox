@@ -1133,7 +1133,7 @@ def parseFASTInputLine(line_raw,i,allowSpaceSeparatedList=False):
 def parseFASTOutList(lines,iStart):
     OutList=[]
     i = iStart
-    MAX=200
+    MAX=500 
     while i<len(lines) and lines[i].upper().find('END')!=0:
         OutList.append(lines[i]) #TODO better parsing
         #print('OutList',lines[i])
