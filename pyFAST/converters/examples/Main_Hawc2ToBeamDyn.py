@@ -31,7 +31,7 @@ def main():
     BDMainTemplate = os.path.join(MyDir,'../../../data/templates/BeamDyn.dat') # readonly, template file to write main BD file
     BD_mainfile  = '_NREL5MW_BeamDyn_Created.dat'       # Name of BeamDyn file to be writen
     BD_bladefile = '_NREL5MW_BeamDyn_Blade_Created.dat' # Name of BeamDyn blade file to be written
-    fig = bd.htcToBeamDyn(H2_htcfile, 'blade1', BD_bladefile, BD_mainfile, BDMainTemplate, Mu=Mu, poly_exp=[2,3,4,5,6], ref_axis='c2def', bPlot=True)
+    fig = bd.htcToBeamDyn(H2_htcfile, 'blade1', BD_bladefile, BD_mainfile, BDMainTemplate, Mu=Mu, poly_exp=[2,3,4,5,6], ref_axis='c2def', bPlot=True, interpCurvilinear=False)
 
     return BD_mainfile, BD_bladefile
 
