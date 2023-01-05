@@ -64,7 +64,7 @@ def main_WriteADPolarLowLevel():
     # --- Creating a Polar object from Cl-Cd data
     polarFile = os.path.join(scriptDir,'../data/DU21_A17.csv')
     p=CSVFile(polarFile).toDataFrame().values
-    polar= Polar(np.nan, p[:,0],p[:,1],p[:,2],p[:,3])
+    polar= Polar(alpha=p[:,0],cl=p[:,1],cd=p[:,2],cm=p[:,3])
     (alpha0,alpha1,alpha2,cnSlope,cn1,cn2,cd0,cm0)=polar.unsteadyParams()
 
     # --- Updating the AD polar file 
@@ -109,6 +109,9 @@ if __name__ == '__main__':
     plt.show()
 
 if __name__ == '__test__':
+    ADpol,polar = main_ReWriteADFile()
+    ADpol,polar = main_WriteADPolar()
+    ADpol,polar = main_WriteADPolar()
     try:
         os.remove('_Polar_out.dat.ignore')
     except:
