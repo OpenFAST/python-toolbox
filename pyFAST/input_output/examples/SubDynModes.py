@@ -31,8 +31,13 @@ plt.plot(df['z_[m]'], df['GuyanMode5x_[m]'], 'o')
 sds.toJSON('_OUT.json')
 sds.toGraph().toJSON('_OUT2.json')
 
-
 if __name__ == '__main__':
     plt.show()
 if __name__=='__test__':
-    pass
+    np.testing.assert_array_almost_equal(df['z_[m]'].values[::2], [-20.   , -13.333,  -6.667,   0.   ,   6.667])
+    np.testing.assert_array_almost_equal(df['GuyanMode1x_[m]'].values[::2], [0.      , 0.446041, 1.270304, 2.170204, 2.843171])
+    try:
+        os.remove('_OUT.json')
+        os.remove('_OUT2.json')
+    except:
+        pass
