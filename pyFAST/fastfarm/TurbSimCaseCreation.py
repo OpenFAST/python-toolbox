@@ -235,15 +235,15 @@ class TSCaseCreation:
         fig.tight_layout
         return fig, ax
 
-    def writeTSFile(self, fileIn, fileOut, NewFile=True, tpath=None, tmax=50, turb=None):
+    def writeTSFile(self, fileIn, fileOut, NewFile=True, tpath=None, tmax=50, turb=None, verbose=0):
         """ Write a TurbSim primary input file, 
         See WriteTSFile below.
         """
-        WriteTSFile(fileIn, fileOut, self, NewFile=NewFile, tpath=tpath, tmax=tmax, turb=turb)
+        WriteTSFile(fileIn, fileOut, self, NewFile=NewFile, tpath=tpath, tmax=tmax, turb=turb, verbose=verbose)
 
 
         
-def WriteTSFile(fileIn, fileOut, params, NewFile=True, tpath=None, tmax=50, turb=None):
+def WriteTSFile(fileIn, fileOut, params, NewFile=True, tpath=None, tmax=50, turb=None, verbose=0):
     """ Write a TurbSim primary input file, 
 
         tpath:     string,
@@ -264,7 +264,7 @@ def WriteTSFile(fileIn, fileOut, params, NewFile=True, tpath=None, tmax=50, turb
         print("WARNING: `turb` is not used when boxType is 'lowres'. Remove `turb` to dismiss this warning.")
 
     if NewFile == True:
-        print('Writing a new {0} file from scratch'.format(fileOut))
+        if verbose>1:  print('Writing a new {0} file from scratch'.format(fileOut))
         # --- Writing FFarm input file from scratch
         with open(fileOut, 'w') as f:
             f.write('--------TurbSim v2.00.* Input File------------------------\n')
