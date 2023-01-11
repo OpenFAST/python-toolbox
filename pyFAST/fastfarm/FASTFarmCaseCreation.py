@@ -137,6 +137,8 @@ class FFCaseCreation:
         # Check the ds and dt for the high- and low-res boxes
         if not (np.array(self.extent_low)>=0).all():
             raise ValueError(f'The array for low-res box extents should be given with positive values')
+        if self.dt_low_les%self.dt_high_les > 1e-14:
+            raise ValueError(f'The temporal resolution dT_Low should be a multiple of dT_High')
         if self.dt_low_les < self.dt_high_les:
             raise ValueError(f'The temporal resolution dT_High should not be greater than dT_Low on the LES side')
         if self.ds_low_les < self.ds_high_les:
