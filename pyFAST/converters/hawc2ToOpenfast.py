@@ -121,7 +121,7 @@ def AE_PC_C2_toAD(ae_filename, pc_filename, blade_c2def, r_AD=None, ADbldFilenam
     xC2     = blade_c2def[:,0+iOff]
     yC2     = blade_c2def[:,1+iOff]
     zC2     = blade_c2def[:,2+iOff]
-    twistC2 = blade_c2def[:,3+iOff]
+    twistC2 = blade_c2def[:,3+iOff] # [deg]
 
     ae_set = ae.data.ae_sets[ae_set_nr]
     radius_H2 = ae_set[:,0]
@@ -135,7 +135,7 @@ def AE_PC_C2_toAD(ae_filename, pc_filename, blade_c2def, r_AD=None, ADbldFilenam
     chord_H2 = np.interp(r_AD, ae_set[:,0], ae_set[:,1])
     trel_H2  = np.interp(r_AD, ae_set[:,0], ae_set[:,2])
     pcset_H2 = np.interp(r_AD, ae_set[:,0], ae_set[:,3])
-    twist_H2 = np.interp(r_AD, zC2, twistC2)
+    twist_H2 = np.interp(r_AD, zC2, twistC2)            #[deg]
     x_H2     = np.interp(r_AD, zC2, xC2) # sweep
     y_H2     = np.interp(r_AD, zC2, yC2) # prebend
     # Aerodynamic Center
@@ -148,12 +148,12 @@ def AE_PC_C2_toAD(ae_filename, pc_filename, blade_c2def, r_AD=None, ADbldFilenam
     # BlSpn        BlCrvAC        BlSwpAC        BlCrvAng       BlTwist        BlChord          BlAFID
     aeroNodes = np.zeros((len(r_AD), 7))
     aeroNodes[:,0] = r_AD
-    aeroNodes[:,1] =  yAC_H2  # BlCrvAC # TODO not c2def but AC
-    aeroNodes[:,2] = -xAC_H2  # BlSwpAC (positive along yOF, negative xH2) # TODO not c2def but AC
+    aeroNodes[:,1] =  yAC_H2  # BlCrvAC # NOTE: not c2def but AC
+    aeroNodes[:,2] = -xAC_H2  # BlSwpAC (positive along yOF, negative xH2) # NOTE: not c2def but AC
     dr = np.gradient(aeroNodes[:,0])
     dx = np.gradient(aeroNodes[:,1])
-    aeroNodes[:,3] = np.degrees(np.arctan2(dx,dr))*np.pi/180
-    aeroNodes[:,4] = -twist_H2
+    aeroNodes[:,3] = np.degrees(np.arctan2(dx,dr))
+    aeroNodes[:,4] = -twist_H2                     # [deg]
     aeroNodes[:,5] =  chord_H2
     aeroNodes[:,6] = (np.arange(len(r_AD))+1).astype(int) # One polar per radius..
     # Write to disk if needed
@@ -186,10 +186,10 @@ def AE_PC_C2_toAD(ae_filename, pc_filename, blade_c2def, r_AD=None, ADbldFilenam
         M, t, pc_set, thicknesses = interpH2Polar(ae.data, pc.data, r, alpha=vAlpha, ae_set_nr=ae_set_nr)
         comment = 'Thickness: {} - pc_set:{} - thicknesses:{}\nGenerated using HAWC2 inputs: AE:{} PC:{}'.format(t, pc_set, thicknesses, ae_base, pc_base)
         Re = 1.0 # TODO
-        # Ensure that first value match new value
+        # Ensure that first value match last value
         M[-1,1:] = M[0,1:]
         # Create an instance of Polar class for convenience
-        P = Polar(Re, alpha=vAlpha, cl=M[:,1], cd=M[:,2], cm=M[:,3], radians=False)
+        P = Polar(Re=Re, alpha=vAlpha, cl=M[:,1], cd=M[:,2], cm=M[:,3], radians=False)
         # Apply 3D correction
         if r>0 and correction3D:
             P = P.correction3D(

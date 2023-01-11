@@ -4,7 +4,9 @@ import pandas as pd
 import os
 from pyFAST.input_output.hawc2_htc_file import HAWC2HTCFile
 from pyFAST.input_output.csv_file import CSVFile
-from pyFAST.input_output.fast_input_file import FASTInputFile
+from pyFAST.input_output.fast_input_file import FASTInputFile, BDFile
+
+from pyFAST.tools.pandalib import pd_interp1
 
 
 from .beam import *
@@ -78,7 +80,7 @@ def mypolyfit(x,y,exponents=[0,1,2,3]):
 
 def htcToBeamDyn(HTCFile, bodyname, BDBldFileOut, BDMainFileOut=None, BDMainTemplate=None, Mu = 1.0e-03, 
                    ref_axis='c2def-polyfit', poly_exp=[2,3,4,5], zref=None, Label='', bPlot=False,
-                   bNoOffset=False, bNoPreSweep=False, nRootZeros=0, bCGOnMeanLine=False):  # Experimental options
+                   bNoOffset=False, bNoPreSweep=False, nRootZeros=0, bCGOnMeanLine=False, interpCurvilinear=True):  # Experimental options
     """
     Writes BeamDyn inputs files from a HAWC2 htc file and the blade body name
     INPUTS:
@@ -92,14 +94,17 @@ def htcToBeamDyn(HTCFile, bodyname, BDBldFileOut, BDMainFileOut=None, BDMainTemp
     H2MeanLine = dfs[bodyname+'_c2']
     H2Structure = dfs[bodyname+'_st']
     H2MeanLine = H2MeanLine[['x_[m]','y_[m]','z_[m]','twist_[deg]']] # Changing order
+    if len(Label)==0:
+        Label='Converted by hawc2ToBeamDyn.py from {}'.format(HTCFile)
+
 
     return hawc2ToBeamDyn(H2MeanLine, H2Structure, BDBldFileOut, BDMainFileOut=BDMainFileOut, BDMainTemplate=BDMainTemplate, Mu=Mu, 
                    ref_axis=ref_axis, poly_exp=poly_exp, zref=zref, Label=Label, bPlot=bPlot,
-                   bNoOffset=bNoOffset, bNoPreSweep=bNoPreSweep, nRootZeros=nRootZeros, bCGOnMeanLine=bCGOnMeanLine)
+                   bNoOffset=bNoOffset, bNoPreSweep=bNoPreSweep, nRootZeros=nRootZeros, bCGOnMeanLine=bCGOnMeanLine, interpCurvilinear=interpCurvilinear)
 
 def hawc2ToBeamDyn(H2MeanLine, H2Structure, BDBldFileOut, BDMainFileOut=None, BDMainTemplate=None, Mu = 1.0e-03, 
                    ref_axis='c2def-polyfit', poly_exp=[2,3,4,5], zref=None, Label='', bPlot=False,
-                   bNoOffset=False, bNoPreSweep=False, nRootZeros=0, bCGOnMeanLine=False):  # Experimental options
+                   bNoOffset=False, bNoPreSweep=False, nRootZeros=0, bCGOnMeanLine=False, interpCurvilinear=True):  # Experimental options
     """
     Writes BeamDyn inputs files from two csv files derived from "Hawc2" inputs
 
@@ -164,8 +169,11 @@ def hawc2ToBeamDyn(H2MeanLine, H2Structure, BDBldFileOut, BDMainFileOut=None, BD
     twist  = - c2def['twist_[deg]'].values # initial_twist [deg] Hawc2 angle is positive around z, unlike the "twist"
 
     # --- Compute r_ref, curvilinear position of keypoints (for st file)
-    dr= np.sqrt((x_O_h2[1:]-x_O_h2[0:-1])**2 +(y_O_h2[1:]-y_O_h2[0:-1])**2 +(z_O_h2[1:]-z_O_h2[0:-1])**2)
-    r_ref = np.concatenate(([0],np.cumsum(dr)))
+    if interpCurvilinear:
+        dr= np.sqrt((x_O_h2[1:]-x_O_h2[0:-1])**2 +(y_O_h2[1:]-y_O_h2[0:-1])**2 +(z_O_h2[1:]-z_O_h2[0:-1])**2)
+        r_ref = np.concatenate(([0],np.cumsum(dr)))
+    else:
+        r_ref = np.abs(z_O_h2)
 
 
     # --- BeamDyn ref axis
@@ -220,13 +228,10 @@ def hawc2ToBeamDyn(H2MeanLine, H2Structure, BDBldFileOut, BDMainFileOut=None, BD
     # For the equations below to be generic we force the column names
     hwc_in.columns=['r_[m]','m_[kg/m]','x_cg_[m]','y_cg_[m]','ri_x_[m]','ri_y_[m]','x_sh_[m]','y_sh_[m]','E_[N/m^2]','G_[N/m^2]','I_x_[m^4]','I_y_[m^4]','I_p_[m^4]','k_x_[-]','k_y_[-]','A_[m^2]','pitch_[deg]','x_e_[m]','y_e_[m]']
     # --- Interpolating to match c2def positions
-    hwc = pd.DataFrame(columns=hwc_in.columns)
-    r_old = hwc_in['r_[m]'].values
-    for c in hwc.columns:
-        hwc[c] = np.interp(r_ref, r_old, hwc_in[c])
-    if r_old[-1]<r_ref[-1]:
-        # NOTE: interp won't do extrap , small hack here...
-        hwc['r_[m]'].values[-1] = r_ref[-1]
+    hwc =  pd_interp1(r_ref, 'r_[m]', hwc_in)
+    #if r_old[-1]<r_ref[-1]:
+    #    # NOTE: interp won't do extrap , small hack here...
+    #    hwc['r_[m]'].values[-1] = r_ref[-1]
 
     # --- Safety check
     if len(hwc)!=len(c2def):
@@ -295,12 +300,14 @@ def hawc2ToBeamDyn(H2MeanLine, H2Structure, BDBldFileOut, BDMainFileOut=None, BD
     #np.savetxt(BDBldFileOut.replace('.dat','offsets.txt'), M, delimiter=',',header='z_[m], xoff_[m], yoff_[m]')
 
     # --- Writing BeamDyn main file based on template file
-    if BDMainTemplate is not None and BDMainFileOut is not None:
-        BD=FASTInputFile(BDMainTemplate)
+    if BDMainFileOut is not None:
+        if BDMainTemplate is not None:
+            BD=FASTInputFile(BDMainTemplate)
+        else:
+            BD=BDFile(BDMainTemplate)
         #print(BD.keys())
         BD.data[1]['value']=Label
         BD['MemberGeom'] = np.column_stack((x_O,y_O,z_O,twist))
-        BD['kp_total']   = len(x_O)
         BD['BldFile']    = '"'+os.path.basename(BDBldFileOut)+'"' 
         BD.data[BD.getID('kp_total')+1]['value']= '1 {}'.format(len(x_O))
 

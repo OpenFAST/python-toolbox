@@ -6,6 +6,7 @@
 
 import os
 import numpy as np
+from .polar_file import loadPolarFile # For IO
 
 class NoCrossingException(Exception):
     pass
@@ -24,10 +25,9 @@ class Polar(object):
         - cd_interp         : cd at given alpha values
         - cm_interp         : cm at given alpha values
         - cn_interp         : cn at given alpha values
-        - f_st_interp       : separation function (compared to fully separated polar)
+        - fs_interp       : separation function (compared to fully separated polar)
         - cl_fs_interp      : cl fully separated at given alpha values
         - cl_inv_interp     : cl inviscid at given alpha values
-        - fromfile          : reads of polar from csv of FAST AD15 file
         - correction3D      : apply 3D rotatational correction
         - extrapolate       : extend polar data set using Viterna's method
         - unsteadyParams    : computes unsteady params e.g. needed by AeroDyn15
@@ -41,13 +41,14 @@ class Polar(object):
         - toAeroDyn: write AeroDyn file 
     """
 
-    def __init__(self, FileName_or_Re=None, alpha=None, cl=None, cd=None, cm=None, Re=None, compute_params=False, radians=None, fformat='auto'):
+    def __init__(self, filename=None, alpha=None, cl=None, cd=None, cm=None, Re=None, 
+            compute_params=False, radians=None, fformat='auto', verbose=False):
         """Constructor
 
         Parameters
         ----------
-        FileName_or_Re: float or string
-            For backward compatibility.. Filename or reynolds number
+        filename: string
+            If provided, the polar will be read from filename using fformat
         Re : float
             Reynolds number
         alpha : ndarray (deg)
@@ -58,13 +59,45 @@ class Polar(object):
             drag coefficient
         cm : ndarray
             moment coefficient
+        fformat: string
+            file format to be used when filename is provided
+
         """
-        self._radians=False 
-        if isinstance(FileName_or_Re, str):
-            alpha, cl, cd, cm, Re = loadPolarFile(FileName_or_Re, fformat=fformat, to_radians=False)
-        else:
-            if Re is None:
-                Re = FileName_or_Re
+        # --- Potentially-locked properties
+        # Introducing locks so that some properties become readonly if prescribed by user
+        self._fs_lock     = False
+        self._cl_fs_lock  = False
+        self._cl_inv_lock = False
+        # TODO lock _alpha0 and cl_alpha
+        self.fs = None  # steady separation function
+        self.cl_fs = None  # cl_fully separated
+        self.cl_inv = None  # cl inviscid/linear/potential flow
+        self._alpha0 = None
+        self._linear_slope = None
+
+        # Read polar according to fileformat, if filename provided
+        if filename is not None:
+            df, Re = loadPolarFile(filename, fformat=fformat, to_radians=radians, verbose=verbose)
+            alpha = df['Alpha'].values
+            cl    = df['Cl'].values
+            cd    = df['Cd'].values
+            cm    = df['Cm'].values
+            if 'fs' in df.keys():
+                print('[INFO] Using separating function from input file.')
+                self.fs = df['fs'].values
+                self._fs_lock = True
+            if 'Cl_fs' in df.keys():
+                print('[INFO] Using Cl fully separated from input file.')
+                self.cl_fs =df['Cl_fs'].values
+                self._cl_fs_lock = True
+            if 'Cl_inv' in df.keys():
+                print('[INFO] Using Cl inviscid from input file.')
+                self.cl_inv = df['Cl_inv'].values
+                self._cl_inv_lock = True
+                # TODO we need a trigger if cl_inv provided, we should get alpha0 and slope from it
+            nLocks = sum([self._fs_lock, self._cl_fs_lock, self._cl_inv_lock])
+            if nLocks>0 and nLocks<3:
+                raise Exception("For now, input files are assumed to have all or none of the columns: (fs, cl_fs, and cl_inv). Otherwise, we\'ll have to ensure consitency, and so far we dont...")
 
         self.Re = Re
         self.alpha = np.array(alpha)
@@ -77,10 +110,6 @@ class Polar(object):
         self.cl = np.array(cl)
         self.cd = np.array(cd)
         self.cm = np.array(cm)
-        self.f_st = None  # separation function
-        self.cl_fs = None  # cl_fully separated
-        self._linear_slope = None
-        self._alpha0 = None
         if radians is None:
             # If the max alpha is above pi, most likely we are in degrees
             self._radians = np.mean(np.abs(self.alpha)) <= np.pi / 2
@@ -90,28 +119,75 @@ class Polar(object):
         # NOTE: method needs to be in harmony for linear_slope and the one used in cl_fully_separated
         if compute_params:
             self._linear_slope, self._alpha0 = self.cl_linear_slope(method="max")
-            self.cl_fully_separated()
-            self.cl_inv = self._linear_slope * (self.alpha - self._alpha0)
+            if not self._cl_fs_lock:
+                self.cl_fully_separated()
+            if not self._cl_inv_lock:
+                self.cl_inv = self._linear_slope * (self.alpha - self._alpha0)
 
     def __repr__(self):
         s='<{} object>:\n'.format(type(self).__name__)
+        sunit = 'deg'
+        if self._radians:
+            sunit = 'rad'
         s+='Parameters:\n'
         s+=' - alpha, cl, cd, cm  : arrays of size {}\n'.format(len(self.alpha))
         s+=' - Re     :            {} \n'.format(self.Re)
         s+=' - _radians:           {} (True if alpha in radians)\n'.format(self._radians)
-        s+=' - _alpha0:            {} \n'.format(self._alpha0)
-        s+=' - _linear_slope:      {} \n'.format(self._linear_slope)
+        s+=' - _alpha0:            {} [{}]\n'.format(self._alpha0, sunit)
+        s+=' - _linear_slope:      {} [1/{}]\n'.format(self._linear_slope, sunit)
         s+='Derived parameters:\n'
-        s+=' * cl_lin             : array of size {} \n'.format(len(self.alpha))
-        s+=' * alpha0 :            {} \n'.format(self.alpha0())
-        s+=' * cl_linear_slope :   {} \n'.format(self.cl_linear_slope())
+        s+=' * cl_lin (UNSURE)    : array of size {} \n'.format(len(self.alpha))
+        s+='Functional parameters:\n'
+        s+=' * alpha0 :            {} [{}]\n'.format(self.alpha0(),sunit)
+        s+=' * cl_linear_slope :   {} [1/{}]\n'.format(self.cl_linear_slope()[0],sunit)
         s+=' * cl_max :            {} \n'.format(self.cl_max())
         s+=' * unsteadyParams :    {} \n'.format(self.unsteadyParams())
-        s+='Useful functions:   cl_interp, cd_interp, cm_interp, f_st_interp \n'
-        s+='                      plot, extrapolate\n'
+        s+='Useful functions:   cl_interp, cd_interp, cm_interp, fs_interp \n'
+        s+='                    cl_fs_interp, cl_inv_interp,                 \n'
+        s+='                    interpolant \n'
+        s+='                    plot, extrapolate\n'
         return s
 
 
+    # --- Potential read only properties
+    @property
+    def cl_inv(self):
+        if self._cl_inv is None:
+            self.cl_fully_separated() # computes cl_fs, cl_inv and fs
+        return self._cl_inv
+    @cl_inv.setter
+    def cl_inv(self, cl_inv):
+        if self._cl_inv_lock:
+            raise Exception('Cl_inv was set by user, cannot modify it')
+        else:
+            self._cl_inv = cl_inv
+
+    @property
+    def cl_fs(self):
+        if self._cl_fs is None:
+            self.cl_fully_separated() # computes cl_fs, cl_inv and fs
+        return self._cl_fs
+    @cl_fs.setter
+    def cl_fs(self, cl_fs):
+        if self._cl_fs_lock:
+            raise Exception('cl_fs was set by user, cannot modify it')
+        else:
+            self._cl_fs = cl_fs
+
+    @property
+    def fs(self):
+        if self._fs is None:
+            self.cl_fully_separated() # computes fs, cl_inv and fs
+        return self._fs
+    @fs.setter
+    def fs(self, fs):
+        if self._fs_lock:
+            raise Exception('fs was set by user, cannot modify it')
+        else:
+            self._fs = fs
+
+    
+    # --- Interpolants
     def cl_interp(self, alpha):
         return np.interp(alpha, self.alpha, self.cl)
 
@@ -124,20 +200,65 @@ class Polar(object):
     def cn_interp(self, alpha):
         return np.interp(alpha, self.alpha, self.cn)
 
-    def f_st_interp(self, alpha):
-        if self.f_st is None:
-            self.cl_fully_separated()
-        return np.interp(alpha, self.alpha, self.f_st)
+    def fs_interp(self, alpha):
+        return np.interp(alpha, self.alpha, self.fs)
 
     def cl_fs_interp(self, alpha):
-        if self.cl_fs is None:
-            self.cl_fully_separated()
         return np.interp(alpha, self.alpha, self.cl_fs)
 
     def cl_inv_interp(self, alpha):
-        if (self._linear_slope is None) and (self._alpha0 is None):
-            self._linear_slope, self._alpha0 = self.cl_linear_slope()
-        return self._linear_slope * (alpha - self._alpha0)
+        return np.interp(alpha, self.alpha, self.cl_inv)
+
+    def interpolant(self, variables=['cl', 'cd', 'cm'], radians=None):
+        """ 
+        Create an interpolant `f` for a set of requested variables with alpha as input variable:
+            var_array = f(alpha)
+
+        This is convenient to quickly interpolate multiple polar variables at once.
+        The interpolant returns an array corresponding to the interpolated values of the
+        requested `variables`, in the same order as they are requested.
+
+        When alpha is a scalar, f(alpha) is of length nVar = len(variables)
+        When alpha is an array of length n, f(alpha) is of shape (nVar x n)
+
+        INPUTS:
+          - variables: list of variables that will be returned by the interpolant
+                    Allowed values: ['alpha', 'cl', 'cd', 'cm', 'fs', 'cl_inv', 'cl_fs']
+          - radians: enforce whether `alpha` is in radians or degrees
+
+        OUTPUTS:
+         - f: interpolant
+
+        """
+        from scipy.interpolate import interp1d
+
+        MAP = {'alpha':self.alpha, 'cl':self.cl, 'cd':self.cd, 'cm':self.cm,
+                'cl_inv':self.cl_inv, 'cl_fs':self.cl_fs, 'fs':self.fs}
+
+        if radians is None:
+            radians = self._radians
+
+        # Create a Matrix with columns requested by user
+        #polCols = polar.columns.values[1:]
+        M = self.alpha # we start by alpha for convenience
+        for v in variables:
+            v = v.lower().strip()
+            if v not in MAP.keys():
+                raise Exception('Polar: cannot create an interpolant for variable `{}`, allowed variables: {}'.format(v, MAP.keys()))
+            M = np.column_stack( (M, MAP[v]) )
+        # We remove alpha
+        M = M[:,1:]
+        # Determine the "x" value for the interpolant (alpha in rad or deg)
+        if radians == self._radians:
+            alpha = self.alpha # the user requested the same as what we have
+        else:
+            if radians:
+                alpha = np.radians(self.alpha)
+            else:
+                alpha = np.degrees(self.alpha)
+        # Create the interpolant for requested variables with alpha as "x" axis
+        f = interp1d(alpha, M.T)
+        return f
 
     @property
     def cn(self):
@@ -150,10 +271,14 @@ class Polar(object):
             return self.cl * np.cos(self.alpha * np.pi / 180) + self.cd * np.sin(self.alpha * np.pi / 180)
 
     @property
-    def cl_lin(self):
-        if (self._linear_slope is None) and (self._alpha0 is None):
-            self._linear_slope,self._alpha0=self.cl_linear_slope()
-        return self._linear_slope*(self.alpha-self._alpha0)
+    def cl_lin(self): # TODO consider removing
+        print('[WARN] Polar: cl_lin is a bit of a weird property. Not sure if it will be kept')
+        if self.cl_inv is None:
+            self.cl_fully_separated() # computes cl_fs, cl_inv and fs
+        return self.cl_inv
+        #if (self._linear_slope is None) and (self._alpha0 is None):
+        #    self._linear_slope,self._alpha0=self.cl_linear_slope()
+        #return self._linear_slope*(self.alpha-self._alpha0)
 
 
 
@@ -161,9 +286,11 @@ class Polar(object):
 
     @classmethod
     def fromfile(cls, filename, fformat='auto', compute_params=False, to_radians=False):
-        """Constructor based on a filename"""
-        alpha, cl, cd, cm, Re = loadPolarFile(filename, fformat=fformat, to_radians=to_radians)
-        return cls(Re=Re, alpha=alpha, cl=cl, cd=cd, cm=cm, compute_params=compute_params, radians=to_radians)
+        """Constructor based on a filename
+        # NOTE: this is legacy
+        """
+        print('[WARN] Polar: "fromfile" is depreciated and will be removed in a future release')
+        return cls(filename, fformat=fformat, compute_params=compute_params, radians=to_radians)
 
     def correction3D(
         self,
@@ -306,7 +433,7 @@ class Polar(object):
 
         cd_3d = cd_2d + delta_cd
 
-        return type(self)(self.Re, np.degrees(alpha), cl=cl_3d, cd=cd_3d, cm=self.cm, radians=False)
+        return type(self)(Re=self.Re, alpha=np.degrees(alpha), cl=cl_3d, cd=cd_3d, cm=self.cm, radians=False)
 
     def extrapolate(self, cdmax, AR=None, cdmin=0.001, nalpha=15):
         """Extrapolates force coefficients up to +/- 180 degrees using Viterna's method
@@ -715,6 +842,13 @@ class Polar(object):
             cnSlope = cnSlope
         else:
             cnSlope = cnSlope * 180 / np.pi
+        # --- Sanity checks performed by OpenFAST
+        deltaAlpha = 5
+        if alpha0<alpha2:
+            print('[WARN] Polar: alpha0<alpha2, changing alpha2..')
+            alpha2 = alpha0 - deltaAlpha
+            #raise Exception('alpha0 must be greater than alpha2')
+
         return (alpha0, alpha1, alpha2, cnSlope, cn1, cn2, cd0, cm0)
 
     def unsteadyparam(self, alpha_linear_min=-5, alpha_linear_max=5):
@@ -892,107 +1026,55 @@ class Polar(object):
            slope (in inverse units of alpha, or in radians-1 if radians=True)
            alpha_0 in the same unit as alpha, or in radians if radians=True
         """
-        # --- Return function
-        def myret(sl, a0):
-            # wrapper function to return degrees or radians
-            if radians:
-                return np.rad2deg(sl), np.deg2rad(a0)
-            else:
-                return sl, a0
+        return cl_linear_slope(self.alpha, self.cl, window=window, method=method, inputInRadians=self._radians, radians=radians)
 
-        # finding our alpha0
+    def cl_fully_separated(self, method='max'):
         alpha0 = self.alpha0()
-
-        # Constant case or only one value
-        if np.all(self.cl == self.cl[0]) or len(self.cl) == 1:
-            return myret(0, alpha0)
-
-        if window is None:
-            if np.nanmin(self.cl) > 0 or np.nanmax(self.cl) < 0:
-                window = [self.alpha[0], self.alpha[-1]]
-            else:
-                # define a window around alpha0
-                if self._radians:
-                    window = alpha0 + np.radians(np.array([-5, +20]))
-                else:
-                    window = alpha0 +            np.array([-5, +20])
-
-        # Ensuring window is within our alpha values
-        window = _alpha_window_in_bounds(self.alpha, window)
-
-        if method == "max":
-            slope, off = _find_slope(self.alpha, self.cl, xi=alpha0, window=window, method="max")
-        elif method == "leastsquare":
-            slope, off = _find_slope(self.alpha, self.cl, xi=alpha0, window=window, method="leastsquare")
-        elif method == "leastsquare_constraint":
-            slope, off = _find_slope(self.alpha, self.cl, x0=alpha0, window=window, method="leastsquare")
-        elif method == "optim":
-            # Selecting range of values within window
-            idx = np.where((self.alpha >= window[0]) & (self.alpha <= window[1]) & ~np.isnan(self.cl))[0]
-            cl, alpha = self.cl[idx], self.alpha[idx]
-            # Selecting within the min and max of this window to improve accuracy
-            imin = np.where(cl == np.min(cl))[0][-1]
-            idx = np.arange(imin, np.argmax(cl) + 1)
-            window = [alpha[imin], alpha[np.argmax(cl)]]
-            cl, alpha = cl[idx], alpha[idx]
-            # Performing minimization of slope
-            slope, off = _find_slope(alpha, cl, x0=alpha0, window=None, method="optim")
-
-        else:
-            raise Exception("Method unknown for lift slope determination: {}".format(method))
-
-        # --- Safety checks
-        if len(self.cl) > 10:
-            # Looking at slope around alpha 0 to see if we are too far off
-            slope_FD, off_FD = _find_slope(self.alpha, self.cl, xi=alpha0, window=window, method="finitediff_1c")
-            if abs(slope - slope_FD) / slope_FD * 100 > 50:
-                #raise Exception('Warning: More than 20% error between estimated slope ({:.4f}) and the slope around alpha0 ({:.4f}). The window for the slope search ([{} {}]) is likely wrong.'.format(slope,slope_FD,window[0],window[-1]))
-                print('[WARN] More than 20% error between estimated slope ({:.4f}) and the slope around alpha0 ({:.4f}). The window for the slope search ([{} {}]) is likely wrong.'.format(slope,slope_FD,window[0],window[-1]))
-#         print('slope ',slope,' Alpha range: {:.3f} {:.3f} - nLin {}  nMin {}  nMax {}'.format(alpha[iStart],alpha[iEnd],len(alpha[iStart:iEnd+1]),nMin,len(alpha)))
-
-        return myret(slope, off)
-
-    def cl_fully_separated(self):
-        alpha0 = self.alpha0()
-        cla,_, = self.cl_linear_slope(method='max')
+        cla,_, = self.cl_linear_slope(method=method)
         if cla == 0:
-            cl_fs = self.cl  # when f_st ==1
-            f_st = self.cl * 0
+            cl_fs = self.cl  # when fs ==1
+            fs = self.cl * 0
         else:
             cl_ratio = self.cl / (cla * (self.alpha - alpha0))
             cl_ratio[np.where(cl_ratio < 0)] = 0
-            f_st = (2 * np.sqrt(cl_ratio) - 1) ** 2
-            f_st[np.where(f_st < 1e-15)] = 0
-            # Initialize to linear region (in fact only at singularity, where f_st=1)
-            cl_fs = self.cl / 2.0  # when f_st ==1
-            # Region where f_st<1, merge
-            I = np.where(f_st < 1)
-            cl_fs[I] = (self.cl[I] - cla * (self.alpha[I] - alpha0) * f_st[I]) / (1.0 - f_st[I])
+            if self._fs_lock:
+                fs = self.fs
+            else:
+                fs = (2 * np.sqrt(cl_ratio) - 1) ** 2
+                fs[np.where(fs < 1e-15)] = 0
+            # Initialize to linear region (in fact only at singularity, where fs=1)
+            cl_fs = self.cl / 2.0  # when fs ==1
+            # Region where fs<1, merge
+            I = np.where(fs < 1)
+            cl_fs[I] = (self.cl[I] - cla * (self.alpha[I] - alpha0) * fs[I]) / (1.0 - fs[I])
             # Outside region, use steady data
-            iHig = np.ma.argmin(np.ma.MaskedArray(f_st, self.alpha < alpha0))
-            iLow = np.ma.argmin(np.ma.MaskedArray(f_st, self.alpha > alpha0))
+            iHig = np.ma.argmin(np.ma.MaskedArray(fs, self.alpha < alpha0))
+            iLow = np.ma.argmin(np.ma.MaskedArray(fs, self.alpha > alpha0))
             cl_fs[0 : iLow + 1] = self.cl[0 : iLow + 1]
             cl_fs[iHig + 1 : -1] = self.cl[iHig + 1 : -1]
 
-        # Ensuring everything is in harmony
+        # Ensuring everything is consistent (but we cant with user provided values..)
         cl_inv = cla * (self.alpha - alpha0)
-        f_st = (self.cl - cl_fs) / (cl_inv - cl_fs + 1e-10)
-        f_st[np.where(f_st < 1e-15)] = 0
-        # Storing
-        self.f_st = f_st
+        if not self._fs_lock:
+            fs = (self.cl - cl_fs) / (cl_inv - cl_fs + 1e-10)
+            fs[np.where(fs < 1e-15)] = 0
+            # Storing
+            self.fs = fs
         self.cl_fs = cl_fs
-        return cl_fs, f_st
+        if not self._cl_inv_lock:
+            self.cl_inv = cl_inv
+        return cl_fs, fs
 
     def dynaStallOye_DiscreteStep(self, alpha_t, tau, fs_prev, dt):
         # compute aerodynamical force from aerodynamic data
         # interpolation from data
-        f_st = self.f_st_interp(alpha_t)
+        fs = self.fs_interp(alpha_t)
         Clinv = self.cl_inv_interp(alpha_t)
         Clfs = self.cl_fs_interp(alpha_t)
         # dynamic stall model
-        fs = f_st + (fs_prev - f_st) * np.exp(-dt / tau)
-        Cl = fs * Clinv + (1 - fs) * Clfs
-        return Cl, fs
+        fs_dyn = fs + (fs_prev - fs) * np.exp(-dt / tau)
+        Cl = fs_dyn * Clinv + (1 - fs_dyn) * Clfs
+        return Cl, fs_dyn
 
     def toAeroDyn(self, filenameOut=None, templateFile=None, Re=1.0, comment=None, unsteadyParams=True):
         from pyFAST.input_output.fast_input_file import ADPolarFile
@@ -1045,60 +1127,6 @@ class Polar(object):
         return ADpol
 
 
-
-def loadPolarFile(filename, fformat='auto', to_radians=False):
-    if not os.path.exists(filename):
-        raise Exception('File not found:',filename)
-
-    from pyFAST.input_output.fast_input_file import FASTInputFile
-    from pyFAST.input_output.csv_file import CSVFile
-
-    if fformat=='ADPolar':
-        M = FASTInputFile(filename).toDataFrame().values
-
-    elif fformat=='delimited':
-        try:
-            M=np.loadtxt(filename,comments=['#','!'])
-        except:
-            # use CSV file instead?
-            import pandas as pd
-            M=pd.read_csv(filename, skiprows = 53, header=None, delim_whitespace=True, names=['Alpha','Cl','Cd','Cm']).values
-        Re    = np.nan
-    elif fformat=='auto':
-        M=None
-        if M is None:
-            try:
-                M = CSVFile(filename).toDataFrame().values
-            except:
-                pass
-        if M is None:
-            try:
-                M = FASTInputFile(filename).toDataFrame().values
-            except:
-                pass
-        if M is None:
-            try: 
-                import welib.weio as weio # TODO
-            except:
-                raise Exception('[WARN] Module `weio` not present, only delimited or ADPolar file formats supported ')
-            df = weio.read(filename).toDataFrame()
-            if type(df) is dict:
-                M=df[list(df.keys())[0]].values
-            else:
-                M=df.values
-    else:
-        raise NotImplementedError('Format not implemented: {}'.format(fformat))
-
-    if M.shape[1]<4:
-        raise Exception('Only supporting polars with 4 columns: alpha cl cd cm')
-    if to_radians:
-        M[:,0]=M[:,0]*np.pi/180
-    alpha = M[:,0]
-    cl    = M[:,1]
-    cd    = M[:,2]
-    cm    = M[:,3]
-    Re    = np.nan
-    return alpha, cl, cd, cm, Re
 
 
 def blend(pol1, pol2, weight):
@@ -1159,7 +1187,7 @@ def blend(pol1, pol2, weight):
         Re = np.nan
 
     if bReturnObject:
-        return type(pol1)(Re, M[:, 0], M[:, 1], M[:, 2], M[:, 3])
+        return type(pol1)(Re=Re, alpha=M[:, 0], cl=M[:, 1], cd=M[:, 2], cm=M[:, 3])
     else:
         return M
 
@@ -1351,7 +1379,9 @@ def cl_fullsep(alpha, dclda, alpha0, alpha_sl_neg, alpha_sl_pos, valpha, vCl, al
     return cl
 
 def f_point(alpha, dclda, alpha0, alpha_sl_neg, alpha_sl_pos, valpha, vCl, alpha_fs_l, alpha_fs_u):
-    """ sepration funciton """
+    """ separation function
+    # TODO harmonize with cl_fully_separated maybe?
+    """
     if dclda==0:
         return 0
     if alpha < alpha_fs_l or alpha > alpha_fs_u:
@@ -1471,11 +1501,11 @@ def polar_params(alpha, cl, cd, cm):
 
         # --- Compute values at all angle of attack
         Cl_fully_sep = np.zeros(alpha.shape)
-        f_st         = np.zeros(alpha.shape)
+        fs           = np.zeros(alpha.shape)
         Cl_linear    = np.zeros(alpha.shape)
         for i,al in enumerate(alpha):
             Cl_fully_sep[i] = cl_fullsep(al, dclda, alpha0, alpha_sl_neg, alpha_sl_pos, alpha, cl, alpha_fs_l, alpha_fs_u)
-            f_st        [i] = f_point   (al, dclda, alpha0, alpha_sl_neg, alpha_sl_pos, alpha, cl, alpha_fs_l, alpha_fs_u)
+            fs          [i] = f_point   (al, dclda, alpha0, alpha_sl_neg, alpha_sl_pos, alpha, cl, alpha_fs_l, alpha_fs_u)
             Cl_linear   [i] = cl_lin    (al, dclda, alpha0, alpha_sl_neg, alpha_sl_pos, alpha, cl)
 
     p=dict()
@@ -1488,13 +1518,18 @@ def polar_params(alpha, cl, cd, cm):
     p['alpha_sl_neg'] = alpha_sl_neg
     p['alpha_sl_pos'] = alpha_sl_pos
 
-    return p, Cl_linear, Cl_fully_sep, f_st
+    return p, Cl_linear, Cl_fully_sep, fs
 
 
 
-
-def Cl_linear_slope(alpha, Cl, window=None, method="max", nInterp=721):
+def cl_linear_slope(alpha, cl, window=None, method="max", nInterp=721, inputInRadians=False, radians=False):
     """ 
+    Find slope of linear region
+    Outputs: a 2-tuplet of:
+       slope (in inverse units of alpha, or in radians-1 if radians=True)
+       alpha_0 in the same unit as alpha, or in radians if radians=True
+
+
     INPUTS:
       - alpha: angle of attack in radians
       - Cl   : lift coefficient
@@ -1503,13 +1538,72 @@ def Cl_linear_slope(alpha, Cl, window=None, method="max", nInterp=721):
     OUTPUTS:
       - Cl_alpha, alpha0: lift slope (1/rad) and angle of attack (rad) of zero lift
     """
+    # --- Return function
+    def myret(sl, a0):
+        # wrapper function to return degrees or radians # TODO this should be a function of self._radians
+        if radians:
+            if inputInRadians:
+                return sl, a0
+            else:
+                return np.rad2deg(sl), np.deg2rad(a0) # NOTE: slope needs rad2deg, alpha needs deg2rad
+        else:
+            return sl, a0
+
+    # finding alpha0 # TODO TODO TODO THIS IS NOT NECESSARY
+    if inputInRadians:
+        windowAlpha0 = [np.radians(-30), np.radians(30)]
+    else:
+        windowAlpha0 = [-30, 30]
+    windowAlpha0 = _alpha_window_in_bounds(alpha, windowAlpha0)
+    alpha0 = _find_alpha0(alpha, cl, windowAlpha0)
+
+    # Constant case or only one value
+    if np.all(cl == cl[0]) or len(cl) == 1:
+        return myret(0, alpha0)
 
     if window is None:
-        window = [np.radians(-3), np.radians(10)]
-        window = _alpha_window_in_bounds(alpha, window)
+        if np.nanmin(cl) > 0 or np.nanmax(cl) < 0:
+            window = [alpha[0], alpha[-1]]
+        else:
+            # define a window around alpha0
+            if inputInRadians:
+                window = alpha0 + np.radians(np.array([-5, +20]))
+            else:
+                window = alpha0 +            np.array([-5, +20])
 
-    return _find_slope(alpha, Cl, xi=0, window=window, method=method, nInterp=nInterp)
+    # Ensuring window is within our alpha values
+    window = _alpha_window_in_bounds(alpha, window)
 
+    if method in ["max", "leastsquare"]:
+        slope, off = _find_slope(alpha, cl, xi=alpha0, window=window, method=method)
+
+    elif method == "leastsquare_constraint":
+        slope, off = _find_slope(alpha, cl, x0=alpha0, window=window, method="leastsquare")
+
+    elif method == "optim":
+        # Selecting range of values within window
+        idx = np.where((alpha >= window[0]) & (alpha <= window[1]) & ~np.isnan(cl))[0]
+        cl, alpha = cl[idx], alpha[idx]
+        # Selecting within the min and max of this window to improve accuracy
+        imin = np.where(cl == np.min(cl))[0][-1]
+        idx = np.arange(imin, np.argmax(cl) + 1)
+        window = [alpha[imin], alpha[np.argmax(cl)]]
+        cl, alpha = cl[idx], alpha[idx]
+        # Performing minimization of slope
+        slope, off = _find_slope(alpha, cl, x0=alpha0, window=None, method="optim")
+
+    else:
+        raise Exception("Method unknown for lift slope determination: {}".format(method))
+
+    # --- Safety checks
+    if len(cl) > 10:
+        # Looking at slope around alpha 0 to see if we are too far off
+        slope_FD, off_FD = _find_slope(alpha, cl, xi=alpha0, window=window, method="finitediff_1c")
+        if abs(slope - slope_FD) / slope_FD * 100 > 50:
+            #raise Exception('Warning: More than 20% error between estimated slope ({:.4f}) and the slope around alpha0 ({:.4f}). The window for the slope search ([{} {}]) is likely wrong.'.format(slope,slope_FD,window[0],window[-1]))
+            print('[WARN] More than 20% error between estimated slope ({:.4f}) and the slope around alpha0 ({:.4f}). The window for the slope search ([{} {}]) is likely wrong.'.format(slope,slope_FD,window[0],window[-1]))
+#         print('slope ',slope,' Alpha range: {:.3f} {:.3f} - nLin {}  nMin {}  nMax {}'.format(alpha[iStart],alpha[iEnd],len(alpha[iStart:iEnd+1]),nMin,len(alpha)))
+    return myret(slope, off)
 
 # --------------------------------------------------------------------------------}
 # --- Generic curve handling functions

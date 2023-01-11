@@ -89,9 +89,13 @@ class FASTInputFile(File):
         KEYS = list(self.basefile.keys())
         if 'NumBlNds' in KEYS:
             return ADBladeFile.from_fast_input_file(self.basefile)
+        elif 'rhoinf' in KEYS:
+            return BDFile.from_fast_input_file(self.basefile)
         elif 'NBlInpSt' in KEYS:
             return EDBladeFile.from_fast_input_file(self.basefile)
-        elif 'MassMatrix' in KEYS and self.module =='ExtPtfm':
+        elif 'NTwInpSt' in KEYS:
+            return EDTowerFile.from_fast_input_file(self.basefile)
+        elif 'MassMatrix' in KEYS and self.module == 'ExtPtfm':
             return ExtPtfmFile.from_fast_input_file(self.basefile)
         elif 'NumCoords' in KEYS and 'InterpOrd' in KEYS:
             return ADPolarFile.from_fast_input_file(self.basefile)
@@ -115,8 +119,8 @@ class FASTInputFile(File):
     def keys(self):
         return self.fixedfile.keys()
 
-    def toGraph(self):
-        return self.fixedfile.toGraph()
+    def toGraph(self, **kwargs):
+        return self.fixedfile.toGraph(**kwargs)
 
     @property
     def filename(self):
@@ -690,7 +694,7 @@ class FASTInputFileBase(File):
                 val='{:13s}'.format(val)
             if len(lab)<13:
                 lab='{:13s}'.format(lab)
-            return val+' '+lab+' - '+descr.strip().strip('-').strip()+'\n'
+            return val+' '+lab+' - '+descr.strip().lstrip('-').lstrip()
 
         def toStringIntFloatStr(x):
             try:
@@ -717,7 +721,6 @@ class FASTInputFileBase(File):
             s+='\n'
             return s
 
-
         for i in range(len(self.data)):
             d=self.data[i]
             if d['isComment']:
@@ -725,9 +728,9 @@ class FASTInputFileBase(File):
             elif d['tabType']==TABTYPE_NOT_A_TAB:
                 if isinstance(d['value'], list):
                     sList=', '.join([str(x) for x in d['value']])
-                    s+='{} {} {}'.format(sList,d['label'],d['descr'])
+                    s+=toStringVLD(sList, d['label'], d['descr'])
                 else:
-                    s+=toStringVLD(d['value'],d['label'],d['descr']).strip()
+                    s+=toStringVLD(d['value'],d['label'],d['descr'])
             elif d['tabType']==TABTYPE_NUM_WITH_HEADER:
                 if d['tabColumnNames'] is not None:
                     s+='{}'.format(' '.join(['{:15s}'.format(s) for s in d['tabColumnNames']]))
@@ -882,9 +885,9 @@ class FASTInputFileBase(File):
             dfs=dfs[list(dfs.keys())[0]]
         return dfs
 
-    def toGraph(self):
+    def toGraph(self, **kwargs):
         from .fast_input_file_graph import fastToGraph
-        return fastToGraph(self)
+        return fastToGraph(self, **kwargs)
         
 
 
@@ -1337,8 +1340,101 @@ def parseFASTFilTable(lines,n,iStart):
 # --------------------------------------------------------------------------------{
 # --------------------------------------------------------------------------------{
 
+
 # --------------------------------------------------------------------------------}
-# --- AeroDyn Blade 
+# --- BeamDyn 
+# --------------------------------------------------------------------------------{
+class BDFile(FASTInputFileBase):
+    @classmethod
+    def from_fast_input_file(cls, parent):
+        self = cls()
+        self.setData(filename=parent.filename, data=parent.data, hasNodal=parent.hasNodal, module='BD')
+        return self
+
+    def __init__(self, filename=None, **kwargs):
+        FASTInputFileBase.__init__(self, filename, **kwargs)
+        if filename is None:
+            # Define a prototype for this file format
+            self.addComment('--------- BEAMDYN with OpenFAST INPUT FILE -------------------------------------------')
+            self.addComment('BeamDyn input file, written by BDFile')
+            self.addComment('---------------------- SIMULATION CONTROL --------------------------------------')
+            self.addValKey(False        , 'Echo'            , 'Echo input data to "<RootName>.ech"? (flag)')
+            self.addValKey(True         , 'QuasiStaticInit' , 'Use quasi-static pre-conditioning with centripetal accelerations in initialization? (flag) [dynamic solve only]')
+            self.addValKey(          0  , 'rhoinf'          , 'Numerical damping parameter for generalized-alpha integrator')
+            self.addValKey(          2  , 'quadrature'      , 'Quadrature method: 1=Gaussian; 2=Trapezoidal (switch)')
+            self.addValKey("DEFAULT"    , 'refine'          , 'Refinement factor for trapezoidal quadrature (-) [DEFAULT = 1; used only when quadrature=2]')
+            self.addValKey("DEFAULT"    , 'n_fact'          , 'Factorization frequency for the Jacobian in N-R iteration(-) [DEFAULT = 5]')
+            self.addValKey("DEFAULT"    , 'DTBeam'          , 'Time step size (s)')
+            self.addValKey("DEFAULT"    , 'load_retries'    , 'Number of factored load retries before quitting the simulation [DEFAULT = 20]')
+            self.addValKey("DEFAULT"    , 'NRMax'           , 'Max number of iterations in Newton-Raphson algorithm (-) [DEFAULT = 10]')
+            self.addValKey("DEFAULT"    , 'stop_tol'        , 'Tolerance for stopping criterion (-) [DEFAULT = 1E-5]')
+            self.addValKey("DEFAULT"    , 'tngt_stf_fd'     , 'Use finite differenced tangent stiffness matrix? (flag)')
+            self.addValKey("DEFAULT"    , 'tngt_stf_comp'   , 'Compare analytical finite differenced tangent stiffness matrix? (flag)')
+            self.addValKey("DEFAULT"    , 'tngt_stf_pert'   , 'Perturbation size for finite differencing (-) [DEFAULT = 1E-6]')
+            self.addValKey("DEFAULT"    , 'tngt_stf_difftol', 'Maximum allowable relative difference between analytical and fd tangent stiffness (-); [DEFAULT = 0.1]')
+            self.addValKey(True         , 'RotStates'       , 'Orient states in the rotating frame during linearization? (flag) [used only when linearizing] ')
+            self.addComment('---------------------- GEOMETRY PARAMETER --------------------------------------')
+            self.addValKey(          1  , 'member_total'    , 'Total number of members (-)')
+            self.addValKey(          0  , 'kp_total'        , 'Total number of key points (-) [must be at least 3]')
+            self.addValKey(      [1, 0] , 'kp_per_member'   , 'Member number; Number of key points in this member')
+            self.addTable('MemberGeom', np.zeros((0,4)), tabType=1, tabDimVar='kp_total', 
+                    cols=['kp_xr', 'kp_yr', 'kp_zr', 'initial_twist'], 
+                    units=['(m)', '(m)', '(m)', '(deg)'])
+            self.addComment('---------------------- MESH PARAMETER ------------------------------------------')
+            self.addValKey(          5  , 'order_elem'     , 'Order of interpolation (basis) function (-)')
+            self.addComment('---------------------- MATERIAL PARAMETER --------------------------------------')
+            self.addValKey('"undefined"', 'BldFile'        ,  'Name of file containing properties for blade (quoted string)')
+            self.addComment('---------------------- PITCH ACTUATOR PARAMETERS -------------------------------')
+            self.addValKey(False        , 'UsePitchAct'    , 'Whether a pitch actuator should be used (flag)')
+            self.addValKey(          1  , 'PitchJ'         , 'Pitch actuator inertia (kg-m^2) [used only when UsePitchAct is true]')
+            self.addValKey(          0  , 'PitchK'         , 'Pitch actuator stiffness (kg-m^2/s^2) [used only when UsePitchAct is true]')
+            self.addValKey(          0  , 'PitchC'         , 'Pitch actuator damping (kg-m^2/s) [used only when UsePitchAct is true]')
+            self.addComment('---------------------- OUTPUTS -------------------------------------------------')
+            self.addValKey(False        , 'SumPrint'      , 'Print summary data to "<RootName>.sum" (flag)')
+            self.addValKey('"ES10.3E2"' , 'OutFmt'        , 'Format used for text tabular output, excluding the time channel.')
+            self.addValKey(          0  , 'NNodeOuts'     , 'Number of nodes to output to file [0 - 9] (-)')
+            self.addValKey(         [1] , 'OutNd'         , 'Nodes whose values will be output  (-)')
+            self.addValKey(        [''] , 'OutList'       , 'The next line(s) contains a list of output parameters. See OutListParameters.xlsx, BeamDyn tab for a listing of available output channels, (-)')
+            self.addComment('END of OutList (the word "END" must appear in the first 3 columns of this last OutList line)')
+            self.addComment('---------------------- NODE OUTPUTS --------------------------------------------')
+            self.addValKey(          99 , 'BldNd_BlOutNd' , 'Blade nodes on each blade (currently unused)')
+            self.addValKey(        [''] , 'OutList_Nodal' , 'The next line(s) contains a list of output parameters.  See OutListParameters.xlsx, BeamDyn_Nodes tab for a listing of available output channels, (-)')
+            self.addComment('END of input file (the word "END" must appear in the first 3 columns of this last OutList line)')
+            self.addComment('--------------------------------------------------------------------------------')
+            self.hasNodal=True
+            #"RootFxr, RootFyr, RootFzr"  
+            #"RootMxr, RootMyr, RootMzr"  
+            #"TipTDxr, TipTDyr, TipTDzr"  
+            #"TipRDxr, TipRDyr, TipRDzr"  
+
+        else:
+            # fix some stuff that generic reader fail at
+            self.data[1] =  {'value':self._lines[1], 'label':'', 'isComment':True, 'descr':'', 'tabType':0}
+            i  = self.getID('kp_total')
+            listval = [int(v) for v in str(self.data[i+1]['value']).split()]
+            self.data[i+1]['value']=listval
+            self.data[i+1]['label']='kp_per_member'
+            self.data[i+1]['isComment']=False
+        self.module='BD'
+
+    def _writeSanityChecks(self):
+        """ Sanity checks before write """
+        self['kp_total']=self['MemberGeom'].shape[0]
+        i  = self.getID('kp_total')
+        self.data[i+1]['value']=[1, self['MemberGeom'].shape[0]] # kp_per_member
+        self.data[i+1]['label']='kp_per_member'
+        # Could check length of OutNd
+
+    def _toDataFrame(self):
+        df = FASTInputFileBase._toDataFrame(self)
+        # TODO add quadrature points based on trapz/gauss
+        return df
+
+    @property
+    def _IComment(self): return [1]
+
+# --------------------------------------------------------------------------------}
+# --- ElastoDyn Blade 
 # --------------------------------------------------------------------------------{
 class EDBladeFile(FASTInputFileBase):
     @classmethod
@@ -1372,11 +1468,11 @@ class EDBladeFile(FASTInputFileBase):
             self.addValKey(     0.0   , 'BldFl1Sh(4)', '           , coeff of x^4')
             self.addValKey(     0.0   , 'BldFl1Sh(5)', '           , coeff of x^5')
             self.addValKey(     0.0   , 'BldFl1Sh(6)', '           , coeff of x^6')
-            self.addValKey(     1.0   , 'BldFl2Sh(2)', 'Flap mode 2, coeff of x^2')
+            self.addValKey(     0.0   , 'BldFl2Sh(2)', 'Flap mode 2, coeff of x^2') # NOTE: using something not too bad just incase user uses these as is..
             self.addValKey(     0.0   , 'BldFl2Sh(3)', '           , coeff of x^3')
-            self.addValKey(     0.0   , 'BldFl2Sh(4)', '           , coeff of x^4')
-            self.addValKey(     0.0   , 'BldFl2Sh(5)', '           , coeff of x^5')
-            self.addValKey(     0.0   , 'BldFl2Sh(6)', '           , coeff of x^6')
+            self.addValKey(   -13.0   , 'BldFl2Sh(4)', '           , coeff of x^4')
+            self.addValKey(    27.0   , 'BldFl2Sh(5)', '           , coeff of x^5')
+            self.addValKey(   -13.0   , 'BldFl2Sh(6)', '           , coeff of x^6')
             self.addValKey(     1.0   , 'BldEdgSh(2)', 'Edge mode 1, coeff of x^2')
             self.addValKey(     0.0   , 'BldEdgSh(3)', '           , coeff of x^3')
             self.addValKey(     0.0   , 'BldEdgSh(4)', '           , coeff of x^4')
@@ -1384,7 +1480,7 @@ class EDBladeFile(FASTInputFileBase):
             self.addValKey(     0.0   , 'BldEdgSh(6)', '           , coeff of x^6')
         else:
             # fix some stuff that generic reader fail at
-            self.data[1] =  self._lines[1]
+            self.data[1] =  {'value':self._lines[1], 'label':'', 'isComment':True, 'descr':'', 'tabType':0}
         self.module='EDBlade'
 
     def _writeSanityChecks(self):
@@ -1422,6 +1518,106 @@ class EDBladeFile(FASTInputFileBase):
     @property
     def _IComment(self): return [1]
 
+# --------------------------------------------------------------------------------}
+# --- ElastoDyn Tower 
+# --------------------------------------------------------------------------------{
+class EDTowerFile(FASTInputFileBase):
+    @classmethod
+    def from_fast_input_file(cls, parent):
+        self = cls()
+        self.setData(filename=parent.filename, data=parent.data, hasNodal=parent.hasNodal, module='EDTower')
+        return self
+
+    def __init__(self, filename=None, **kwargs):
+        FASTInputFileBase.__init__(self, filename, **kwargs)
+        if filename is None:
+            # Define a prototype for this file format
+            self.addComment('------- ELASTODYN V1.00.* TOWER INPUT FILE -------------------------------------')
+            self.addComment('ElastoDyn tower definition, written by EDTowerFile.')
+            self.addComment('---------------------- TOWER PARAMETERS ----------------------------------------')
+            self.addValKey(         0  , 'NTwInpSt'      , 'Number of blade input stations (-)')
+            self.addValKey(         1. , 'TwrFADmp(1)'   , 'Tower 1st fore-aft mode structural damping ratio (%)')
+            self.addValKey(         1. , 'TwrFADmp(2)'   , 'Tower 2nd fore-aft mode structural damping ratio (%)')
+            self.addValKey(         1. , 'TwrSSDmp(1)'   , 'Tower 1st side-to-side mode structural damping ratio (%)')
+            self.addValKey(         1. , 'TwrSSDmp(2)'   , 'Tower 2nd side-to-side mode structural damping ratio (%)')
+            self.addComment('---------------------- TOWER ADJUSTMENT FACTORS --------------------------------')
+            self.addValKey(         1. , 'FAStTunr(1)'   , 'Tower fore-aft modal stiffness tuner, 1st mode (-)')
+            self.addValKey(         1. , 'FAStTunr(2)'   , 'Tower fore-aft modal stiffness tuner, 2nd mode (-)')
+            self.addValKey(         1. , 'SSStTunr(1)'   , 'Tower side-to-side stiffness tuner, 1st mode (-)')
+            self.addValKey(         1. , 'SSStTunr(2)'   , 'Tower side-to-side stiffness tuner, 2nd mode (-)')
+            self.addValKey(         1. , 'AdjTwMa'       , 'Factor to adjust tower mass density (-)')
+            self.addValKey(         1. , 'AdjFASt'       , 'Factor to adjust tower fore-aft stiffness (-)')
+            self.addValKey(         1. , 'AdjSSSt'       , 'Factor to adjust tower side-to-side stiffness (-)')
+            self.addComment('---------------------- DISTRIBUTED TOWER PROPERTIES ----------------------------')
+            self.addTable('TowProp', np.zeros((0,6)), tabType=1, tabDimVar='NTwInpSt', 
+                    cols=['HtFract','TMassDen','TwFAStif','TwSSStif'], 
+                    units=['(-)', '(kg/m)', '(Nm^2)', '(Nm^2)'])
+            self.addComment('---------------------- TOWER FORE-AFT MODE SHAPES ------------------------------')
+            self.addValKey(     1.0   , 'TwFAM1Sh(2)', 'Mode 1, coefficient of x^2 term')
+            self.addValKey(     0.0   , 'TwFAM1Sh(3)', '      , coefficient of x^3 term')
+            self.addValKey(     0.0   , 'TwFAM1Sh(4)', '      , coefficient of x^4 term')
+            self.addValKey(     0.0   , 'TwFAM1Sh(5)', '      , coefficient of x^5 term')
+            self.addValKey(     0.0   , 'TwFAM1Sh(6)', '      , coefficient of x^6 term')
+            self.addValKey(    -26.   , 'TwFAM2Sh(2)', 'Mode 2, coefficient of x^2 term') # NOTE: using something not too bad just incase user uses these as is..
+            self.addValKey(     0.0   , 'TwFAM2Sh(3)', '      , coefficient of x^3 term')
+            self.addValKey(     27.   , 'TwFAM2Sh(4)', '      , coefficient of x^4 term')
+            self.addValKey(     0.0   , 'TwFAM2Sh(5)', '      , coefficient of x^5 term')
+            self.addValKey(     0.0   , 'TwFAM2Sh(6)', '      , coefficient of x^6 term')
+            self.addComment('---------------------- TOWER SIDE-TO-SIDE MODE SHAPES --------------------------')
+            self.addValKey(     1.0   , 'TwSSM1Sh(2)', 'Mode 1, coefficient of x^2 term')
+            self.addValKey(     0.0   , 'TwSSM1Sh(3)', '      , coefficient of x^3 term')
+            self.addValKey(     0.0   , 'TwSSM1Sh(4)', '      , coefficient of x^4 term')
+            self.addValKey(     0.0   , 'TwSSM1Sh(5)', '      , coefficient of x^5 term')
+            self.addValKey(     0.0   , 'TwSSM1Sh(6)', '      , coefficient of x^6 term')
+            self.addValKey(    -26.   , 'TwSSM2Sh(2)', 'Mode 2, coefficient of x^2 term') # NOTE: using something not too bad just incase user uses these as is..
+            self.addValKey(     0.0   , 'TwSSM2Sh(3)', '      , coefficient of x^3 term')
+            self.addValKey(     27.   , 'TwSSM2Sh(4)', '      , coefficient of x^4 term')
+            self.addValKey(     0.0   , 'TwSSM2Sh(5)', '      , coefficient of x^5 term')
+            self.addValKey(     0.0   , 'TwSSM2Sh(6)', '      , coefficient of x^6 term')
+        else:
+            # fix some stuff that generic reader fail at
+            self.data[1] =  {'value':self._lines[1], 'label':'', 'isComment':True, 'descr':'', 'tabType':0}
+        self.module='EDTower'
+
+    def _writeSanityChecks(self):
+        """ Sanity checks before write """
+        self['NTwInpSt']=self['TowProp'].shape[0]
+        # Sum of Coeffs should be 1
+        for s in ['TwFAM1Sh','TwFAM2Sh','TwSSM1Sh','TwSSM2Sh']:
+            sumcoeff=np.sum([self[s+'('+str(i)+')'] for i in [2,3,4,5,6] ])
+            if np.abs(sumcoeff-1)>1e-4:
+                print('[WARN] Sum of coefficients for polynomial {} not equal to 1 ({}). File: {}'.format(s, sumcoeff, self.filename))
+
+    def _toDataFrame(self):
+        df = FASTInputFileBase._toDataFrame(self)
+        # We add the shape functions for EDBladeFile
+        x=df['BlFract_[-]'].values
+        Modes=np.zeros((x.shape[0],3))
+        Modes[:,0] = x**2 * self['TwFAM1Sh(2)'] \
+                   + x**3 * self['TwFAM1Sh(3)'] \
+                   + x**4 * self['TwFAM1Sh(4)'] \
+                   + x**5 * self['TwFAM1Sh(5)'] \
+                   + x**6 * self['TwFAM1Sh(6)'] 
+        Modes[:,1] = x**2 * self['TwFAM2Sh(2)'] \
+                   + x**3 * self['TwFAM2Sh(3)'] \
+                   + x**4 * self['TwFAM2Sh(4)'] \
+                   + x**5 * self['TwFAM2Sh(5)'] \
+                   + x**6 * self['TwFAM2Sh(6)'] 
+        Modes[:,2] = x**2 * self['TwSSM1Sh(2)'] \
+                   + x**3 * self['TwSSM1Sh(3)'] \
+                   + x**4 * self['TwSSM1Sh(4)'] \
+                   + x**5 * self['TwSSM1Sh(5)'] \
+                   + x**6 * self['TwSSM1Sh(6)'] 
+        Modes[:,3] = x**2 * self['TwSSM2Sh(2)'] \
+                   + x**3 * self['TwSSM2Sh(3)'] \
+                   + x**4 * self['TwSSM2Sh(4)'] \
+                   + x**5 * self['TwSSM2Sh(5)'] \
+                   + x**6 * self['TwSSM2Sh(6)'] 
+        df[['ShapeForeAft1_[-]','ShapeForeAft2_[-]','ShapeSideSide1_[-]','ShapeSideSide2_[-]']]=Modes
+        return df
+
+    @property
+    def _IComment(self): return [1]
 
 # --------------------------------------------------------------------------------}
 # --- AeroDyn Blade 
@@ -1510,6 +1706,10 @@ class ADBladeFile(FASTInputFileBase):
         df['c2_Crv_Approx_[m]'] = prebend
         df['c2_Swp_Approx_[m]'] = sweep
         df['AC_Approx_[-]'] = ACloc
+        # --- Calc CvrAng
+        dr = np.gradient(aeroNodes[:,0])
+        dx = np.gradient(aeroNodes[:,1])
+        df['CrvAng_Calc_[-]'] =  np.degrees(np.arctan2(dx,dr))
         return df
 
     @property
