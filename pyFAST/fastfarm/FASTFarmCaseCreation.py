@@ -1267,9 +1267,6 @@ class FFCaseCreation:
                     ff_file['dr'] = self.cmax
                     ff_file['NumRadii']  = int(np.ceil(3*D_/(2*self.cmax) + 1))
                     ff_file['NumPlanes'] = int(np.ceil( 20*D_/(self.dt_low_les*Vhub_*(1-1/6)) ) )
-                    if self.path == '/projects/shellwind/rthedin/task_equinor_empire_LES_10':
-                        # Custom 15D downstream distance for number of wake planes for large Equinor case
-                        ff_file['NumPlanes'] = int(np.ceil( 15*D_/(self.dt_low_les*Vhub_*(1-1/6)) ) )
         
                     # Vizualization outputs
                     ff_file['WrDisWind'] = 'False'
