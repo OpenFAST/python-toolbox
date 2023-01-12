@@ -381,8 +381,12 @@ def setFastFarmOutputs(fastFarmFile, OutListT1):
     OutList=['']
     for s in OutListT1:
         s=s.strip('"')  
-        if s.find('T1'):
+        if 'T1' in s:
             OutList+=['"'+s.replace('T1','T{:d}'.format(iWT+1))+'"' for iWT in np.arange(nWTOut) ]
+        elif 'W1VAmb' in s: # special case for ambient wind
+            OutList+=['"'+s.replace('1','{:d}'.format(iWT+1))+'"' for iWT in np.arange(nWTOut) ]
+        elif 'W1VDis' in s: # special case for disturbed wind
+            OutList+=['"'+s.replace('1','{:d}'.format(iWT+1))+'"' for iWT in np.arange(nWTOut) ]
         else:
             OutList+='"'+s+'"'
     fst['OutList']=OutList
