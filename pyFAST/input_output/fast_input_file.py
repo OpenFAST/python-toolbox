@@ -355,12 +355,19 @@ class FASTInputFileBase(File):
 
         # --- Tables that can be detected based on the "Label" (second entry on line)
         # NOTE: MJointID1, used by SubDyn and HydroDyn
-        NUMTAB_FROM_LAB_DETECT   = ['NumAlf'  , 'F_X'       , 'MemberCd1'    , 'MJointID1' , 'NOutLoc'    , 'NOutCnt'    , 'PropD'       ,'Diam'       ,'Type'           ,'LineType' ]
-        NUMTAB_FROM_LAB_DIM_VAR  = ['NumAlf'  , 'NKInpSt'   , 'NCoefMembers' , 'NMembers'  , 'NMOutputs'  , 'NMOutputs'  , 'NPropSets'   ,'NTypes'     ,'NConnects'      ,'NLines'   ]
-        NUMTAB_FROM_LAB_VARNAME  = ['AFCoeff' , 'TMDspProp' , 'MemberProp'   , 'Members'   , 'MemberOuts' , 'MemberOuts' , 'SectionProp' ,'LineTypes'  ,'ConnectionProp' ,'LineProp' ]
-        NUMTAB_FROM_LAB_NHEADER  = [2         , 2           , 2              , 2           , 2            , 2            , 2             , 2           , 2               , 2         ]
-        NUMTAB_FROM_LAB_NOFFSET  = [0         , 0           , 0              , 0           , 0            , 0            , 0             , 0           , 0               , 0         ]
-        NUMTAB_FROM_LAB_TYPE     = ['num'     , 'num'       , 'num'          , 'mix'       , 'num'        , 'sdout'      , 'num'         ,'mix'        ,'mix'            ,'mix'      ]
+        NUMTAB_FROM_LAB_DETECT   = ['NumAlf'  , 'F_X'       , 'MemberCd1'    , 'MJointID1' , 'NOutLoc'    , 'NOutCnt'    , 'PropD'       ]
+        NUMTAB_FROM_LAB_DIM_VAR  = ['NumAlf'  , 'NKInpSt'   , 'NCoefMembers' , 'NMembers'  , 'NMOutputs'  , 'NMOutputs'  , 'NPropSets'   ]
+        NUMTAB_FROM_LAB_VARNAME  = ['AFCoeff' , 'TMDspProp' , 'MemberProp'   , 'Members'   , 'MemberOuts' , 'MemberOuts' , 'SectionProp' ]
+        NUMTAB_FROM_LAB_NHEADER  = [2         , 2           , 2              , 2           , 2            , 2            , 2             ]
+        NUMTAB_FROM_LAB_NOFFSET  = [0         , 0           , 0              , 0           , 0            , 0            , 0             ]
+        NUMTAB_FROM_LAB_TYPE     = ['num'     , 'num'       , 'num'          , 'mix'       , 'num'        , 'sdout'      , 'num'         ]
+        # MoorDyn Version 1 and 2 (with AUTO for LAB_DIM_VAR)
+        NUMTAB_FROM_LAB_DETECT   += ['Diam'       ,'Type'           ,'LineType'    , 'Attachment']
+        NUMTAB_FROM_LAB_DIM_VAR  += ['NTypes:AUTO','NConnects'      ,'NLines:AUTO' , 'AUTO']
+        NUMTAB_FROM_LAB_VARNAME  += ['LineTypes'  ,'ConnectionProp' ,'LineProp'    , 'Points']
+        NUMTAB_FROM_LAB_NHEADER  += [ 2           , 2               , 2            , 2     ]
+        NUMTAB_FROM_LAB_NOFFSET  += [ 0           , 0               , 0            , 0     ]
+        NUMTAB_FROM_LAB_TYPE     += ['mix'        ,'mix'            ,'mix'         , 'mix']
         # SubDyn
         NUMTAB_FROM_LAB_DETECT   += ['GuyanDampSize'     , 'YoungE'   , 'YoungE'    , 'EA'             , 'MatDens'       ]
         NUMTAB_FROM_LAB_DIM_VAR  += [6                   , 'NPropSets', 'NXPropSets', 'NCablePropSets' , 'NRigidPropSets']
@@ -484,6 +491,19 @@ class FASTInputFileBase(File):
                 i+=1;
                 self.readBeamDynProps(lines,i)
                 return
+            elif line.upper().find('OUTPUTS')>0:
+                if 'Points' in self.keys() and 'dtM' in self.keys():
+                    OutList,i = parseFASTOutList(lines,i+1) 
+                    d = getDict()
+                    d['label']   = 'Outlist'
+                    d['descr']   = ''
+                    d['tabType'] = TABTYPE_FIL # TODO
+                    d['value']   = OutList
+                    self.addComment('------------------------ OUTPUTS --------------------------------------------')
+                    self.data.append(d)
+                    self.addComment('END')
+                    self.addComment('------------------------- need this line --------------------------------------')
+                    return
 
             # --- Parsing of standard lines: value(s) key comment
             line = lines[i]
@@ -601,7 +621,6 @@ class FASTInputFileBase(File):
                     self.data.append(dd)
 
                 d['label']     = NUMTAB_FROM_LAB_VARNAME[ii]
-                d['tabDimVar'] = NUMTAB_FROM_LAB_DIM_VAR[ii]
                 if d['label'].lower()=='afcoeff' :
                     d['tabType']        = TABTYPE_NUM_WITH_HEADERCOM
                 else:
@@ -611,10 +630,28 @@ class FASTInputFileBase(File):
                         d['tabType']   = TABTYPE_NUM_SUBDYNOUT
                     else:
                         d['tabType']   = TABTYPE_MIX_WITH_HEADER
-                if isinstance(d['tabDimVar'],int):
+                # Finding table dimension (number of lines)
+                tabDimVar = NUMTAB_FROM_LAB_DIM_VAR[ii]
+                if isinstance(tabDimVar, int): # dimension hardcoded
+                    d['tabDimVar'] = tabDimVar
                     nTabLines = d['tabDimVar']
                 else:
-                    nTabLines = self[d['tabDimVar']+labOffset]
+                    # We either use a variable name or "AUTO" to find the number of rows
+                    tabDimVars = tabDimVar.split(':')
+                    for tabDimVar in tabDimVars:
+                        d['tabDimVar'] = tabDimVar
+                        if tabDimVar=='AUTO':
+                            # Determine table dimension automatically
+                            nTabLines = findNumberOfTableLines(lines[i+nHeaders:], break_chars=['---','!','#'])
+                            break
+                        else:
+                            try:
+                                nTabLines = self[tabDimVar+labOffset]
+                                break
+                            except KeyError:
+                                #print('Cannot determine table dimension using {}'.format(tabDimVar))
+                                # Hopefully this table has AUTO as well
+                                pass
 
                 d['label']  += labOffset
                 #print('Reading table {} Dimension {} (based on {})'.format(d['label'],nTabLines,d['tabDimVar']));
@@ -758,10 +795,13 @@ class FASTInputFileBase(File):
                 s+='\n'.join('\t'.join('{:15.8e}'.format(x) for x in y) for y in d['value'])
             elif d['tabType']==TABTYPE_FIL:
                 #f.write('{} {} {}\n'.format(d['value'][0],d['tabDetect'],d['descr']))
+                label = d['label']
+                if 'kbot' in self.keys(): # Moordyn has no 'OutList' label..
+                    label=''
                 if len(d['value'])==1:
-                    s+='{} {} {}'.format(d['value'][0],d['label'],d['descr']) # TODO?
+                    s+='{} {} {}'.format(d['value'][0], label, d['descr']) # TODO?
                 else:
-                    s+='{} {} {}\n'.format(d['value'][0],d['label'],d['descr']) # TODO?
+                    s+='{} {} {}\n'.format(d['value'][0], label, d['descr']) # TODO?
                     s+='\n'.join(fil for fil in d['value'][1:])
             elif d['tabType']==TABTYPE_NUM_BEAMDYN:
                 # TODO use dedicated sub-class
@@ -1184,6 +1224,17 @@ def detectUnits(s,nRef):
     else:
         Units=s.split()
     return Units
+
+
+def findNumberOfTableLines(lines, break_chars):
+    """ Loop through lines until a one of the "break character is found"""
+    for i, l in enumerate(lines):
+        for bc in break_chars:
+            if l.startswith(bc):
+                return i
+    # Not found
+    print('[FAIL] end of table not found')
+    return len(lines)
 
 
 def parseFASTNumTable(filename,lines,n,iStart,nHeaders=2,tableType='num',nOffset=0, varNumLines=''):
