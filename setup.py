@@ -32,7 +32,6 @@ setup(
     python_requires=">=3.6",
     install_requires=[
         "numpy>=1.15.2",
-        "future",
         "pandas",
         "matplotlib",
         "chardet",

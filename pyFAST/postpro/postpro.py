@@ -1,5 +1,4 @@
 # --- For cmd.py
-from __future__ import division, print_function
 import os
 import pandas as pd
 import numpy as np
@@ -1415,6 +1414,7 @@ def averagePostPro(outFiles,avgMethod='periods',avgParam=None,ColMap=None,ColKee
             columns = MeanValues.columns
             result = pd.DataFrame(np.nan, index=np.arange(len(outFiles)), columns=columns)
         result.iloc[i,:] = MeanValues.copy().values
+
 
     if len(invalidFiles)==len(outFiles):
         raise Exception('None of the files can be read (or exist)!. For instance, cannot find: {}'.format(invalidFiles[0]))
