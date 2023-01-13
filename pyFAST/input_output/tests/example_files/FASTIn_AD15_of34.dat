@@ -98,17 +98,17 @@ RtVAvgxh
 RtVAvgyh
 RtVAvgzh
 RtSkew
-RtFldFxh
-RtFldFyh
-RtFldFzh
-RtFldMxh
-RtFldMyh
-RtFldMzh
-RtFldPwr
+RtAeroFxh
+RtAeroFyh
+RtAeroFzh
+RtAeroMxh
+RtAeroMyh
+RtAeroMzh
+RtAeroPwr
 RtArea
-RtFldCp
-RtFldCq
-RtFldCt
+RtAeroCp
+RtAeroCq
+RtAeroCt
 B1N3Clrnc, B2N3Clrnc, B3N3Clrnc
 END of input file (the word "END" must appear in the first 3 columns of this last OutList line)
 ====== Outputs for all blade stations (same ending as above for B1N1.... =========================== [optional section]
