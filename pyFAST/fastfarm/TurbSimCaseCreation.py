@@ -155,12 +155,13 @@ class TSCaseCreation:
             if manual_mode:
                 self.ymin = min(self.y) - self.low_ext[2]*self.D
                 self.ymax = max(self.y) + self.low_ext[3]*self.D
+                Zdist_Low = self.RefHt + self.low_ext[4]*self.D
             else:
-                self.ymin = min(self.y)-2.23313*self.Cmeander*self.D/2
-                self.ymax = max(self.y)+2.23313*self.Cmeander*self.D/2
+                self.ymin = min(self.y)-2.23313*self.Cmeander*self.D/2  # JJ: I don't recall where these recommendations came from. I can't find them on the modelling guidance document
+                self.ymax = max(self.y)+2.23313*self.Cmeander*self.D/2  # JJ: I only see the y0_Low <= WT_Y_min -3*D recommendation
+                Zdist_Low = self.RefHt + self.D/2 + 2.23313*self.Cmeander*self.D/2 # JJ: ditto
             
             Ydist_Low = self.ymax - self.ymin
-            Zdist_Low = self.RefHt + self.D/2 + 2.23313*self.Cmeander*self.D/2
 
             self.ny = np.ceil(Ydist_Low/self.dy)+1
             self.nz = np.ceil(Zdist_Low/self.dz)+1
