@@ -137,7 +137,7 @@ class FFCaseCreation:
         # Check the ds and dt for the high- and low-res boxes
         if not (np.array(self.extent_low)>=0).all():
             raise ValueError(f'The array for low-res box extents should be given with positive values')
-        if self.dt_low_les%self.dt_high_les > 1e-14:
+        if self.dt_low_les%(self.dt_high_les-1e-15) > 1e-14:
             raise ValueError(f'The temporal resolution dT_Low should be a multiple of dT_High')
         if self.dt_low_les < self.dt_high_les:
             raise ValueError(f'The temporal resolution dT_High should not be greater than dT_Low on the LES side')
@@ -169,7 +169,9 @@ class FFCaseCreation:
             raise ValueError(f'The number of turbines in wts ({len(self.wts)}) should match the number of turbines '\
                              f'in the ADmodel and EDmodel arrays ({np.shape(self.ADmodel)[1]})')
   
-        # Auxiliary variables and some checks
+        # Check on seed parameters
+        if not isinstance(self.nSeeds,int):
+            raise ValueError(f'An integer number of seeds should be requested. Got {self.nSeeds}.')
         if self.seedValues is None:
             self.seedValues = [2318573, 122299, 123456, 389432, -432443, 9849898]
         if len(self.seedValues) != self.nSeeds:
@@ -397,17 +399,17 @@ class FFCaseCreation:
 
         '''
 
-        self.EDfilename    = "unused" 
-        self.SEDfilename   = "unused" 
-        self.HDfilename    = "unused" 
-        self.SrvDfilename  = "unused" 
-        self.ADfilename    = "unused" 
-        self.ADskfilename  = "unused" 
-        self.SubDfilename  = "unused" 
-        self.IWfilename    = "unused" 
-        self.BDfilepath    = "unused" 
-        self.bladefilename = "unused" 
-        self.towerfilename = "unused" 
+        self.EDfilename    = "unused";  self.EDfilepath    = "unused" 
+        self.SEDfilename   = "unused";  self.SEDfilepath   = "unused" 
+        self.HDfilename    = "unused";  self.HDfilepath    = "unused" 
+        self.SrvDfilename  = "unused";  self.SrvDfilepath  = "unused" 
+        self.ADfilename    = "unused";  self.ADfilepath    = "unused" 
+        self.ADskfilename  = "unused";  self.ADskfilepath  = "unused" 
+        self.SubDfilename  = "unused";  self.SubDfilepath  = "unused" 
+        self.IWfilename    = "unused";  self.IWfilepath    = "unused" 
+        self.BDfilepath    = "unused";  self.BDfilename    = "unused" 
+        self.bladefilename = "unused";  self.bladefilepath = "unused" 
+        self.towerfilename = "unused";  self.towerfilepath = "unused" 
 
 
         if templatePath is None:
@@ -579,13 +581,13 @@ class FFCaseCreation:
             if f != 'unused':
               return FASTInputFile(f)
 
-        self.ElastoDynFile   = _check_and_open(self.EDfilepath)  #FASTInputFile(os.path.join(self.templatePath, f'{ElastoDynFileName}.dat'))
-        self.SElastoDynFile  = _check_and_open(self.SEDfilepath)  #FASTInputFile(os.path.join(self.templatePath, f'{SElastoDynFileName}.dat'))
-        self.HydroDynFile    = _check_and_open(self.HDfilepath)  #FASTInputFile(os.path.join(self.templatePath, HydroDynFileName))
-        self.ServoDynFile    = _check_and_open(self.SrvDfilepath)  #FASTInputFile(os.path.join(self.templatePath, f'{ServoDynFileName}.dat'))
-        self.AeroDiskFile    = _check_and_open(self.ADskfilepath)  #FASTInputFile(os.path.join(self.templatePath, AeroDiskFileName))
-        self.turbineFile     = _check_and_open(self.turbfilepath)  #FASTInputFile(os.path.join(self.templatePath, f'{turbineFileName}.fst'))
-        self.InflowWindFile  = _check_and_open(self.IWfilepath)  #FASTInputFile(os.path.join(self.templatePath, InflowWindFileName))
+        self.ElastoDynFile   = _check_and_open(self.EDfilepath)  
+        self.SElastoDynFile  = _check_and_open(self.SEDfilepath) 
+        self.HydroDynFile    = _check_and_open(self.HDfilepath)  
+        self.ServoDynFile    = _check_and_open(self.SrvDfilepath)
+        self.AeroDiskFile    = _check_and_open(self.ADskfilepath)
+        self.turbineFile     = _check_and_open(self.turbfilepath)
+        self.InflowWindFile  = _check_and_open(self.IWfilepath)  
             
 
 
@@ -807,6 +809,50 @@ class FFCaseCreation:
 
 
     def TS_low_slurm_prepare(self, slurmfilepath):
+
+
+
+       # # --------------------------------------------------
+       # # ----- Prepare SLURM script for Low-res boxes -----
+       # # --------------- ONE SCRIPT PER CASE --------------
+       # # --------------------------------------------------
+       # 
+       # if not os.path.isfile(slurmfilepath):
+       #     raise ValueError (f'SLURM script for FAST.Farm {slurmfilepath} does not exist.')
+       # self.slurmfilename_ff = os.path.basename(slurmfilepath)
+
+
+       # for cond in range(self.nConditions):
+       #     for case in range(self.nCases):
+       #         for seed in range(self.nSeeds):
+       #             
+       #             fname = f'runFASTFarm_cond{cond}_case{case}_seed{seed}.sh'
+       #             status = os.system(f'cp {slurmfilepath} {os.path.join(self.path,fname)}')
+       # 
+       #             # Change job name (for convenience only)
+       #             sed_command = f"sed -i 's|#SBATCH --job-name=runFF|#SBATCH --job-name=c{cond}_c{case}_s{seed}_runFF_{os.path.basename(self.path)}|g' {fname}"
+       #             _ = subprocess.call(sed_command, cwd=self.path, shell=True)
+       #             # Change logfile name (for convenience only)
+       #             sed_command = f"sed -i 's|#SBATCH --output log.fastfarm_c0_c0_seed0|#SBATCH --output log.fastfarm_c{cond}_c{case}_s{seed}|g' {fname}"
+       #             _ = subprocess.call(sed_command, cwd=self.path, shell=True)
+       #             # Change the fastfarm binary to be called
+       #             sed_command = f"""sed -i "s|^fastfarmbin.*|fastfarmbin='{self.ffbin}'|g" {fname}"""
+       #             _ = subprocess.call(sed_command, cwd=self.path, shell=True)
+       #             # Change the path inside the script to the desired one
+       #             sed_command = f"sed -i 's|/projects/shellwind/rthedin/Task2_2regis|{self.path}|g' {fname}"
+       #             _ = subprocess.call(sed_command, cwd=self.path, shell=True)
+       #             # Write condition
+       #             sed_command = f"""sed -i "s|^cond.*|cond='{self.condDirList[cond]}'|g" {fname}"""
+       #             _ = subprocess.call(sed_command, cwd=self.path, shell=True)
+       #             # Write case
+       #             sed_command = f"""sed -i "s|^case.*|case='{self.caseDirList[case]}'|g" {fname}"""
+       #             _ = subprocess.call(sed_command, cwd=self.path, shell=True)
+       #             # Write seed
+       #             sed_command = f"""sed -i "s|^seed.*|seed={seed}|g" {fname}"""
+       #             _ = subprocess.call(sed_command, cwd=self.path, shell=True)
+
+
+
         # --------------------------------------------------
         # ----- Prepare SLURM script for Low-res boxes -----
         # --------------------------------------------------
@@ -829,6 +875,9 @@ class FFCaseCreation:
         listtoprint = "' '".join(self.condDirList)
         sed_command = f"""sed -i "s|^condList.*|condList=('{listtoprint}')|g" {self.slurmfilename_low}"""
         _ = subprocess.call(sed_command, cwd=self.path, shell=True)
+        # Change the number of seeds
+        _ = subprocess.call(f"sed -i 's|nSeeds=6|nSeeds={self.nSeeds}|g' {self.slurmfilename_low}", cwd=self.path, shell=True)
+
 
 
     def TS_low_slurm_submit(self):
@@ -966,6 +1015,11 @@ class FFCaseCreation:
 
     def TS_high_setup(self, writeFiles=True):
 
+        #todo: Check if the low-res boxes were created successfully
+
+        # Create symbolic links for the low-res boxes
+        self.TS_low_createSymlinks()
+
         # Loop on all conditions/cases/seeds setting up the High boxes
         boxType='highres'
         for cond in range(self.nConditions):
@@ -1036,7 +1090,9 @@ class FFCaseCreation:
         sed_command = f"sed -i 's|/projects/shellwind/rthedin/Task2_2regis|{self.path}|g' {self.slurmfilename_high}"
         _ = subprocess.call(sed_command, cwd=self.path, shell=True)
         # Change number of turbines
-        _ = subprocess.call(f"sed -i 's|nTurbines=12|nTurbines={self.nTurbines}|g'      {self.slurmfilename_high}", cwd=self.path, shell=True)
+        _ = subprocess.call(f"sed -i 's|nTurbines=12|nTurbines={self.nTurbines}|g' {self.slurmfilename_high}", cwd=self.path, shell=True)
+        # Change number of seeds
+        _ = subprocess.call(f"sed -i 's|nSeeds=6|nSeeds={self.nSeeds}|g' {self.slurmfilename_high}", cwd=self.path, shell=True)
         # Change number of nodes values
         _ = subprocess.call(f"sed -i 's|#SBATCH --nodes=3|#SBATCH --nodes={int(np.ceil(ntasks/36))}|g' {self.slurmfilename_high}", cwd=self.path, shell=True)
         # Assemble list of conditions and write it
@@ -1102,11 +1158,13 @@ class FFCaseCreation:
             outlistFF = [
                 "RtAxsXT1     , RtAxsYT1     , RtAxsZT1",
                 "RtPosXT1     , RtPosYT1     , RtPosZT1",
-                "RtDiamT1",
+                #"RtDiamT1",
                 "YawErrT1",
                 "TIAmbT1",
                 'RtVAmbT1',
                 'RtVRelT1',
+                'RtSkewT1',
+                'RtCtAvgT1',
                 'W1VAmbX, W1VAmbY, W1VAmbZ',
                 "W1VDisX, W1VDisY, W1VDisZ",
                 "CtT1N01      , CtT1N02      , CtT1N03      , CtT1N04      , CtT1N05      , CtT1N06      , CtT1N07      , CtT1N08      , CtT1N09      , CtT1N10      , CtT1N11      , CtT1N12      , CtT1N13      , CtT1N14      , CtT1N15      , CtT1N16      , CtT1N17      , CtT1N18      , CtT1N19      ,  CtT1N20",
@@ -1367,7 +1425,7 @@ class FFCaseCreation:
                     ff_file['NWindVel'] = 9
                     ff_file['WindVelX'] = ' '.join(map(str, xWT[:9]))
                     ff_file['WindVelY'] = ' '.join(map(str, yWT[:9]))
-                    ff_file['WindVelZ'] = ' '.join(map(str, zWT[:9]))
+                    ff_file['WindVelZ'] = ' '.join(map(str, zWT[:9]+self.zhub))
         
                     ff_file.write(outputFSTF)
 
