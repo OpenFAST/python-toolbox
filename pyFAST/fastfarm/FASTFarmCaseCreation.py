@@ -133,6 +133,10 @@ class FFCaseCreation:
             yaw = np.ones((1,self.nTurbines))*0
             self.yaw_init = np.repeat(yaw, len(self.inflow_deg), axis=0)      
 
+        # Check TI values if given in percent
+        for t in self.TIvalue:
+            if t<0:  raise ValueError(f'TI cannot be negative. Received {t}.')
+            if t<1:  raise ValueError(f'TI should be given in percentage (e.g. "10" for a 10% TI). Received {t}.')
 
         # Check the ds and dt for the high- and low-res boxes
         if not (np.array(self.extent_low)>=0).all():
@@ -271,9 +275,9 @@ class FFCaseCreation:
                 # Update parameters to be changed in the *Dyn files
                 self.HydroDynFile['WaveHs']     = self.bins.sel(wspd=Vhub_, method='nearest').WaveHs.values
                 self.HydroDynFile['WaveTp']     = self.bins.sel(wspd=Vhub_, method='nearest').WaveTp.values
-                self.HydroDynFile['WvHiCOffD']  = 2.0*np.pi/self.HydroDynFile['WaveTp']   # !!!!!!!!!!!!!!  check with JJ
+                self.HydroDynFile['WvHiCOffD']  = 2.0*np.pi/self.HydroDynFile['WaveTp']   # check with JJ
                 self.HydroDynFile['WvLowCOffS'] = 2.0*np.pi/self.HydroDynFile['WaveTp']
-                # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! do i need to change the first 3 values of HD? can they be 'default'? JJ
+                # !!! JJ: do i need to change the first 3 values of HD? can they be 'default'?
         
                 self.ElastoDynFile['RotSpeed']   = self.bins.sel(wspd=Vhub_, method='nearest').RotSpeed.values
                 self.ElastoDynFile['BlPitch(1)'] = self.bins.sel(wspd=Vhub_, method='nearest').BlPitch.values
@@ -605,17 +609,32 @@ class FFCaseCreation:
 
 
     def _create_all_cond(self):
-        self.nConditions = len(self.vhub) * len(self.shear) * len(self.TIvalue)
+
+        if len(self.vhub)==len(self.shear) and len(self.shear)==len(self.TIvalue):
+            self.nConditions = len(self.vhub)
+
+            if self.verbose>1: print(f'The length of vhub, shear, and TI are the same. Assuming each position is a condition.')
+            if self.verbose>0: print(f'Creating {self.nConditions} conditions')
+
+            self.allCond = xr.Dataset({'vhub':    (['cond'], self.vhub   ),
+                                       'shear':   (['cond'], self.shear  ),
+                                       'TIvalue': (['cond'], self.TIvalue)},
+                                       coords={'cond': np.arange(self.nConditions)} )
+        
+        else:
+            import itertools
+            self.nConditions = len(self.vhub) * len(self.shear) * len(self.TIvalue)
+
+            if self.verbose>1: print(f'The length of vhub, shear, and TI are different. Assuming sweep on each of them.')
+            if self.verbose>0: print(f'Creating {self.nConditions} conditions')
     
-        # Repeat arrays as necessary to build xarray Dataset
-        vhub_repeat    = np.repeat(self.vhub,    self.nConditions/len(self.vhub),    axis=0)
-        shear_repeat   = np.repeat(self.shear,   self.nConditions/len(self.shear),   axis=0)
-        TIvalue_repeat = np.repeat(self.TIvalue, self.nConditions/len(self.TIvalue), axis=0)
-    
-        self.allCond = xr.Dataset({'vhub':    (['cond'], vhub_repeat   ),
-                                   'shear':   (['cond'], shear_repeat  ),
-                                   'TIvalue': (['cond'], TIvalue_repeat)},
-                                   coords={'cond': np.arange(self.nConditions)} )
+            # Repeat arrays as necessary to build xarray Dataset
+            combination = np.vstack(list(itertools.product(self.vhub,self.shear,self.TIvalue)))
+
+            self.allCond = xr.Dataset({'vhub':    (['cond'], combination[:,0]),
+                                       'shear':   (['cond'], combination[:,1]),
+                                       'TIvalue': (['cond'], combination[:,2])},
+                                       coords={'cond': np.arange(self.nConditions)} )
   
 
     def _create_all_cases(self):
@@ -662,7 +681,6 @@ class FFCaseCreation:
             wakeSteering = np.tile([False], nWindDir*nCasesROmultiplier*nCasesYawmultiplier)
             misalignment = np.tile([False], nWindDir*nCasesROmultiplier*nCasesYawmultiplier)
         
-        
             
         # Create array of random numbers for yaw misalignment, and set it to zero where no yaw misalign is requested
         yawMisalignedValue = np.random.uniform(size = [nCases,self.nTurbines], low=-8.0, high=8.0)
@@ -692,7 +710,7 @@ class FFCaseCreation:
                 'zhub':   (['case','turbine'], np.repeat(self.wts_rot_ds['zhub'].values, nCasesWSmultiplier*nCasesYMmultiplier*nCasesROmultiplier*nCasesYawmultiplier, axis=0)),
                 'yawmis': (['case','turbine'], yawMisalignedValue),
                 'yaw':    (['case','turbine'], yawInit),
-                'yawCase': (['case'], np.repeat(yawCase, nWindDir*nCasesWSmultiplier*nCasesYMmultiplier*nCasesROmultiplier)), # i didn't have ROM multiplier
+                'yawCase': (['case'], np.repeat(yawCase, nWindDir*nCasesWSmultiplier*nCasesYMmultiplier*nCasesROmultiplier)),
                 'ADmodel': (['case','turbine'], np.tile(np.repeat(self.ADmodel, nCasesWSmultiplier*nCasesYMmultiplier*nCasesYawmultiplier, axis=0),(nWindDir,1)) ),
                 'EDmodel': (['case','turbine'], np.tile(np.repeat(self.EDmodel, nCasesWSmultiplier*nCasesYMmultiplier*nCasesYawmultiplier, axis=0),(nWindDir,1)) ),
                 'nFullAeroDyn':    (['case'], np.repeat(np.tile(nADyn, nWindDir), nCasesWSmultiplier*nCasesYMmultiplier*nCasesYawmultiplier)),
@@ -794,7 +812,7 @@ class FFCaseCreation:
                 Lowinp = FASTInputFile(currentTSLowFile)
                 Lowinp['RandSeed1'] = self.seedValues[seed]
                 Lowinp['PLExp']     = shear_
-                #Lowinp['latitude']  = latitude
+                #Lowinp['latitude']  = latitude # Not used when IECKAI model is selected.
                 Lowinp['InCDec1']   = Lowinp['InCDec2'] = Lowinp['InCDec3'] = f'"{a} {b/(8.1*Lambda1):.8f}"'
                 # The dt was computed for a proper low-res box but here we will want to compare with the high-res
                 # and it is convenient to have the same time step. Let's do that change here
@@ -879,6 +897,8 @@ class FFCaseCreation:
         _ = subprocess.call(f"sed -i 's|nSeeds=6|nSeeds={self.nSeeds}|g' {self.slurmfilename_low}", cwd=self.path, shell=True)
 
 
+        if self.nSeeds != 6:
+            print(f'--- WARNING: The memory-per-cpu on the low-res boxes SLURM script is configured for 6 seeds, not {self.nSeeds}.')
 
     def TS_low_slurm_submit(self):
         # ---------------------------------
@@ -1063,7 +1083,7 @@ class FFCaseCreation:
                         Highinp['RefHt']     = HubHt_
                         Highinp['URef']      = Vhub_
                         Highinp['PLExp']     = shear_
-                        #Highinp['latitude']  = latitude
+                        #Highinp['latitude']  = latitude # Not used when IECKAI model is selected.
                         Highinp['InCDec1']   = Highinp['InCDec2'] = Highinp['InCDec3'] = f'"{a} {b/(8.1*Lambda1):.8f}"'
                         if writeFiles:
                             Highinp.write( os.path.join(seedPath, f'HighT{t+1}.inp') )
