@@ -363,7 +363,7 @@ def WriteTSFile(fileIn, fileOut, params, NewFile=True, tpath=None, tmax=50, turb
                         if tmpVar in line:
                             newline = str(NewPars[index])+'\t!!Orig is:  '+line
                     if '.fst' in line:
-                        newline =str('{params.x[wt]:.3f}\t\t{params.y[wt]:.3f}\t\t{params.z[wt]:.3f}\t\t{tpath}_WT{wt+1:d}.fst"\t{params.X0_High[wt]:.3f}\t\t{params.Y0_High[wt]:.3f}\t\t{params.Z0_High:.3f}\t\t{params.dX_High:.3f}\t\t{params.dY_High:.3f}\t\t{params.dZ_High:.3f}\n'
+                        newline =str('{params.x[wt]:.3f}\t\t{params.y[wt]:.3f}\t\t{params.z[wt]:.3f}\t\t{tpath}_WT{wt+1:d}.fst"\t{params.X0_High[wt]:.3f}\t\t{params.Y0_High[wt]:.3f}\t\t{params.Z0_High:.3f}\t\t{params.dX_High:.3f}\t\t{params.dY_High:.3f}\t\t{params.dZ_High:.3f}\n')
                         wt+=1
                     new_file.write(newline)
 
