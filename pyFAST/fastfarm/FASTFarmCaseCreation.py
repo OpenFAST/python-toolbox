@@ -17,7 +17,7 @@ def sind(t): return np.sin(np.deg2rad(t))
 class FFCaseCreation:
 
 
-    def __init__(self, path, wts, cmax, fmax, Cmeander, tmax, zbot, vhub, shear, TIvalue, inflow_deg, dt_high_les, ds_high_les, extent_high, dt_low_les, ds_low_les, extent_low, ffbin, yaw_init=None, ADmodel=None, EDmodel=None, nSeeds=6, LESpath=None, sweepWakeSteering=False, sweepYawMisalignment=False, seedValues=None, refTurb_rot=0, verbose=0):
+    def __init__(self, path, wts, cmax, fmax, Cmeander, tmax, zbot, vhub, shear, TIvalue, inflow_deg, dt_high_les=None, ds_high_les=None, extent_high=None, dt_low_les=None, ds_low_les=None, extent_low=None, ffbin=None, yaw_init=None, ADmodel=None, EDmodel=None, nSeeds=6, LESpath=None, sweepWakeSteering=False, sweepYawMisalignment=False, seedValues=None, refTurb_rot=0, verbose=0):
         '''
         
         ffbin: str
@@ -70,6 +70,11 @@ class FFCaseCreation:
         self.createAuxArrays()          
         if self.verbose>0: print(f'Creating auxiliary arrays for all conditions and cases... Done.')
                                         
+
+        if self.verbose>0: print(f'Determining box parameters...', end='\r')
+        self._determineBoxParamters()       
+        if self.verbose>0: print(f'Determining box paramters... Done.')
+
 
         if self.verbose>0: print(f'Creating directory structure and copying files...', end='\r')
         self._create_dir_structure()
@@ -139,21 +144,33 @@ class FFCaseCreation:
             if t<1:  raise ValueError(f'TI should be given in percentage (e.g. "10" for a 10% TI). Received {t}.')
 
         # Check the ds and dt for the high- and low-res boxes
-        if not (np.array(self.extent_low)>=0).all():
-            raise ValueError(f'The array for low-res box extents should be given with positive values')
-        if self.dt_low_les%(self.dt_high_les-1e-15) > 1e-14:
-            raise ValueError(f'The temporal resolution dT_Low should be a multiple of dT_High')
-        if self.dt_low_les < self.dt_high_les:
-            raise ValueError(f'The temporal resolution dT_High should not be greater than dT_Low on the LES side')
-        if self.ds_low_les < self.ds_high_les:
-            raise ValueError(f'The grid resolution dS_High should not be greater than dS_Low on the LES side')
-        if not isinstance(self.extent_high, (float,int)):
-            raise ValueError(f'The extent_high should be a scalar')
-        if self.extent_high<=0:
-            raise ValueError(f'The extent of high boxes should be positive')
+        if None not in (self.dt_high_les, self.dt_low_les, self.ds_high_les, self.ds_low_les, self.extent_high, self.extent_low):
+            # All values for ds, dt, and extent were given
+            if not (np.array(self.extent_low)>=0).all():
+                raise ValueError(f'The array for low-res box extents should be given with positive values')
+            if self.dt_low_les%(self.dt_high_les-1e-15) > 1e-14:
+                raise ValueError(f'The temporal resolution dT_Low should be a multiple of dT_High')
+            if self.dt_low_les < self.dt_high_les:
+                raise ValueError(f'The temporal resolution dT_High should not be greater than dT_Low on the LES side')
+            if self.ds_low_les < self.ds_high_les:
+                raise ValueError(f'The grid resolution dS_High should not be greater than dS_Low on the LES side')
+            if not isinstance(self.extent_high, (float,int)):
+                raise ValueError(f'The extent_high should be a scalar')
+            if self.extent_high<=0:
+                raise ValueError(f'The extent of high boxes should be positive')
+        else:
+            # At least one of the ds, dt, extent are None. If that is the case, all of them should be None
+            if None in (self.dt_high_les, self.dt_low_les, self.ds_high_les, self.ds_low_les, self.extent_high, self.extent_low):
+                raise ValueError (f'The dt, ds, and extent for high and low res boxes need to either be fully' \
+                                  f'given or computed. Some were given, but some were not.')
 
 
         # Check the FAST.Farm binary
+        if self.ffbin is None:
+            import shutil
+            self.ffbin = shutil.which('FAST.Farm')
+            if verbose>1:
+                print(f'FAST.Farm binary not given. Using the following from your $PATH: {self.ffbin}.')
         if not os.path.isfile(self.ffbin):
             raise ValueError (f'The FAST.Farm binary given does not appear to exist')
 
@@ -747,6 +764,18 @@ class FFCaseCreation:
 
         self.wts_rot_ds = pd.DataFrame.from_dict(wts_rot, orient='index').to_xarray().rename({'level_0':'inflow_deg','level_1':'turbine'})
   
+
+    def _determine_box_parameters(self):
+
+        if self.dt_high_les is not None:
+            # Box paramters given. Only one check is needed since it passed `checkInputs`
+            return
+
+        # todo: compute the boxes paraters
+        raise NotImplementedError(f'The ability to automatically determine the box paraters is not implemented yet.')
+
+
+
   
     def _setRotorParameters(self):
   
