@@ -72,7 +72,7 @@ class FFCaseCreation:
                                         
 
         if self.verbose>0: print(f'Determining box parameters...', end='\r')
-        self._determineBoxParamters()       
+        self.DetermineBoxParameters()       
         if self.verbose>0: print(f'Determining box paramters... Done.')
 
 
@@ -765,23 +765,48 @@ class FFCaseCreation:
         self.wts_rot_ds = pd.DataFrame.from_dict(wts_rot, orient='index').to_xarray().rename({'level_0':'inflow_deg','level_1':'turbine'})
   
 
-    def _determine_box_parameters(self):
+    def DetermineBoxParameters(self):
 
         if self.dt_high_les is not None:
             # Box paramters given. Only one check is needed since it passed `checkInputs`
             return
 
+
         # todo: compute the boxes paraters
         raise NotImplementedError(f'The ability to automatically determine the box paraters is not implemented yet.')
 
 
+
+ 
+
+    def writeAMRWindRefinement(self):
+
+
+        raise NotImplementedError(f'writeAMRWindRefinement is not implemented.')
+
+
+        # Get list of proper non-repeated cases
+        self._get_domain_parameters()
+
+        # Loop over all turbines of all cases/conditions
         for cond in range(self.nConditions):
-            for case in range(self.nCases):
-                for t in range(self.nTurbines):
+            for case in range(self.nHighBoxCases):
+                # Get actual case number given the high-box that need to be saved
+                case = self.allHighBoxCases.isel(case=case)['case'].values
+                if self.verbose>3:
+                    print(f'Generating AMR-Wind input file for cond {cond} ({self.condDirList[cond]}),'\ 
+                          f'case {case} ({self.caseDirList[case]}).')
+                    for t in range(self.nTurbines):
+                        # Recover turbine properties
+                        D_       = self.allCases.sel(case=case, turbine=t)['D'   ].values
+                        HubHt_   = self.allCases.sel(case=case, turbine=t)['zhub'].values
+                        xloc_    = self.allCases.sel(case=case, turbine=t)['Tx'  ].values
+                        yloc_    = self.allCases.sel(case=case, turbine=t)['Ty'  ].values
 
+                        # todo: maybe get information about your grid from amr-wind. You want to sample at the cell center
+                        # todo: call another function to spit out the refinements in the proper syntax
 
-
-
+                        
 
   
     def _setRotorParameters(self):
