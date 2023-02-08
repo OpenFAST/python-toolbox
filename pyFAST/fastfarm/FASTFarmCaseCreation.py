@@ -775,6 +775,13 @@ class FFCaseCreation:
         raise NotImplementedError(f'The ability to automatically determine the box paraters is not implemented yet.')
 
 
+        for cond in range(self.nConditions):
+            for case in range(self.nCases):
+                for t in range(self.nTurbines):
+
+
+
+
 
   
     def _setRotorParameters(self):
@@ -1068,6 +1075,12 @@ class FFCaseCreation:
 
         # Create symbolic links for the low-res boxes
         self.TS_low_createSymlinks()
+
+        # Get proper list of cases to loop (some can be repetead, e.g., ADyn/ADisk models)
+        self.getDomainParameters()
+
+        # Open low-res and get time-series file
+        self.TS_high_get_time_series()
 
         # Loop on all conditions/cases/seeds setting up the High boxes
         boxType='highres'
