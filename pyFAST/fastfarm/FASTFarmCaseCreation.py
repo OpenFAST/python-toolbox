@@ -961,7 +961,7 @@ class FFCaseCreation:
         os.chdir(notepath)
 
 
-    def getDomainParameters(self):
+    def _get_domain_parameters(self):
 
         # If the low box setup hasn't been called (e.g. LES run), do it once to get domain extents
         if not self.TSlowBoxFilesCreatedBool:
@@ -980,6 +980,12 @@ class FFCaseCreation:
         if self.nHighBoxCases != len(self.allHighBoxCases.case):
             raise ValueError(f'The number of cases do not match as expected. {self.nHighBoxCases} unique wind directions, but {len(self.allHighBoxCases.case)} unique cases.')
         
+        if self.verbose>2:
+            print(f'allHighBoxCases is:')
+            print(self.allHighBoxCases)
+
+    def _get_offset_turbsOrigin2TSOrigin(self):
+
         # Determine offsets from turbines coordinate frame to TurbSim coordinate frame
         self.yoffset_turbsOrigin2TSOrigin = -( (self.TSlowbox.ymax - self.TSlowbox.ymin)/2 + self.TSlowbox.ymin )
         self.xoffset_turbsOrigin2TSOrigin = - self.extent_low[0]*self.D
@@ -987,10 +993,6 @@ class FFCaseCreation:
         if self.verbose>0:
             print(f"    The y offset between the turbine ref frame and turbsim is {self.yoffset_turbsOrigin2TSOrigin}")
             print(f"    The x offset between the turbine ref frame and turbsim is {self.xoffset_turbsOrigin2TSOrigin}")
-
-        if self.verbose>2:
-            print(f'allHighBoxCases is:')
-            print(self.allHighBoxCases)
 
 
     def TS_high_get_time_series(self):
@@ -1077,7 +1079,10 @@ class FFCaseCreation:
         self.TS_low_createSymlinks()
 
         # Get proper list of cases to loop (some can be repetead, e.g., ADyn/ADisk models)
-        self.getDomainParameters()
+        self._get_domain_parameters()
+
+        # Get offset between given reference frame and TurbSim's
+        self._get_offset_turbsOrigin2TSOrigin()
 
         # Open low-res and get time-series file
         self.TS_high_get_time_series()
