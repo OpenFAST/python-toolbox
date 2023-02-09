@@ -18,11 +18,10 @@ df = FASTOutputFile(fastoutFilename).toDataFrame()
 
 
 # Compute equivalent load for one signal and Wohler slope
-T = df['Time_[s]'].values[-1] # number of 1Hz load cycles (time series length in second)
-m = 10 # Wohler slope
-Leq = equivalent_load(df['RootMyc1_[kN-m]'], Teq=T,  m=1)
+m = 1 # Wohler slope
+Leq = equivalent_load(df['Time_[s]'], df['RootMyc1_[kN-m]'], m=m)
 print('Leq ',Leq)
-# Leq = equivalent_load(df['RootMyc1_[kN-m]'], Teq=T,  m=1, method='fatpack') # requires package fatpack
+# Leq = equivalent_load(df['Time_[s]'], df['RootMyc1_[kN-m]'], m=m, method='fatpack') # requires package fatpack
 
 
 if __name__ == '__main__':
