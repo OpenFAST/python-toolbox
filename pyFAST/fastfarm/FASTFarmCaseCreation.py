@@ -777,9 +777,9 @@ class FFCaseCreation:
     def DetermineBoxParameters(self):
         '''
         Calculate the following variables for FAST.Farm:
-            dt_high_les, ds_high_les, extent_high, dt_low_les, ds_low_les, extent_low, and ffbin
+            dt_high_les, ds_high_les, extent_high, dt_low_les, ds_low_les, and extent_low
         And calculate information for the AMR-Wind simulation:
-            TODO: sampling_labels, output_frequency, ...
+            sampling_labels, output_frequency, specs for lr domain, specs for hr domains
         '''
         amr = self.amr
 
@@ -895,6 +895,60 @@ class FFCaseCreation:
         amr.zlow_lr = zlow_lr
         amr.zhigh_lr = zhigh_lr
         amr.zoffsets_lr = zoffsets_lr
+
+        ### ~~~~~~~~~ Calculate high resolution grid placement ~~~~~~~~~
+        hr_domains = {} 
+        for turbkey in self.wts:
+            wt_x = self.wts[turbkey]['x']
+            wt_y = self.wts[turbkey]['y']
+            wt_z = self.wts[turbkey]['zhub'] + 0.5*self.wts[turbkey]['D']
+            wt_D = self.wts[turbkey]['D']
+
+            # Calculate minimum/maximum HR domain extents
+            x_buffer_hr = 0.6 * wt_D
+            y_buffer_hr = 0.6 * wt_D
+            z_buffer_hr = 0.6 * wt_D
+
+            xlow_hr_min = wt_x - x_buffer_hr
+            xhigh_hr_max = wt_x + x_buffer_hr
+            ylow_hr_min = wt_y - y_buffer_hr
+            yhigh_hr_max = wt_y + y_buffer_hr
+            zhigh_hr_max = wt_z + z_buffer_hr
+
+            # Calculate the minimum/maximum HR domain coordinate lengths & number of grid cells
+            xdist_hr_min = xhigh_hr_max - xlow_hr_min  # Minumum possible length of x-extent of HR domain
+            xdist_hr = self.ds_high_les * np.ceil(xdist_hr_min/self.ds_high_les)  
+            nx_hr = int(xdist_hr/self.ds_high_les) + 1
+
+            ydist_hr_min = yhigh_hr_max - ylow_hr_min
+            ydist_hr = self.ds_high_les * np.ceil(ydist_hr_min/self.ds_high_les)
+            ny_hr = int(ydist_hr/self.ds_high_les) + 1
+
+            zdist_hr = self.ds_high_les * np.ceil(zhigh_hr_max/self.ds_high_les)
+            nz_hr = int(zdist_hr/self.ds_high_les) + 1
+
+            # Calculate actual HR domain extent
+            #  NOTE: Sampling planes should measure at AMR-Wind cell centers, not cell edges
+            xlow_hr = self.ds_high_les * np.floor(xlow_hr_min/self.ds_high_les) - 0.5*amr.dx_refine
+            xhigh_hr = xlow_hr + xdist_hr
+            ylow_hr = self.ds_high_les * np.floor(ylow_hr_min/self.ds_high_les) - 0.5*amr.dy_refine
+            yhigh_hr = ylow_hr + ydist_hr
+            zlow_hr = zlow_lr
+            zhigh_hr = zlow_hr + zdist_hr
+            zoffsets_hr = np.arange(zlow_hr, zhigh_hr+self.ds_high_les, self.ds_high_les) - zlow_hr
+
+            # Save info
+            # self.extent_high = ?  # TODO: How should this be formatted?
+
+            hr_turb_info = {'nx_hr': nx_hr, 'ny_hr': ny_hr, 'nz_hr': nz_hr,
+                            'xlow_hr': xlow_hr, 'ylow_hr': ylow_hr, 'zlow_hr': zlow_hr,
+                            'xhigh_hr': xhigh_hr, 'yhigh_hr': yhigh_hr, 'zhigh_hr': zhigh_hr,
+                            'zoffsets_hr': zoffsets_hr}
+            hr_domains[turbkey] = hr_turb_info
+        amr.hr_domains = hr_domains
+
+        ### ~~~~~~~~~ Write out sampling plane info ~~~~~~~~~
+        amr.write_sampling_params(self.path)
 
     def CheckAutoBoxParameters(self):
         '''
