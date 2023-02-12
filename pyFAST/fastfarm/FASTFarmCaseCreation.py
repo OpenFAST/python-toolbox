@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 from pyFAST.input_output import FASTInputFile, FASTOutputFile, TurbSimFile, VTKFile
 from pyFAST.fastfarm import writeFastFarm, fastFarmTurbSimExtent, plotFastFarmSetup
 from pyFAST.fastfarm.TurbSimCaseCreation import TSCaseCreation, writeTimeSeriesFile
+from pyFAST.fastfarm.AMRWindSimulation import AMRWindSimulation
 
 def cosd(t): return np.cos(np.deg2rad(t))
 def sind(t): return np.sin(np.deg2rad(t))
@@ -17,7 +18,7 @@ def sind(t): return np.sin(np.deg2rad(t))
 class FFCaseCreation:
 
 
-    def __init__(self, path, wts, cmax, fmax, Cmeander, tmax, zbot, vhub, shear, TIvalue, inflow_deg, dt_high_les=None, ds_high_les=None, extent_high=None, dt_low_les=None, ds_low_les=None, extent_low=None, ffbin=None, yaw_init=None, ADmodel=None, EDmodel=None, nSeeds=6, LESpath=None, sweepWakeSteering=False, sweepYawMisalignment=False, seedValues=None, refTurb_rot=0, verbose=0):
+    def __init__(self, path, wts, cmax, fmax, Cmeander, tmax, zbot, vhub, shear, TIvalue, inflow_deg, dt_high_les=None, ds_high_les=None, extent_high=None, dt_low_les=None, ds_low_les=None, extent_low=None, ffbin=None, yaw_init=None, ADmodel=None, EDmodel=None, nSeeds=6, LESpath=None, sweepWakeSteering=False, sweepYawMisalignment=False, seedValues=None, refTurb_rot=0, amr=None, verbose=0):
         '''
         
         ffbin: str
@@ -53,6 +54,7 @@ class FFCaseCreation:
         self.sweepYM     = sweepYawMisalignment
         self.seedValues  = seedValues
         self.refTurb_rot = refTurb_rot
+        self.amr         = amr
         self.verbose     = verbose
                                         
                                         
@@ -206,6 +208,11 @@ class FFCaseCreation:
             if not os.path.isdir(self.LESpath):
                 raise ValueError (f'The path {self.LESpath} does not exist')
             self.inflowStr = 'LES'
+
+        # Check class of amr
+        if self.amr is not None:
+            if not isinstance(self.amr, AMRWindSimulation):
+                raise ValueError(f"The class of amr should be AMRWindSimulation, but is {type(self.amr)}")
 
         # Check the reference turbine for rotation
         if self.refTurb_rot >= self.nTurbines:
@@ -766,6 +773,10 @@ class FFCaseCreation:
   
 
     def DetermineBoxParameters(self):
+        '''
+        Calculate dt_high_les, ds_high_les, extent_high, dt_low_les, ds_low_les, extent_low, and ffbin
+          
+        '''
 
         if self.dt_high_les is not None:
             # Box paramters given. Only one check is needed since it passed `checkInputs`
