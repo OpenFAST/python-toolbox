@@ -3,7 +3,9 @@ class AMRWindSimulation:
     This class is used to help prepare sampling planes for an AMR-Wind
       simulation. The sampling planes will be used to generate inflow
       data for FAST.Farm simulations.
-    Specifically, this class contains info from the AMR-Wind input file
+    Specifically, this class contains info from the AMR-Wind input file,
+      and it carries out simple calculations about the AMR-Wind
+      simulation
     '''
 
     def __init__(self, dt: float, prob_lo: tuple, prob_hi: tuple, 
@@ -42,5 +44,19 @@ class AMRWindSimulation:
             raise ValueError("y-component of prob_lo larger than y-component of prob_hi")
         if (self.prob_lo[2] >= self.prob_hi[2]):
             raise ValueError("z-component of prob_lo larger than z-component of prob_hi")
-            
+
+    def calc_params(self):
+        '''
+        Calculate simulation parameters, given simulation inputs
+        '''
+        # Grid resolution at Level 0
+        self.dx0 = (self.prob_hi[0] - self.prob_lo[0]) / self.n_cell[0]
+        self.dy0 = (self.prob_hi[1] - self.prob_lo[1]) / self.n_cell[1]
+        self.dz0 = (self.prob_hi[2] - self.prob_lo[2]) / self.n_cell[2]
+
+        # Grid resolution at finest refinement level
+        self.dx_refine = self.dx0/(2**self.max_level)
+        self.dy_refine = self.dy0/(2**self.max_level)
+        self.dz_refine = self.dz0/(2**self.max_level)
+        self.refine_max = max(self.dx_refine, self.dy_refine, self.dz_refine)
 
