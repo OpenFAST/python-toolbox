@@ -1,3 +1,5 @@
+import numpy as np
+
 class AMRWindSimulation:
     '''
     This class is used to help prepare sampling planes for an AMR-Wind
@@ -18,6 +20,7 @@ class AMRWindSimulation:
           * dt: this should be a fixed dt value
           * incflo_velocity_hh: velocity vector, specifically at hub height
         '''
+        # Process inputs
         self.dt = dt
         self.prob_lo = prob_lo
         self.prob_hi = prob_hi
@@ -26,6 +29,10 @@ class AMRWindSimulation:
         self.incflo_velocity_hh = incflo_velocity_hh
         self.postproc_name = postproc_name
 
+        # Placeholder variables, to be calculated by FFCaseCreation
+        self.output_frequency = None
+
+        # Run extra functions
         self._checkInputs()
 
     def _checkInputs(self):
@@ -60,3 +67,5 @@ class AMRWindSimulation:
         self.dz_refine = self.dz0/(2**self.max_level)
         self.refine_max = max(self.dx_refine, self.dy_refine, self.dz_refine)
 
+        # Hub height wind speed
+        self.vhub = np.sqrt(self.incflo_velocity_hh[0]**2 + self.incflo_velocity_hh[1]**2)

@@ -74,7 +74,9 @@ class FFCaseCreation:
                                         
 
         if self.verbose>0: print(f'Determining box parameters...', end='\r')
-        self.DetermineBoxParameters()       
+        if self.dt_high_les is not None:
+            self.DetermineBoxParameters()       
+            self.CheckAutoBoxParameters()
         if self.verbose>0: print(f'Determining box paramters... Done.')
 
 
@@ -774,21 +776,47 @@ class FFCaseCreation:
 
     def DetermineBoxParameters(self):
         '''
-        Calculate dt_high_les, ds_high_les, extent_high, dt_low_les, ds_low_les, extent_low, and ffbin
-          
+        Calculate dt_high_les, ds_high_les, extent_high, dt_low_les, ds_low_les, extent_low, and ffbin,
+            given inputs from amr
+        '''
+        amr = self.amr
+
+        ### Calculate timestep values and AMR-Wind plane sampling frequency
+        ## Low resolution domain, dt_low_les
+        cmeander_min = float("inf")
+        Dwake_min = float("inf")
+        for turbkey in self.wts:
+            cmeander_min = min(cmeander_min, self.wts[turbkey]['Cmeander'])
+            Dwake_min = min(Dwake_min, self.wts[turbkey]['D'])  # Approximate D_wake as D_rotor
+
+        dt_lr_max = cmeander_min * Dwake_min / (10 * amr.vhub)
+        self.dt_low_les = amr.dt * np.floor(dt_lr_max/amr.dt)  # Ensure that dt_lr is a multiple of the AMR-Wind timestep
+
+        ## High resolution domain, dt_high_les
+        fmax_max = 0
+        for turbkey in self.wts:
+            fmax_max = max(0, self.wts[turbkey]['fmax'])
+        dt_hr_max = 1 / (2 * fmax_max)
+        self.dt_high_les = amr.dt * np.floor(dt_hr_max/amr.dt)  # Ensure that dt_hr is a multiple of the AMR-Wind timestep
+
+        ## Sampling frequency
+        amr.output_frequency = int(self.dt_high_les/amr.dt)
+
+
+    def CheckAutoBoxParameters(self):
+        '''
+        Check the values of parameters that were calculated by DetermineBoxParameters
         '''
 
-        if self.dt_high_les is not None:
-            # Box paramters given. Only one check is needed since it passed `checkInputs`
-            return
+        ## Timestep checks
+        if self.dt_low_les >= self.amr.dt:
+            raise ValueError("AMR-Wind timestep too coarse for low resolution domain!")
+        if self.dt_high_les >= self.amr.dt:
+            raise ValueError("AMR-Wind timestep too coarse for high resolution domain!")
+        if self.dt_high_les <= self.dt_low_les:
+            raise ValueError("Low resolution timestep is finer than high resolution timestep!")
 
 
-        # todo: compute the boxes paraters
-        raise NotImplementedError(f'The ability to automatically determine the box paraters is not implemented yet.')
-
-
-
- 
 
     def writeAMRWindRefinement(self):
 
