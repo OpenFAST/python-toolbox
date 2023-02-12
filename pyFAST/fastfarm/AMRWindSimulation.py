@@ -32,6 +32,18 @@ class AMRWindSimulation:
         # Placeholder variables, to be calculated by FFCaseCreation
         self.output_frequency = None
         self.sampling_labels = None
+        self.ds_lr = None
+        self.ds_hr = None
+        self.nx_lr = None
+        self.ny_lr = None
+        self.nz_lr = None
+        self.xlow_lr = None
+        self.xhigh_lr = None
+        self.ylow_lr = None
+        self.yhigh_lr = None
+        self.zlow_lr = None
+        self.zhigh_lr = None
+        self.zoffsets_lr = None
 
         # Run extra functions
         self._checkInputs()

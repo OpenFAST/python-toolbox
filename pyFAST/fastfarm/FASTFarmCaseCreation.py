@@ -817,6 +817,7 @@ class FFCaseCreation:
         #            just time step and velocity requiements
         ds_lr_max = self.dt_low_les * amr.vhub**2 / 15
         self.ds_low_les = amr.ds0_max * np.floor(ds_lr_max/amr.ds0_max)  # Ensure that ds_lr is a multiple of the coarse AMR-Wind grid spacing
+        amr.ds_lr = self.ds_low_les
 
         ## High resolution domain, ds_hr
         #    ASSUME: FAST.Farm HR zone lies within the region of maxmum AMR-Wind grid refinement
@@ -827,8 +828,73 @@ class FFCaseCreation:
             cmax_min = min(cmax_min, self.wts[turbkey]['cmax'])
         ds_hr_max = cmax_min
         self.ds_high_les = amr.ds_refine_max * np.floor(ds_hr_max/amr.ds_refine_max)  # Ensure that ds_hr is a multiple of the refined AMR-Wind grid spacing
-        assert self.ds_high_les >= amr.ds_refine_max, "AMR-Wind grid spacing too coarse for high resolution domain!"
+        amr.ds_hr = self.ds_high_les
 
+        ### ~~~~~~~~~ Calculate low resolution grid placement ~~~~~~~~~ 
+        # Calculate minimum/maximum LR domain extents
+        wt_all_x_min = float("inf")     # Minimum x-value of any turbine
+        wt_all_x_max = -1*float("inf")
+        wt_all_y_min = float("inf")
+        wt_all_y_max = -1*float("inf")
+        wt_all_z_max = -1*float("inf")  # Tallest rotor disk point of any turbine
+        Drot_max = -1*float("inf")
+        for turbkey in self.wts:
+            wt_all_x_min = min(wt_all_x_min, self.wts[turbkey]['x'])
+            wt_all_x_max = max(wt_all_x_max, self.wts[turbkey]['x'])
+            wt_all_y_min = min(wt_all_y_min, self.wts[turbkey]['y'])
+            wt_all_y_max = max(wt_all_x_min, self.wts[turbkey]['y'])
+            wt_all_z_max = max(wt_all_z_max, self.wts[turbkey]['zhub'] + 0.5*self.wts[turbkey]['D'])
+            Drot_max = max(Drot_max, self.wts[turbkey]['D'])
+            
+        x_buffer_lr = 3 * Drot_max
+        y_buffer_lr = 3 * Drot_max
+        z_buffer_lr = 1 * Drot_max  # This buffer size was arbitrarily chosen
+        xlow_lr_min = wt_all_x_min - x_buffer_lr
+        xhigh_lr_max = wt_all_x_max + x_buffer_lr
+        ylow_lr_min = wt_all_y_min - y_buffer_lr
+        yhigh_lr_max = wt_all_y_max + y_buffer_lr
+        zhigh_lr_max = wt_all_z_max + z_buffer_lr
+
+        # Calculate the minimum/maximum LR domain coordinate lengths & number of grid cells
+        xdist_lr_min = xhigh_lr_max - xlow_lr_min  # Minumum possible length of x-extent of LR domain
+        xdist_lr = self.ds_low_les * np.ceil(xdist_lr_min/self.ds_low_les)  # The `+ ds_lr` comes from the +1 to NS_LOW in Sec. 4.2.15.6.4.1.1
+        # TODO: adjust xdist_lr calculation by also using `inflow_deg`
+        nx_lr = int(xdist_lr/self.ds_low_les) + 1
+
+        ydist_lr_min = yhigh_lr_max - ylow_lr_min
+        ydist_lr = self.ds_low_les * np.ceil(ydist_lr_min/self.ds_low_les)
+        # TODO: adjust ydist_lr calculation by also using `inflow_deg`
+        ny_lr = int(ydist_lr/self.ds_low_les) + 1
+
+        zdist_lr = self.ds_low_les * np.ceil(zhigh_lr_max/self.ds_low_les)
+        nz_lr = int(zdist_lr/self.ds_low_les) + 1
+
+        ## Calculate actual LR domain extent
+        #   NOTE: Sampling planes should measure at AMR-Wind cell centers, not cell edges
+        #   NOTE: Should we use dx/dy/dz values here or ds_lr?
+        #           - AR: I think it's correct to use ds_lr to get to the xlow values,
+        #               but then offset by 0.5*amr_dx0
+        xlow_lr = self.ds_low_les * np.floor(xlow_lr_min/self.ds_low_les) - 0.5*amr.dx0
+        xhigh_lr = xlow_lr + xdist_lr
+        ylow_lr = self.ds_low_les * np.floor(ylow_lr_min/self.ds_low_les) - 0.5*amr.dy0
+        yhigh_lr = ylow_lr + ydist_lr
+        zlow_lr = 0.5 * amr.dz0  # Lowest z point is half the height of the lowest grid cell
+        zhigh_lr = zlow_lr + zdist_lr
+        zoffsets_lr = np.arange(zlow_lr, zhigh_lr+self.ds_low_les, self.ds_low_les) - zlow_lr
+
+        ## Save out info 
+        # self.extent_low = ?  # TODO: How should this be formatted?
+
+        amr.nx_lr = nx_lr
+        amr.ny_lr = ny_lr
+        amr.nz_lr = nz_lr
+        amr.xlow_lr = xlow_lr
+        amr.xhigh_lr = xhigh_lr
+        amr.ylow_lr = ylow_lr
+        amr.yhigh_lr = yhigh_lr
+        amr.zlow_lr = zlow_lr
+        amr.zhigh_lr = zhigh_lr
+        amr.zoffsets_lr = zoffsets_lr
 
     def CheckAutoBoxParameters(self):
         '''
@@ -853,6 +919,19 @@ class FFCaseCreation:
         if self.ds_high_les >= self.amr.ds_refine_max:
             raise ValueError("AMR-Wind grid spacing too coarse for high resolution domain!")
 
+        ## Low resolution domain extent checks
+        if self.amr.xhigh_lr < self.amr.prob_hi[0]:
+            raise ValueError("LR domain extends beyond maximum AMR-Wind x-extent!")
+        if self.amr.xlow_lr > self.amr.prob_lo[0]:
+            raise ValueError("LR domain extends beyond minimum AMR-Wind x-extent!")
+        if self.amr.yhigh_lr < self.amr.prob_hi[1]:
+            raise ValueError("LR domain extends beyond maximum AMR-Wind y-extent!")
+        if self.amr.ylow_lr > self.amr.prob_lo[1]:
+            raise ValueError("LR domain extends beyond minimum AMR-Wind y-extent!")
+        if self.amr.zhigh_lr < self.amr.prob_hi[2]:
+            raise ValueError("LR domain extends beyond maximum AMR-Wind z-extent!")
+        if self.amr.zlow_lr > self.amr.prob_lo[2]:
+            raise ValueError("LR domain extends beyond minimum AMR-Wind z-extent!")
 
     def writeAMRWindRefinement(self):
 
