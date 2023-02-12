@@ -30,11 +30,11 @@ class AMRWindSimulation:
         '''
         Check that the AMR-Wind inputs make sense
         '''
-        if len(self.prob_lo != 3):
+        if len(self.prob_lo) != 3:
             raise ValueError(f"prob_lo must contain 3 elements, but it has {len(self.prob_lo)}")
-        if len(self.prob_hi != 3):
+        if len(self.prob_hi) != 3:
             raise ValueError(f"prob_hi must contain 3 elements, but it has {len(self.prob_hi)}")
-        if len(self.incflo_velocity_hh != 3):
+        if len(self.incflo_velocity_hh) != 3:
             raise ValueError(f"incflo_velocity_hh must contain 3 elements, but it has {len(self.incflo_velocity_hh)}")
         if (self.prob_lo[0] >= self.prob_hi[0]):
             raise ValueError("x-component of prob_lo larger than x-component of prob_hi")
