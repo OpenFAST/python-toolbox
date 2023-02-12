@@ -60,6 +60,7 @@ class AMRWindSimulation:
         self.dx0 = (self.prob_hi[0] - self.prob_lo[0]) / self.n_cell[0]
         self.dy0 = (self.prob_hi[1] - self.prob_lo[1]) / self.n_cell[1]
         self.dz0 = (self.prob_hi[2] - self.prob_lo[2]) / self.n_cell[2]
+        self.ds0_max = max(self.dx0, self.dy0, self.dz0)
 
         # Grid resolution at finest refinement level
         self.dx_refine = self.dx0/(2**self.max_level)

@@ -781,7 +781,7 @@ class FFCaseCreation:
         '''
         amr = self.amr
 
-        ### Calculate timestep values and AMR-Wind plane sampling frequency
+        ### ~~~~~~~~~ Calculate timestep values and AMR-Wind plane sampling frequency ~~~~~~~~~
         ## Low resolution domain, dt_low_les
         cmeander_min = float("inf")
         Dwake_min = float("inf")
@@ -802,6 +802,25 @@ class FFCaseCreation:
         ## Sampling frequency
         amr.output_frequency = int(self.dt_high_les/amr.dt)
 
+        ### ~~~~~~~~~ Calculate grid resolutions ~~~~~~~~~
+        ## Low resolution domain, ds_lr (s = x/y/z)
+        #    ASSUME: FAST.Farm LR zone uses Level 0 AMR-Wind grid spacing
+        #    NOTE: ds_lr is calculated independent of any x/y/z requirements,
+        #            just time step and velocity requiements
+        ds_lr_max = self.dt_low_les * amr.vhub**2 / 15
+        self.ds_low_les = amr.ds0_max * np.floor(ds_lr_max/amr.ds0_max)  # Ensure that ds_lr is a multiple of the coarse AMR-Wind grid spacing
+
+        ## High resolution domain, ds_hr
+        #    ASSUME: FAST.Farm HR zone lies within the region of maxmum AMR-Wind grid refinement
+        #    NOTE: ds_hr is calculated independent of any x/y/z requirements,
+        #            just blade chord length requirements
+        cmax_min = float("inf")
+        for turbkey in self.wts:
+            cmax_min = min(cmax_min, self.wts[turbkey]['cmax'])
+        ds_hr_max = cmax_min
+        self.ds_high_les = amr.ds_refine_max * np.floor(ds_hr_max/amr.ds_refine_max)  # Ensure that ds_hr is a multiple of the refined AMR-Wind grid spacing
+        assert self.ds_high_les >= amr.ds_refine_max, "AMR-Wind grid spacing too coarse for high resolution domain!"
+
 
     def CheckAutoBoxParameters(self):
         '''
@@ -816,6 +835,15 @@ class FFCaseCreation:
         if self.dt_high_les <= self.dt_low_les:
             raise ValueError("Low resolution timestep is finer than high resolution timestep!")
 
+        ## Grid resolution checks
+        if self.ds_low_les >= self.amr.dx0:
+            raise ValueError("AMR-Wind Level 0 x-grid spacing too coarse for low resolution domain!")
+        if self.ds_low_les >= self.amr.dy0:
+            raise ValueError("AMR-Wind Level 0 y-grid spacing too coarse for low resolution domain!")
+        if self.ds_low_les >= self.amr.dz0:
+            raise ValueError("AMR-Wind Level 0 z-grid spacing too coarse for low resolution domain!")
+        if self.ds_high_les >= self.amr.ds_refine_max:
+            raise ValueError("AMR-Wind grid spacing too coarse for high resolution domain!")
 
 
     def writeAMRWindRefinement(self):
