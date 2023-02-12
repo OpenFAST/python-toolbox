@@ -776,10 +776,18 @@ class FFCaseCreation:
 
     def DetermineBoxParameters(self):
         '''
-        Calculate dt_high_les, ds_high_les, extent_high, dt_low_les, ds_low_les, extent_low, and ffbin,
-            given inputs from amr
+        Calculate the following variables for FAST.Farm:
+            dt_high_les, ds_high_les, extent_high, dt_low_les, ds_low_les, extent_low, and ffbin
+        And calculate information for the AMR-Wind simulation:
+            TODO: sampling_labels, output_frequency, ...
         '''
         amr = self.amr
+
+        ### ~~~~~~~~~ Calculate high-level info for AMR-Wind sampling ~~~~~~~~~
+        sampling_labels = ["Low"]
+        for turbkey in self.wts:
+            sampling_labels.append(f"High{turbkey}_inflow0deg")
+        amr.sampling_labels = sampling_labels
 
         ### ~~~~~~~~~ Calculate timestep values and AMR-Wind plane sampling frequency ~~~~~~~~~
         ## Low resolution domain, dt_low_les
