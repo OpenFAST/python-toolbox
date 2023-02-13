@@ -987,33 +987,6 @@ class FFCaseCreation:
         if self.amr.zlow_lr > self.amr.prob_lo[2]:
             raise ValueError("LR domain extends beyond minimum AMR-Wind z-extent!")
 
-    def writeAMRWindRefinement(self):
-
-
-        raise NotImplementedError(f'writeAMRWindRefinement is not implemented.')
-
-
-        # Get list of proper non-repeated cases
-        self._get_domain_parameters()
-
-        # Loop over all turbines of all cases/conditions
-        for cond in range(self.nConditions):
-            for case in range(self.nHighBoxCases):
-                # Get actual case number given the high-box that need to be saved
-                case = self.allHighBoxCases.isel(case=case)['case'].values
-                if self.verbose>3:
-                    print(f'Generating AMR-Wind input file for cond {cond} ({self.condDirList[cond]}),'\ 
-                          f'case {case} ({self.caseDirList[case]}).')
-                    for t in range(self.nTurbines):
-                        # Recover turbine properties
-                        D_       = self.allCases.sel(case=case, turbine=t)['D'   ].values
-                        HubHt_   = self.allCases.sel(case=case, turbine=t)['zhub'].values
-                        xloc_    = self.allCases.sel(case=case, turbine=t)['Tx'  ].values
-                        yloc_    = self.allCases.sel(case=case, turbine=t)['Ty'  ].values
-
-                        # todo: maybe get information about your grid from amr-wind. You want to sample at the cell center
-                        # todo: call another function to spit out the refinements in the proper syntax
-
                         
 
   
