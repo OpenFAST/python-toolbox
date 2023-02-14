@@ -9,7 +9,6 @@ import matplotlib.pyplot as plt
 from pyFAST.input_output import FASTInputFile, FASTOutputFile, TurbSimFile, VTKFile
 from pyFAST.fastfarm import writeFastFarm, fastFarmTurbSimExtent, plotFastFarmSetup
 from pyFAST.fastfarm.TurbSimCaseCreation import TSCaseCreation, writeTimeSeriesFile
-from pyFAST.fastfarm.AMRWindSimulation import AMRWindSimulation
 
 def cosd(t): return np.cos(np.deg2rad(t))
 def sind(t): return np.sin(np.deg2rad(t))
@@ -18,7 +17,7 @@ def sind(t): return np.sin(np.deg2rad(t))
 class FFCaseCreation:
 
 
-    def __init__(self, path, wts, cmax, fmax, Cmeander, tmax, zbot, vhub, shear, TIvalue, inflow_deg, dt_high_les=None, ds_high_les=None, extent_high=None, dt_low_les=None, ds_low_les=None, extent_low=None, ffbin=None, yaw_init=None, ADmodel=None, EDmodel=None, nSeeds=6, LESpath=None, sweepWakeSteering=False, sweepYawMisalignment=False, seedValues=None, refTurb_rot=0, amr=None, verbose=0):
+    def __init__(self, path, wts, cmax, fmax, Cmeander, tmax, zbot, vhub, shear, TIvalue, inflow_deg, dt_high_les, ds_high_les, extent_high, dt_low_les, ds_low_les, extent_low, ffbin, yaw_init=None, ADmodel=None, EDmodel=None, nSeeds=6, LESpath=None, sweepWakeSteering=False, sweepYawMisalignment=False, seedValues=None, refTurb_rot=0, verbose=0):
         '''
         
         ffbin: str
@@ -54,7 +53,6 @@ class FFCaseCreation:
         self.sweepYM     = sweepYawMisalignment
         self.seedValues  = seedValues
         self.refTurb_rot = refTurb_rot
-        self.amr         = amr
         self.verbose     = verbose
                                         
                                         
@@ -72,13 +70,6 @@ class FFCaseCreation:
         self.createAuxArrays()          
         if self.verbose>0: print(f'Creating auxiliary arrays for all conditions and cases... Done.')
                                         
-
-        if self.verbose>0: print(f'Determining box parameters...', end='\r')
-        if self.dt_high_les is not None:
-            self.DetermineBoxParameters()       
-            self.CheckAutoBoxParameters()
-        if self.verbose>0: print(f'Determining box paramters... Done.')
-
 
         if self.verbose>0: print(f'Creating directory structure and copying files...', end='\r')
         self._create_dir_structure()
@@ -148,33 +139,21 @@ class FFCaseCreation:
             if t<1:  raise ValueError(f'TI should be given in percentage (e.g. "10" for a 10% TI). Received {t}.')
 
         # Check the ds and dt for the high- and low-res boxes
-        if None not in (self.dt_high_les, self.dt_low_les, self.ds_high_les, self.ds_low_les, self.extent_high, self.extent_low):
-            # All values for ds, dt, and extent were given
-            if not (np.array(self.extent_low)>=0).all():
-                raise ValueError(f'The array for low-res box extents should be given with positive values')
-            if self.dt_low_les%(self.dt_high_les-1e-15) > 1e-14:
-                raise ValueError(f'The temporal resolution dT_Low should be a multiple of dT_High')
-            if self.dt_low_les < self.dt_high_les:
-                raise ValueError(f'The temporal resolution dT_High should not be greater than dT_Low on the LES side')
-            if self.ds_low_les < self.ds_high_les:
-                raise ValueError(f'The grid resolution dS_High should not be greater than dS_Low on the LES side')
-            if not isinstance(self.extent_high, (float,int)):
-                raise ValueError(f'The extent_high should be a scalar')
-            if self.extent_high<=0:
-                raise ValueError(f'The extent of high boxes should be positive')
-        else:
-            # At least one of the ds, dt, extent are None. If that is the case, all of them should be None
-            if None in (self.dt_high_les, self.dt_low_les, self.ds_high_les, self.ds_low_les, self.extent_high, self.extent_low):
-                raise ValueError (f'The dt, ds, and extent for high and low res boxes need to either be fully' \
-                                  f'given or computed. Some were given, but some were not.')
+        if not (np.array(self.extent_low)>=0).all():
+            raise ValueError(f'The array for low-res box extents should be given with positive values')
+        if self.dt_low_les%(self.dt_high_les-1e-15) > 1e-14:
+            raise ValueError(f'The temporal resolution dT_Low should be a multiple of dT_High')
+        if self.dt_low_les < self.dt_high_les:
+            raise ValueError(f'The temporal resolution dT_High should not be greater than dT_Low on the LES side')
+        if self.ds_low_les < self.ds_high_les:
+            raise ValueError(f'The grid resolution dS_High should not be greater than dS_Low on the LES side')
+        if not isinstance(self.extent_high, (float,int)):
+            raise ValueError(f'The extent_high should be a scalar')
+        if self.extent_high<=0:
+            raise ValueError(f'The extent of high boxes should be positive')
 
 
         # Check the FAST.Farm binary
-        if self.ffbin is None:
-            import shutil
-            self.ffbin = shutil.which('FAST.Farm')
-            if verbose>1:
-                print(f'FAST.Farm binary not given. Using the following from your $PATH: {self.ffbin}.')
         if not os.path.isfile(self.ffbin):
             raise ValueError (f'The FAST.Farm binary given does not appear to exist')
 
@@ -210,11 +189,6 @@ class FFCaseCreation:
             if not os.path.isdir(self.LESpath):
                 raise ValueError (f'The path {self.LESpath} does not exist')
             self.inflowStr = 'LES'
-
-        # Check class of amr
-        if self.amr is not None:
-            if not isinstance(self.amr, AMRWindSimulation):
-                raise ValueError(f"The class of amr should be AMRWindSimulation, but is {type(self.amr)}")
 
         # Check the reference turbine for rotation
         if self.refTurb_rot >= self.nTurbines:
@@ -773,222 +747,6 @@ class FFCaseCreation:
 
         self.wts_rot_ds = pd.DataFrame.from_dict(wts_rot, orient='index').to_xarray().rename({'level_0':'inflow_deg','level_1':'turbine'})
   
-
-    def DetermineBoxParameters(self):
-        '''
-        Calculate the following variables for FAST.Farm:
-            dt_high_les, ds_high_les, extent_high, dt_low_les, ds_low_les, and extent_low
-        And calculate information for the AMR-Wind simulation:
-            sampling_labels, output_frequency, specs for lr domain, specs for hr domains
-        '''
-        amr = self.amr
-
-        ### ~~~~~~~~~ Calculate high-level info for AMR-Wind sampling ~~~~~~~~~
-        sampling_labels = ["Low"]
-        for turbkey in self.wts:
-            sampling_labels.append(f"High{turbkey}_inflow0deg")
-        amr.sampling_labels = sampling_labels
-
-        ### ~~~~~~~~~ Calculate timestep values and AMR-Wind plane sampling frequency ~~~~~~~~~
-        ## Low resolution domain, dt_low_les
-        cmeander_min = float("inf")
-        Dwake_min = float("inf")
-        for turbkey in self.wts:
-            cmeander_min = min(cmeander_min, self.wts[turbkey]['Cmeander'])
-            Dwake_min = min(Dwake_min, self.wts[turbkey]['D'])  # Approximate D_wake as D_rotor
-
-        dt_lr_max = cmeander_min * Dwake_min / (10 * amr.vhub)
-        self.dt_low_les = amr.dt * np.floor(dt_lr_max/amr.dt)  # Ensure that dt_lr is a multiple of the AMR-Wind timestep
-
-        ## High resolution domain, dt_high_les
-        fmax_max = 0
-        for turbkey in self.wts:
-            fmax_max = max(0, self.wts[turbkey]['fmax'])
-        dt_hr_max = 1 / (2 * fmax_max)
-        self.dt_high_les = amr.dt * np.floor(dt_hr_max/amr.dt)  # Ensure that dt_hr is a multiple of the AMR-Wind timestep
-
-        ## Sampling frequency
-        amr.output_frequency = int(self.dt_high_les/amr.dt)
-
-        ### ~~~~~~~~~ Calculate grid resolutions ~~~~~~~~~
-        ## Low resolution domain, ds_lr (s = x/y/z)
-        #    ASSUME: FAST.Farm LR zone uses Level 0 AMR-Wind grid spacing
-        #    NOTE: ds_lr is calculated independent of any x/y/z requirements,
-        #            just time step and velocity requiements
-        ds_lr_max = self.dt_low_les * amr.vhub**2 / 15
-        self.ds_low_les = amr.ds0_max * np.floor(ds_lr_max/amr.ds0_max)  # Ensure that ds_lr is a multiple of the coarse AMR-Wind grid spacing
-        amr.ds_lr = self.ds_low_les
-
-        ## High resolution domain, ds_hr
-        #    ASSUME: FAST.Farm HR zone lies within the region of maxmum AMR-Wind grid refinement
-        #    NOTE: ds_hr is calculated independent of any x/y/z requirements,
-        #            just blade chord length requirements
-        cmax_min = float("inf")
-        for turbkey in self.wts:
-            cmax_min = min(cmax_min, self.wts[turbkey]['cmax'])
-        ds_hr_max = cmax_min
-        self.ds_high_les = amr.ds_refine_max * np.floor(ds_hr_max/amr.ds_refine_max)  # Ensure that ds_hr is a multiple of the refined AMR-Wind grid spacing
-        amr.ds_hr = self.ds_high_les
-
-        ### ~~~~~~~~~ Calculate low resolution grid placement ~~~~~~~~~ 
-        # Calculate minimum/maximum LR domain extents
-        wt_all_x_min = float("inf")     # Minimum x-value of any turbine
-        wt_all_x_max = -1*float("inf")
-        wt_all_y_min = float("inf")
-        wt_all_y_max = -1*float("inf")
-        wt_all_z_max = -1*float("inf")  # Tallest rotor disk point of any turbine
-        Drot_max = -1*float("inf")
-        for turbkey in self.wts:
-            wt_all_x_min = min(wt_all_x_min, self.wts[turbkey]['x'])
-            wt_all_x_max = max(wt_all_x_max, self.wts[turbkey]['x'])
-            wt_all_y_min = min(wt_all_y_min, self.wts[turbkey]['y'])
-            wt_all_y_max = max(wt_all_x_min, self.wts[turbkey]['y'])
-            wt_all_z_max = max(wt_all_z_max, self.wts[turbkey]['zhub'] + 0.5*self.wts[turbkey]['D'])
-            Drot_max = max(Drot_max, self.wts[turbkey]['D'])
-            
-        x_buffer_lr = 3 * Drot_max
-        y_buffer_lr = 3 * Drot_max
-        z_buffer_lr = 1 * Drot_max  # This buffer size was arbitrarily chosen
-        xlow_lr_min = wt_all_x_min - x_buffer_lr
-        xhigh_lr_max = wt_all_x_max + x_buffer_lr
-        ylow_lr_min = wt_all_y_min - y_buffer_lr
-        yhigh_lr_max = wt_all_y_max + y_buffer_lr
-        zhigh_lr_max = wt_all_z_max + z_buffer_lr
-
-        # Calculate the minimum/maximum LR domain coordinate lengths & number of grid cells
-        xdist_lr_min = xhigh_lr_max - xlow_lr_min  # Minumum possible length of x-extent of LR domain
-        xdist_lr = self.ds_low_les * np.ceil(xdist_lr_min/self.ds_low_les)  # The `+ ds_lr` comes from the +1 to NS_LOW in Sec. 4.2.15.6.4.1.1
-        # TODO: adjust xdist_lr calculation by also using `inflow_deg`
-        nx_lr = int(xdist_lr/self.ds_low_les) + 1
-
-        ydist_lr_min = yhigh_lr_max - ylow_lr_min
-        ydist_lr = self.ds_low_les * np.ceil(ydist_lr_min/self.ds_low_les)
-        # TODO: adjust ydist_lr calculation by also using `inflow_deg`
-        ny_lr = int(ydist_lr/self.ds_low_les) + 1
-
-        zdist_lr = self.ds_low_les * np.ceil(zhigh_lr_max/self.ds_low_les)
-        nz_lr = int(zdist_lr/self.ds_low_les) + 1
-
-        ## Calculate actual LR domain extent
-        #   NOTE: Sampling planes should measure at AMR-Wind cell centers, not cell edges
-        #   NOTE: Should we use dx/dy/dz values here or ds_lr?
-        #           - AR: I think it's correct to use ds_lr to get to the xlow values,
-        #               but then offset by 0.5*amr_dx0
-        xlow_lr = self.ds_low_les * np.floor(xlow_lr_min/self.ds_low_les) - 0.5*amr.dx0
-        xhigh_lr = xlow_lr + xdist_lr
-        ylow_lr = self.ds_low_les * np.floor(ylow_lr_min/self.ds_low_les) - 0.5*amr.dy0
-        yhigh_lr = ylow_lr + ydist_lr
-        zlow_lr = 0.5 * amr.dz0  # Lowest z point is half the height of the lowest grid cell
-        zhigh_lr = zlow_lr + zdist_lr
-        zoffsets_lr = np.arange(zlow_lr, zhigh_lr+self.ds_low_les, self.ds_low_les) - zlow_lr
-
-        ## Save out info 
-        # self.extent_low = ?  # TODO: How should this be formatted?
-
-        amr.nx_lr = nx_lr
-        amr.ny_lr = ny_lr
-        amr.nz_lr = nz_lr
-        amr.xlow_lr = xlow_lr
-        amr.xhigh_lr = xhigh_lr
-        amr.ylow_lr = ylow_lr
-        amr.yhigh_lr = yhigh_lr
-        amr.zlow_lr = zlow_lr
-        amr.zhigh_lr = zhigh_lr
-        amr.zoffsets_lr = zoffsets_lr
-
-        ### ~~~~~~~~~ Calculate high resolution grid placement ~~~~~~~~~
-        hr_domains = {} 
-        for turbkey in self.wts:
-            wt_x = self.wts[turbkey]['x']
-            wt_y = self.wts[turbkey]['y']
-            wt_z = self.wts[turbkey]['zhub'] + 0.5*self.wts[turbkey]['D']
-            wt_D = self.wts[turbkey]['D']
-
-            # Calculate minimum/maximum HR domain extents
-            x_buffer_hr = 0.6 * wt_D
-            y_buffer_hr = 0.6 * wt_D
-            z_buffer_hr = 0.6 * wt_D
-
-            xlow_hr_min = wt_x - x_buffer_hr
-            xhigh_hr_max = wt_x + x_buffer_hr
-            ylow_hr_min = wt_y - y_buffer_hr
-            yhigh_hr_max = wt_y + y_buffer_hr
-            zhigh_hr_max = wt_z + z_buffer_hr
-
-            # Calculate the minimum/maximum HR domain coordinate lengths & number of grid cells
-            xdist_hr_min = xhigh_hr_max - xlow_hr_min  # Minumum possible length of x-extent of HR domain
-            xdist_hr = self.ds_high_les * np.ceil(xdist_hr_min/self.ds_high_les)  
-            nx_hr = int(xdist_hr/self.ds_high_les) + 1
-
-            ydist_hr_min = yhigh_hr_max - ylow_hr_min
-            ydist_hr = self.ds_high_les * np.ceil(ydist_hr_min/self.ds_high_les)
-            ny_hr = int(ydist_hr/self.ds_high_les) + 1
-
-            zdist_hr = self.ds_high_les * np.ceil(zhigh_hr_max/self.ds_high_les)
-            nz_hr = int(zdist_hr/self.ds_high_les) + 1
-
-            # Calculate actual HR domain extent
-            #  NOTE: Sampling planes should measure at AMR-Wind cell centers, not cell edges
-            xlow_hr = self.ds_high_les * np.floor(xlow_hr_min/self.ds_high_les) - 0.5*amr.dx_refine
-            xhigh_hr = xlow_hr + xdist_hr
-            ylow_hr = self.ds_high_les * np.floor(ylow_hr_min/self.ds_high_les) - 0.5*amr.dy_refine
-            yhigh_hr = ylow_hr + ydist_hr
-            zlow_hr = zlow_lr
-            zhigh_hr = zlow_hr + zdist_hr
-            zoffsets_hr = np.arange(zlow_hr, zhigh_hr+self.ds_high_les, self.ds_high_les) - zlow_hr
-
-            # Save info
-            # self.extent_high = ?  # TODO: How should this be formatted?
-
-            hr_turb_info = {'nx_hr': nx_hr, 'ny_hr': ny_hr, 'nz_hr': nz_hr,
-                            'xlow_hr': xlow_hr, 'ylow_hr': ylow_hr, 'zlow_hr': zlow_hr,
-                            'xhigh_hr': xhigh_hr, 'yhigh_hr': yhigh_hr, 'zhigh_hr': zhigh_hr,
-                            'zoffsets_hr': zoffsets_hr}
-            hr_domains[turbkey] = hr_turb_info
-        amr.hr_domains = hr_domains
-
-        ### ~~~~~~~~~ Write out sampling plane info ~~~~~~~~~
-        amr.write_sampling_params(self.path)
-
-    def CheckAutoBoxParameters(self):
-        '''
-        Check the values of parameters that were calculated by DetermineBoxParameters
-        '''
-
-        ## Timestep checks
-        if self.dt_low_les >= self.amr.dt:
-            raise ValueError("AMR-Wind timestep too coarse for low resolution domain!")
-        if self.dt_high_les >= self.amr.dt:
-            raise ValueError("AMR-Wind timestep too coarse for high resolution domain!")
-        if self.dt_high_les <= self.dt_low_les:
-            raise ValueError("Low resolution timestep is finer than high resolution timestep!")
-
-        ## Grid resolution checks
-        if self.ds_low_les >= self.amr.dx0:
-            raise ValueError("AMR-Wind Level 0 x-grid spacing too coarse for low resolution domain!")
-        if self.ds_low_les >= self.amr.dy0:
-            raise ValueError("AMR-Wind Level 0 y-grid spacing too coarse for low resolution domain!")
-        if self.ds_low_les >= self.amr.dz0:
-            raise ValueError("AMR-Wind Level 0 z-grid spacing too coarse for low resolution domain!")
-        if self.ds_high_les >= self.amr.ds_refine_max:
-            raise ValueError("AMR-Wind grid spacing too coarse for high resolution domain!")
-
-        ## Low resolution domain extent checks
-        if self.amr.xhigh_lr < self.amr.prob_hi[0]:
-            raise ValueError("LR domain extends beyond maximum AMR-Wind x-extent!")
-        if self.amr.xlow_lr > self.amr.prob_lo[0]:
-            raise ValueError("LR domain extends beyond minimum AMR-Wind x-extent!")
-        if self.amr.yhigh_lr < self.amr.prob_hi[1]:
-            raise ValueError("LR domain extends beyond maximum AMR-Wind y-extent!")
-        if self.amr.ylow_lr > self.amr.prob_lo[1]:
-            raise ValueError("LR domain extends beyond minimum AMR-Wind y-extent!")
-        if self.amr.zhigh_lr < self.amr.prob_hi[2]:
-            raise ValueError("LR domain extends beyond maximum AMR-Wind z-extent!")
-        if self.amr.zlow_lr > self.amr.prob_lo[2]:
-            raise ValueError("LR domain extends beyond minimum AMR-Wind z-extent!")
-
-                        
-
   
     def _setRotorParameters(self):
   
@@ -1167,7 +925,7 @@ class FFCaseCreation:
         os.chdir(notepath)
 
 
-    def _get_domain_parameters(self):
+    def getDomainParameters(self):
 
         # If the low box setup hasn't been called (e.g. LES run), do it once to get domain extents
         if not self.TSlowBoxFilesCreatedBool:
@@ -1186,12 +944,6 @@ class FFCaseCreation:
         if self.nHighBoxCases != len(self.allHighBoxCases.case):
             raise ValueError(f'The number of cases do not match as expected. {self.nHighBoxCases} unique wind directions, but {len(self.allHighBoxCases.case)} unique cases.')
         
-        if self.verbose>2:
-            print(f'allHighBoxCases is:')
-            print(self.allHighBoxCases)
-
-    def _get_offset_turbsOrigin2TSOrigin(self):
-
         # Determine offsets from turbines coordinate frame to TurbSim coordinate frame
         self.yoffset_turbsOrigin2TSOrigin = -( (self.TSlowbox.ymax - self.TSlowbox.ymin)/2 + self.TSlowbox.ymin )
         self.xoffset_turbsOrigin2TSOrigin = - self.extent_low[0]*self.D
@@ -1199,6 +951,10 @@ class FFCaseCreation:
         if self.verbose>0:
             print(f"    The y offset between the turbine ref frame and turbsim is {self.yoffset_turbsOrigin2TSOrigin}")
             print(f"    The x offset between the turbine ref frame and turbsim is {self.xoffset_turbsOrigin2TSOrigin}")
+
+        if self.verbose>2:
+            print(f'allHighBoxCases is:')
+            print(self.allHighBoxCases)
 
 
     def TS_high_get_time_series(self):
@@ -1283,15 +1039,6 @@ class FFCaseCreation:
 
         # Create symbolic links for the low-res boxes
         self.TS_low_createSymlinks()
-
-        # Get proper list of cases to loop (some can be repetead, e.g., ADyn/ADisk models)
-        self._get_domain_parameters()
-
-        # Get offset between given reference frame and TurbSim's
-        self._get_offset_turbsOrigin2TSOrigin()
-
-        # Open low-res and get time-series file
-        self.TS_high_get_time_series()
 
         # Loop on all conditions/cases/seeds setting up the High boxes
         boxType='highres'
@@ -1908,56 +1655,3 @@ class FFCaseCreation:
                     print(f'Calling: {sub_command}')
                     subprocess.call(sub_command, cwd=self.path, shell=True)
                     time.sleep(4) # Sometimes the same job gets submitted twice. This gets around it.
-            
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
