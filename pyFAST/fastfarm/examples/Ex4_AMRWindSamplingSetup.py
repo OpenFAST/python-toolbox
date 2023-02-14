@@ -47,7 +47,7 @@ def main():
         incflo.post_processing = sampling # averaging
         sampling.output_frequency = 1
         sampling.fields = velocity # temperature tke
-        sampling.labels = ['Low', 'HighT0_inflow0deg', 'HighT1_inflow0deg', 'HighT2_inflow0deg']
+        sampling.labels = Low HighT0_inflow0deg HighT1_inflow0deg HighT2_inflow0deg
 
         # Low sampling grid spacing = 10.0 m
         sampling.Low.type         = PlaneSampler
@@ -59,33 +59,31 @@ def main():
         sampling.Low.offsets      = 0 10 20 30 40 50 60 70 80 90 100 110 120 130 140 150 160 170 180 190 200 210 220 230 240 250 260 270 280
 
         # Turbine T0 at (x,y) = (1280.0, 2560), with D = 126.9, grid spacing = 5.0 m
-        sampling.T0.type         = PlaneSampler
-        sampling.T0.num_points   = 32 32
-        sampling.T0.origin       = 1197.5 2477.5 2.5
-        sampling.T0.axis1        = 155.0 0.0 0.0
-        sampling.T0.axis2        = 0.0 155.0 0.0
-        sampling.T0.normal       = 0.0 0.0 1.0
-        sampling.T0.offsets      = 0 5 10 15 20 25 30 35 40 45 50 55 60 65 70 75 80 85 90 95 100 105 110 115 120 125 130 135 140 145 150 155 160 165 170 175 180 185 190 195 200 205 210 215 220 225 230
+        sampling.HighT0_inflow0deg.type         = PlaneSampler
+        sampling.HighT0_inflow0deg.num_points   = 32 32
+        sampling.HighT0_inflow0deg.origin       = 1197.5 2477.5 2.5
+        sampling.HighT0_inflow0deg.axis1        = 155.0 0.0 0.0
+        sampling.HighT0_inflow0deg.axis2        = 0.0 155.0 0.0
+        sampling.HighT0_inflow0deg.normal       = 0.0 0.0 1.0
+        sampling.HighT0_inflow0deg.offsets      = 0 5 10 15 20 25 30 35 40 45 50 55 60 65 70 75 80 85 90 95 100 105 110 115 120 125 130 135 140 145 150 155 160 165 170 175 180 185 190 195 200 205 210 215 220 225 230
 
         # Turbine T1 at (x,y) = (1280.0, 3200), with D = 126.9, grid spacing = 5.0 m
-        sampling.T1.type         = PlaneSampler
-        sampling.T1.num_points   = 32 32
-        sampling.T1.origin       = 1197.5 3117.5 2.5
-        sampling.T1.axis1        = 155.0 0.0 0.0
-        sampling.T1.axis2        = 0.0 155.0 0.0
-        sampling.T1.normal       = 0.0 0.0 1.0
-        sampling.T1.offsets      = 0 5 10 15 20 25 30 35 40 45 50 55 60 65 70 75 80 85 90 95 100 105 110 115 120 125 130 135 140 145 150 155 160 165 170 175 180 185 190 195 200 205 210 215 220 225 230
+        sampling.HighT1_inflow0deg.type         = PlaneSampler
+        sampling.HighT1_inflow0deg.num_points   = 32 32
+        sampling.HighT1_inflow0deg.origin       = 1197.5 3117.5 2.5
+        sampling.HighT1_inflow0deg.axis1        = 155.0 0.0 0.0
+        sampling.HighT1_inflow0deg.axis2        = 0.0 155.0 0.0
+        sampling.HighT1_inflow0deg.normal       = 0.0 0.0 1.0
+        sampling.HighT1_inflow0deg.offsets      = 0 5 10 15 20 25 30 35 40 45 50 55 60 65 70 75 80 85 90 95 100 105 110 115 120 125 130 135 140 145 150 155 160 165 170 175 180 185 190 195 200 205 210 215 220 225 230
 
         # Turbine T2 at (x,y) = (1280.0, 3840), with D = 126.9, grid spacing = 5.0 m
-        sampling.T2.type         = PlaneSampler
-        sampling.T2.num_points   = 32 32
-        sampling.T2.origin       = 1197.5 3757.5 2.5
-        sampling.T2.axis1        = 155.0 0.0 0.0
-        sampling.T2.axis2        = 0.0 155.0 0.0
-        sampling.T2.normal       = 0.0 0.0 1.0
-        sampling.T2.offsets      = 0 5 10 15 20 25 30 35 40 45 50 55 60 65 70 75 80 85 90 95 100 105 110 115 120 125 130 135 140 145 150 155 160 165 170 175 180 185 190 195 200 205 210 215 220 225 230
-
-
+        sampling.HighT2_inflow0deg.type         = PlaneSampler
+        sampling.HighT2_inflow0deg.num_points   = 32 32
+        sampling.HighT2_inflow0deg.origin       = 1197.5 3757.5 2.5
+        sampling.HighT2_inflow0deg.axis1        = 155.0 0.0 0.0
+        sampling.HighT2_inflow0deg.axis2        = 0.0 155.0 0.0
+        sampling.HighT2_inflow0deg.normal       = 0.0 0.0 1.0
+        sampling.HighT2_inflow0deg.offsets      = 0 5 10 15 20 25 30 35 40 45 50 55 60 65 70 75 80 85 90 95 100 105 110 115 120 125 130 135 140 145 150 155 160 165 170 175 180 185 190 195 200 205 210 215 220 225 230
     '''
 
 if __name__ == '__main__':
