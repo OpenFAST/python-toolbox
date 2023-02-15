@@ -18,7 +18,8 @@ class AMRWindSimulation:
                     incflo_velocity_hh: tuple, 
                     postproc_name='sampling',
                     buffer_lr = [3,6,3,3,2],
-                    buffer_hr = 0.6,):
+                    buffer_hr = 0.6,
+                    ds_hr = None, ds_lr = None):
         '''
         Values from the AMR-Wind input file
         Inputs:
@@ -38,12 +39,12 @@ class AMRWindSimulation:
         self.postproc_name      = postproc_name
         self.buffer_lr          = buffer_lr
         self.buffer_hr          = buffer_hr
+        self.ds_hr              = ds_hr
+        self.ds_lr              = ds_lr
 
         # Placeholder variables, to be calculated by FFCaseCreation
         self.output_frequency = None
         self.sampling_labels = None
-        self.ds_lr = None
-        self.ds_hr = None
         self.nx_lr = None
         self.ny_lr = None
         self.nz_lr = None
@@ -151,8 +152,16 @@ class AMRWindSimulation:
         for turbkey in self.wts:
             cmax_min = min(cmax_min, self.wts[turbkey]['cmax'])
         ds_hr_max = cmax_min
-        self.ds_high_les = self.ds_refine_max * np.floor(ds_hr_max/self.ds_refine_max)  # Ensure that ds_hr is a multiple of the refined AMR-Wind grid spacing
-        self.ds_hr = self.ds_high_les
+
+        if self.ds_hr is None:
+            if ds_hr_max < self.ds_refine_max:
+                raise ValueError(f"AMR-Wind grid spacing of {self.ds_refine_max} is too coarse for high resolution domain! The high-resolution domain requires "\
+                                 f"AMR-Wind grid spacing to be at least {ds_hr_max} m. If a coarser high-res domain is acceptable, then manually specify the "\
+                                 f"high-resolution grid spacing to be at least {self.ds_refine_max} with ds_hr = {self.ds_refine_max}.")
+            self.ds_high_les = self.ds_refine_max * np.floor(ds_hr_max/self.ds_refine_max)  # Ensure that ds_hr is a multiple of the refined AMR-Wind grid spacing
+            self.ds_hr = self.ds_high_les
+        else:
+            self.ds_high_les = self.ds_hr
 
         ### ~~~~~~~~~ Calculate low resolution grid placement ~~~~~~~~~ 
         # Calculate minimum/maximum LR domain extents
@@ -170,11 +179,11 @@ class AMRWindSimulation:
             wt_all_z_max = max(wt_all_z_max, self.wts[turbkey]['zhub'] + 0.5*self.wts[turbkey]['D'])
             Drot_max = max(Drot_max, self.wts[turbkey]['D'])
             
-        xlow_lr_min  = wt_all_x_min - selfbuffer_lr[0] * Drot_max
-        xhigh_lr_max = wt_all_x_max + selfbuffer_lr[1] * Drot_max 
-        ylow_lr_min  = wt_all_y_min - selfbuffer_lr[2] * Drot_max 
-        yhigh_lr_max = wt_all_y_max + selfbuffer_lr[3] * Drot_max 
-        zhigh_lr_max = wt_all_z_max + selfbuffer_lr[4] * Drot_max 
+        xlow_lr_min  = wt_all_x_min - self.buffer_lr[0] * Drot_max
+        xhigh_lr_max = wt_all_x_max + self.buffer_lr[1] * Drot_max 
+        ylow_lr_min  = wt_all_y_min - self.buffer_lr[2] * Drot_max 
+        yhigh_lr_max = wt_all_y_max + self.buffer_lr[3] * Drot_max 
+        zhigh_lr_max = wt_all_z_max + self.buffer_lr[4] * Drot_max 
 
         # Calculate the minimum/maximum LR domain coordinate lengths & number of grid cells
         xdist_lr_min = xhigh_lr_max - xlow_lr_min  # Minumum possible length of x-extent of LR domain
@@ -235,9 +244,9 @@ class AMRWindSimulation:
 
             # Calculate actual HR domain extent
             #  NOTE: Sampling planes should measure at AMR-Wind cell centers, not cell edges
-            xlow_hr = self.ds_high_les * np.floor(xlow_hr_min/self.ds_high_les) - 0.5*self.dx_refine
+            xlow_hr = self.ds_high_les * np.floor(xlow_hr_min/self.ds_high_les) - 0.5*self.dx_refine + self.prob_lo[0]%self.ds_high_les
             xhigh_hr = xlow_hr + xdist_hr
-            ylow_hr = self.ds_high_les * np.floor(ylow_hr_min/self.ds_high_les) - 0.5*self.dy_refine
+            ylow_hr = self.ds_high_les * np.floor(ylow_hr_min/self.ds_high_les) - 0.5*self.dy_refine + self.prob_lo[1]%self.ds_high_les
             yhigh_hr = ylow_hr + ydist_hr
             zlow_hr = self.zlow_lr / (2**self.max_level)
             zhigh_hr = zlow_hr + zdist_hr
