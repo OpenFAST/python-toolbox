@@ -220,7 +220,7 @@ class AMRWindSimulation:
         for turbkey in self.wts:
             wt_x = self.wts[turbkey]['x']
             wt_y = self.wts[turbkey]['y']
-            wt_z = self.wts[turbkey]['zhub'] + 0.5*self.wts[turbkey]['D']
+            wt_z = self.wts[turbkey]['zhub']
             wt_D = self.wts[turbkey]['D']
 
             # Calculate minimum/maximum HR domain extents
