@@ -192,9 +192,9 @@ class AMRWindSimulation:
         #   NOTE: Should we use dx/dy/dz values here or ds_lr?
         #           - AR: I think it's correct to use ds_lr to get to the xlow values,
         #               but then offset by 0.5*amr_dx0
-        self.xlow_lr = self.ds_low_les * np.floor(xlow_lr_min/self.ds_low_les) - 0.5*self.dx0
+        self.xlow_lr = self.ds_low_les * np.floor(xlow_lr_min/self.ds_low_les) - 0.5*self.dx0 + self.prob_lo[0]%self.ds_low_les
         self.xhigh_lr = self.xlow_lr + self.xdist_lr
-        self.ylow_lr = self.ds_low_les * np.floor(ylow_lr_min/self.ds_low_les) - 0.5*self.dy0
+        self.ylow_lr = self.ds_low_les * np.floor(ylow_lr_min/self.ds_low_les) - 0.5*self.dy0 + self.prob_lo[1]%self.ds_low_les
         self.yhigh_lr = self.ylow_lr + self.ydist_lr
         self.zlow_lr = 0.5 * self.dz0  # Lowest z point is half the height of the lowest grid cell
         self.zhigh_lr = self.zlow_lr + self.zdist_lr
