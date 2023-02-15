@@ -16,22 +16,28 @@ class AMRWindSimulation:
                     dt: float, prob_lo: tuple, prob_hi: tuple, 
                     n_cell: tuple, max_level: int, 
                     incflo_velocity_hh: tuple, 
-                    postproc_name='sampling'):
+                    postproc_name='sampling',
+                    buffer_lr = [3,6,3,3,2],
+                    buffer_hr = 0.6,):
         '''
         Values from the AMR-Wind input file
         Inputs:
-          * dt: this should be a fixed dt value
+          * dt: this should be a fixed dt value from the LES run
           * incflo_velocity_hh: velocity vector, specifically at hub height
+          * buffer_lr: buffer for [xmin, xmax, ymin, ymax, zmax] in low-res box, in D
+          * buffer_hr: buffer for all directions (constant) in high-res box, in D
         '''
         # Process inputs
-        self.wts = wts
-        self.dt = dt
-        self.prob_lo = prob_lo
-        self.prob_hi = prob_hi
-        self.n_cell = n_cell
-        self.max_level = max_level
+        self.wts                = wts
+        self.dt                 = dt
+        self.prob_lo            = prob_lo
+        self.prob_hi            = prob_hi
+        self.n_cell             = n_cell
+        self.max_level          = max_level
         self.incflo_velocity_hh = incflo_velocity_hh
-        self.postproc_name = postproc_name
+        self.postproc_name      = postproc_name
+        self.buffer_lr          = buffer_lr
+        self.buffer_hr          = buffer_hr
 
         # Placeholder variables, to be calculated by FFCaseCreation
         self.output_frequency = None
@@ -164,14 +170,11 @@ class AMRWindSimulation:
             wt_all_z_max = max(wt_all_z_max, self.wts[turbkey]['zhub'] + 0.5*self.wts[turbkey]['D'])
             Drot_max = max(Drot_max, self.wts[turbkey]['D'])
             
-        x_buffer_lr = 3 * Drot_max
-        y_buffer_lr = 3 * Drot_max
-        z_buffer_lr = 1 * Drot_max  # This buffer size was arbitrarily chosen
-        xlow_lr_min = wt_all_x_min - x_buffer_lr
-        xhigh_lr_max = wt_all_x_max + x_buffer_lr
-        ylow_lr_min = wt_all_y_min - y_buffer_lr
-        yhigh_lr_max = wt_all_y_max + y_buffer_lr
-        zhigh_lr_max = wt_all_z_max + z_buffer_lr
+        xlow_lr_min  = wt_all_x_min - selfbuffer_lr[0] * Drot_max
+        xhigh_lr_max = wt_all_x_max + selfbuffer_lr[1] * Drot_max 
+        ylow_lr_min  = wt_all_y_min - selfbuffer_lr[2] * Drot_max 
+        yhigh_lr_max = wt_all_y_max + selfbuffer_lr[3] * Drot_max 
+        zhigh_lr_max = wt_all_z_max + selfbuffer_lr[4] * Drot_max 
 
         # Calculate the minimum/maximum LR domain coordinate lengths & number of grid cells
         xdist_lr_min = xhigh_lr_max - xlow_lr_min  # Minumum possible length of x-extent of LR domain
@@ -191,7 +194,7 @@ class AMRWindSimulation:
         #   NOTE: Sampling planes should measure at AMR-Wind cell centers, not cell edges
         #   NOTE: Should we use dx/dy/dz values here or ds_lr?
         #           - AR: I think it's correct to use ds_lr to get to the xlow values,
-        #               but then offset by 0.5*amr_dx0
+        #               but then offset by 0.5*amr_dx0 if need be
         self.xlow_lr = self.ds_low_les * np.floor(xlow_lr_min/self.ds_low_les) - 0.5*self.dx0 + self.prob_lo[0]%self.ds_low_les
         self.xhigh_lr = self.xlow_lr + self.xdist_lr
         self.ylow_lr = self.ds_low_les * np.floor(ylow_lr_min/self.ds_low_les) - 0.5*self.dy0 + self.prob_lo[1]%self.ds_low_les
@@ -200,8 +203,8 @@ class AMRWindSimulation:
         self.zhigh_lr = self.zlow_lr + self.zdist_lr
         self.zoffsets_lr = np.arange(self.zlow_lr, self.zhigh_lr+self.ds_low_les, self.ds_low_les) - self.zlow_lr
 
-        ## Save out info 
-        # self.extent_low = ?  # TODO: How should this be formatted?
+        ## Save out info for FFCaseCreation
+        self.extent_low = self.buffer_lr
 
         ### ~~~~~~~~~ Calculate high resolution grid placement ~~~~~~~~~
         hr_domains = {} 
@@ -212,15 +215,11 @@ class AMRWindSimulation:
             wt_D = self.wts[turbkey]['D']
 
             # Calculate minimum/maximum HR domain extents
-            x_buffer_hr = 0.6 * wt_D
-            y_buffer_hr = 0.6 * wt_D
-            z_buffer_hr = 0.6 * wt_D
-
-            xlow_hr_min = wt_x - x_buffer_hr
-            xhigh_hr_max = wt_x + x_buffer_hr
-            ylow_hr_min = wt_y - y_buffer_hr
-            yhigh_hr_max = wt_y + y_buffer_hr
-            zhigh_hr_max = wt_z + z_buffer_hr
+            xlow_hr_min  = wt_x - self.buffer_hr * wt_D 
+            xhigh_hr_max = wt_x + self.buffer_hr * wt_D 
+            ylow_hr_min  = wt_y - self.buffer_hr * wt_D 
+            yhigh_hr_max = wt_y + self.buffer_hr * wt_D 
+            zhigh_hr_max = wt_z + self.buffer_hr * wt_D 
 
             # Calculate the minimum/maximum HR domain coordinate lengths & number of grid cells
             xdist_hr_min = xhigh_hr_max - xlow_hr_min  # Minumum possible length of x-extent of HR domain
@@ -244,8 +243,8 @@ class AMRWindSimulation:
             zhigh_hr = zlow_hr + zdist_hr
             zoffsets_hr = np.arange(zlow_hr, zhigh_hr+self.ds_high_les, self.ds_high_les) - zlow_hr
 
-            # Save info
-            # self.extent_high = ?  # TODO: How should this be formatted?
+            # Save out info for FFCaseCreation
+            self.extent_high = self.buffer_hr
 
             hr_turb_info = {'nx_hr': nx_hr, 'ny_hr': ny_hr, 'nz_hr': nz_hr,
                             'xdist_hr': xdist_hr, 'ydist_hr': ydist_hr, 'zdist_hr': zdist_hr,
@@ -347,10 +346,13 @@ class AMRWindSimulation:
                 if coord not in amr_zgrid_refine_cc:
                     raise ValueError("High resolution z-sampling grid is not cell cenetered with AMR-Wind's grid!")
 
-    def write_sampling_params(self, outdir):
+    def write_sampling_params(self, outdir=None):
         '''
         Write out text that can be used for the sampling planes in an 
           AMR-Wind input file
+
+        outdir: str
+            Input file
         '''
         outfile = Path(outdir, 'sampling_config.i')
         if outfile.is_file():
@@ -361,10 +363,10 @@ class AMRWindSimulation:
             # Write high-level info for sampling
             sampling_labels_str = " ".join(str(item) for item in self.sampling_labels)
             out.write(f"# Sampling info generated by AMRWindSamplingCreation.py\n")
-            out.write(f"incflo.post_processing = {self.postproc_name} # averaging\n")
+            out.write(f"incflo.post_processing    = {self.postproc_name} # averaging\n")
             out.write(f"{self.postproc_name}.output_frequency = {self.output_frequency}\n")
-            out.write(f"{self.postproc_name}.fields = velocity # temperature tke\n")
-            out.write(f"{self.postproc_name}.labels = {sampling_labels_str}\n")
+            out.write(f"{self.postproc_name}.fields           = velocity # temperature tke\n")
+            out.write(f"{self.postproc_name}.labels           = {sampling_labels_str}\n")
 
             # Write out low resolution sampling plane info
             zoffsets_lr_str = " ".join(str(int(item)) for item in self.zoffsets_lr)
