@@ -140,8 +140,9 @@ class AMRWindSimulation:
         self.dt_high_les = self.dt * np.floor(dt_hr_max/self.dt)  # Ensure that dt_hr is a multiple of the AMR-Wind timestep
 
         ## Sampling frequency
-        self.output_frequency_lr = int(np.floor(self.dt_low_les/self.dt))
         self.output_frequency_hr = int(np.floor(self.dt_high_les/self.dt))
+        output_frequency_lr_max = int(np.floor(self.dt_low_les/self.dt))
+        self.output_frequency_lr = self.output_frequency_hr * np.floor(output_frequency_lr_max/self.output_frequency_hr)
 
         ### ~~~~~~~~~ Calculate grid resolutions ~~~~~~~~~
         ## Low resolution domain, ds_lr (s = x/y/z)
@@ -283,6 +284,8 @@ class AMRWindSimulation:
             raise ValueError(f"AMR-Wind timestep too coarse for high resolution domain! AMR-Wind timestep must be at least {self.dt_high_les} sec.")
         if self.dt_high_les > self.dt_low_les:
             raise ValueError(f"Low resolution timestep ({self.dt_low_les}) is finer than high resolution timestep ({self.dt_high_les})!")
+        if self.output_frequency_lr % self.output_frequency_hr != 0:
+            raise ValueError(f"Low resolution output frequency of {self.output_frequency_lr} not a multiple of the high resolution frequency {self.output_frequency_hr}!")
 
         ## Grid resolution checks
         if self.ds_low_les < self.dx0:
