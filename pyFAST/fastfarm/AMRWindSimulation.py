@@ -64,7 +64,6 @@ class AMRWindSimulation:
         self._checkInputs()
         self._calc_simple_params()
         self._calc_sampling_params()
-        self._check_sampling_params()
 
     def _checkInputs(self):
         '''
@@ -107,7 +106,15 @@ class AMRWindSimulation:
         Calculate parameters for sampling planes
         '''
 
-        ### ~~~~~~~~~ Calculate high-level info for AMR-Wind sampling ~~~~~~~~~
+        self._calc_sampling_labels()
+        self._calc_sampling_time()
+        self._calc_grid_resolution()
+        self._calc_grid_placement()
+
+    def _calc_sampling_labels(self):
+        '''
+        Calculate labels for AMR-Wind sampling
+        '''
         sampling_labels_lr = ["Low"]
         self.sampling_labels_lr = sampling_labels_lr
 
@@ -121,16 +128,10 @@ class AMRWindSimulation:
         
         self.sampling_labels_hr = sampling_labels_hr
 
-        ### ~~~~~~~~~ Calculate timestep values and AMR-Wind plane sampling frequency ~~~~~~~~~
-        ## Low resolution domain, dt_low_les
-        cmeander_min = float("inf")
-        Dwake_min = float("inf")
-        for turbkey in self.wts:
-            cmeander_min = min(cmeander_min, self.wts[turbkey]['Cmeander'])
-            Dwake_min = min(Dwake_min, self.wts[turbkey]['D'])  # Approximate D_wake as D_rotor
-
-        dt_lr_max = cmeander_min * Dwake_min / (10 * self.vhub)
-        self.dt_low_les = self.dt * np.floor(dt_lr_max/self.dt)  # Ensure that dt_lr is a multiple of the AMR-Wind timestep
+    def _calc_sampling_time(self):
+        '''
+        Calculate timestep values and AMR-Wind plane sampling frequency
+        '''
 
         ## High resolution domain, dt_high_les
         fmax_max = 0
@@ -139,19 +140,35 @@ class AMRWindSimulation:
         dt_hr_max = 1 / (2 * fmax_max)
         self.dt_high_les = self.dt * np.floor(dt_hr_max/self.dt)  # Ensure that dt_hr is a multiple of the AMR-Wind timestep
 
+        if self.dt_high_les < self.dt:
+            raise ValueError(f"AMR-Wind timestep {self.dt} too coarse for high resolution domain! AMR-Wind timestep must be at least {self.dt_high_les} sec.")
+
+        ## Low resolution domain, dt_low_les
+        cmeander_min = float("inf")
+        Dwake_min = float("inf")
+        for turbkey in self.wts:
+            cmeander_min = min(cmeander_min, self.wts[turbkey]['Cmeander'])
+            Dwake_min = min(Dwake_min, self.wts[turbkey]['D'])  # Approximate D_wake as D_rotor
+
+        dt_lr_max = cmeander_min * Dwake_min / (10 * self.vhub)
+        self.dt_low_les = self.dt_high_les * np.floor(dt_lr_max/self.dt_high_les)  # Ensure that dt_lr is a multiple of the high res sampling timestep
+
+        if self.dt_low_les < self.dt:
+            raise ValueError(f"AMR-Wind timestep {self.dt} too coarse for low resolution domain! AMR-Wind timestep must be at least {self.dt_low_les} sec.")
+        if self.dt_high_les > self.dt_low_les:
+            raise ValueError(f"Low resolution timestep ({self.dt_low_les}) is finer than high resolution timestep ({self.dt_high_les})!")
+
         ## Sampling frequency
         self.output_frequency_hr = int(np.floor(self.dt_high_les/self.dt))
-        output_frequency_lr_max = int(np.floor(self.dt_low_les/self.dt))
-        self.output_frequency_lr = self.output_frequency_hr * np.floor(output_frequency_lr_max/self.output_frequency_hr)
+        self.output_frequency_lr = self.output_frequency_hr * np.floor(self.dt_low_les/self.dt_high_les)
 
-        ### ~~~~~~~~~ Calculate grid resolutions ~~~~~~~~~
-        ## Low resolution domain, ds_lr (s = x/y/z)
-        #    ASSUME: FAST.Farm LR zone uses Level 0 AMR-Wind grid spacing
-        #    NOTE: ds_lr is calculated independent of any x/y/z requirements,
-        #            just time step and velocity requiements
-        ds_lr_max = self.dt_low_les * self.vhub**2 / 15
-        self.ds_low_les = self.ds0_max * np.floor(ds_lr_max/self.ds0_max)  # Ensure that ds_lr is a multiple of the coarse AMR-Wind grid spacing
-        self.ds_lr = self.ds_low_les
+        if self.output_frequency_lr % self.output_frequency_hr != 0:
+            raise ValueError(f"Low resolution output frequency of {self.output_frequency_lr} not a multiple of the high resolution frequency {self.output_frequency_hr}!")
+
+    def _calc_grid_resolution(self):
+        '''
+        Calculate sampling grid resolutions
+        '''
 
         ## High resolution domain, ds_hr
         #    ASSUME: FAST.Farm HR zone lies within the region of maxmum AMR-Wind grid refinement
@@ -162,7 +179,7 @@ class AMRWindSimulation:
             cmax_min = min(cmax_min, self.wts[turbkey]['cmax'])
         ds_hr_max = cmax_min
 
-        if self.ds_hr is None:
+        if self.ds_hr is None:  # Calculate ds_hr if it is not specified as an input
             if ds_hr_max < self.ds_refine_max:
                 raise ValueError(f"AMR-Wind grid spacing of {self.ds_refine_max} is too coarse for high resolution domain! The high-resolution domain requires "\
                                  f"AMR-Wind grid spacing to be at least {ds_hr_max} m. If a coarser high-res domain is acceptable, then manually specify the "\
@@ -171,6 +188,102 @@ class AMRWindSimulation:
             self.ds_hr = self.ds_high_les
         else:
             self.ds_high_les = self.ds_hr
+
+        if self.ds_high_les < self.ds_refine_max:
+            raise ValueError(f"AMR-Wind fine grid spacing {self.ds_refine_max} too coarse for high resolution domain! AMR-Wind grid spacing must be at least {self.ds_high_les} m.")
+
+        ## Low resolution domain, ds_lr (s = x/y/z)
+        #    ASSUME: FAST.Farm LR zone uses Level 0 AMR-Wind grid spacing
+        #    NOTE: ds_lr is calculated independent of any x/y/z requirements,
+        #            just time step and velocity requiements
+        if self.ds_lr is None:
+            ds_lr_max = self.dt_low_les * self.vhub**2 / 15
+            self.ds_low_les = self.ds0_max * np.floor(ds_lr_max/self.ds0_max)  # Ensure that ds_lr is a multiple of the coarse AMR-Wind grid spacing
+            self.ds_lr = self.ds_low_les
+        else:
+            self.ds_low_les = self.ds_lr
+
+        if self.ds_low_les < self.ds0_max:
+            raise ValueError(f"AMR-Wind coarse grid spacing {self.ds0_max} too coarse for high resolution domain! AMR-Wind grid spacing must be at least {self.ds_low_les} m.")
+
+    def _calc_grid_placement(self):
+        '''
+        Calculate placement of sampling grids
+        '''
+
+        self._calc_hr_grid_placement()
+        self._calc_lr_grid_placement()
+
+    def _calc_hr_grid_placement(self):
+        '''
+        Calculate placement of high resolution grids
+        '''
+        ### ~~~~~~~~~ Calculate high resolution grid placement ~~~~~~~~~
+        hr_domains = {} 
+        for turbkey in self.wts:
+            wt_x = self.wts[turbkey]['x']
+            wt_y = self.wts[turbkey]['y']
+            wt_z = self.wts[turbkey]['zhub']
+            wt_D = self.wts[turbkey]['D']
+
+            # Calculate minimum/maximum HR domain extents
+            xlow_hr_min  = wt_x - self.buffer_hr * wt_D 
+            xhigh_hr_max = wt_x + self.buffer_hr * wt_D 
+            ylow_hr_min  = wt_y - self.buffer_hr * wt_D 
+            yhigh_hr_max = wt_y + self.buffer_hr * wt_D 
+            zhigh_hr_max = wt_z + self.buffer_hr * wt_D 
+
+            # Calculate the minimum/maximum HR domain coordinate lengths & number of grid cells
+            xdist_hr_min = xhigh_hr_max - xlow_hr_min  # Minumum possible length of x-extent of HR domain
+            xdist_hr = self.ds_high_les * np.ceil(xdist_hr_min/self.ds_high_les)  
+            nx_hr = int(xdist_hr/self.ds_high_les) + 1
+
+            ydist_hr_min = yhigh_hr_max - ylow_hr_min
+            ydist_hr = self.ds_high_les * np.ceil(ydist_hr_min/self.ds_high_les)
+            ny_hr = int(ydist_hr/self.ds_high_les) + 1
+
+            zdist_hr = self.ds_high_les * np.ceil(zhigh_hr_max/self.ds_high_les)
+            nz_hr = int(zdist_hr/self.ds_high_les) + 1
+
+            # Calculate actual HR domain extent
+            #  NOTE: Sampling planes should measure at AMR-Wind cell centers, not cell edges
+            xlow_hr = self.ds_high_les * np.floor(xlow_hr_min/self.ds_high_les) - 0.5*self.dx_refine + self.prob_lo[0]%self.ds_high_les
+            xhigh_hr = xlow_hr + xdist_hr
+            ylow_hr = self.ds_high_les * np.floor(ylow_hr_min/self.ds_high_les) - 0.5*self.dy_refine + self.prob_lo[1]%self.ds_high_les
+            yhigh_hr = ylow_hr + ydist_hr
+            zlow_hr = self.zlow_lr / (2**self.max_level)
+            zhigh_hr = zlow_hr + zdist_hr
+            zoffsets_hr = np.arange(zlow_hr, zhigh_hr+self.ds_high_les, self.ds_high_les) - zlow_hr
+
+            # Check domain extents
+            if xhigh_hr > self.prob_hi[0]:
+                raise ValueError(f"HR domain point {xhigh_hr} extends beyond maximum AMR-Wind x-extent!")
+            if xlow_hr < self.prob_lo[0]:
+                raise ValueError(f"HR domain point {xlow_hr} extends beyond minimum AMR-Wind x-extent!")
+            if yhigh_hr > self.prob_hi[1]:
+                raise ValueError(f"HR domain point {yhigh_hr} extends beyond maximum AMR-Wind y-extent!")
+            if ylow_hr < self.prob_lo[1]:
+                raise ValueError(f"HR domain point {ylow_hr} extends beyond minimum AMR-Wind y-extent!")
+            if zhigh_hr > self.prob_hi[2]:
+                raise ValueError(f"HR domain point {zhigh_hr} extends beyond maximum AMR-Wind z-extent!")
+            if zlow_hr < self.prob_lo[2]:
+                raise ValueError(f"HR domain point {zlow_hr} extends beyond minimum AMR-Wind z-extent!")
+
+            # Save out info for FFCaseCreation
+            self.extent_high = self.buffer_hr
+
+            hr_turb_info = {'nx_hr': nx_hr, 'ny_hr': ny_hr, 'nz_hr': nz_hr,
+                            'xdist_hr': xdist_hr, 'ydist_hr': ydist_hr, 'zdist_hr': zdist_hr,
+                            'xlow_hr': xlow_hr, 'ylow_hr': ylow_hr, 'zlow_hr': zlow_hr,
+                            'xhigh_hr': xhigh_hr, 'yhigh_hr': yhigh_hr, 'zhigh_hr': zhigh_hr,
+                            'zoffsets_hr': zoffsets_hr}
+            hr_domains[turbkey] = hr_turb_info
+        self.hr_domains = hr_domains
+
+    def _calc_lr_grid_placement(self):
+        '''
+        Calculate placement of low resolution grid
+        '''
 
         ### ~~~~~~~~~ Calculate low resolution grid placement ~~~~~~~~~ 
         # Calculate minimum/maximum LR domain extents
@@ -221,95 +334,30 @@ class AMRWindSimulation:
         self.zhigh_lr = self.zlow_lr + self.zdist_lr
         self.zoffsets_lr = np.arange(self.zlow_lr, self.zhigh_lr+self.ds_low_les, self.ds_low_les) - self.zlow_lr
 
+        ## Check domain extents
+        if self.xhigh_lr > self.prob_hi[0]:
+            raise ValueError(f"LR domain point {self.xhigh_lr} extends beyond maximum AMR-Wind x-extent!")
+        if self.xlow_lr < self.prob_lo[0]:
+            raise ValueError(f"LR domain point {self.xlow_lr} extends beyond minimum AMR-Wind x-extent!")
+        if self.yhigh_lr > self.prob_hi[1]:
+            raise ValueError(f"LR domain point {self.yhigh_lr} extends beyond maximum AMR-Wind y-extent!")
+        if self.ylow_lr < self.prob_lo[1]:
+            raise ValueError(f"LR domain point {self.ylow_lr} extends beyond minimum AMR-Wind y-extent!")
+        if self.zhigh_lr > self.prob_hi[2]:
+            raise ValueError(f"LR domain point {self.zhigh_lr} extends beyond maximum AMR-Wind z-extent!")
+        if self.zlow_lr < self.prob_lo[2]:
+            raise ValueError(f"LR domain point {self.zlow_lr} extends beyond minimum AMR-Wind z-extent!")
+
+        ## Check grid placement
+        self._check_grid_placement()
+
         ## Save out info for FFCaseCreation
         self.extent_low = self.buffer_lr
 
-        ### ~~~~~~~~~ Calculate high resolution grid placement ~~~~~~~~~
-        hr_domains = {} 
-        for turbkey in self.wts:
-            wt_x = self.wts[turbkey]['x']
-            wt_y = self.wts[turbkey]['y']
-            wt_z = self.wts[turbkey]['zhub']
-            wt_D = self.wts[turbkey]['D']
-
-            # Calculate minimum/maximum HR domain extents
-            xlow_hr_min  = wt_x - self.buffer_hr * wt_D 
-            xhigh_hr_max = wt_x + self.buffer_hr * wt_D 
-            ylow_hr_min  = wt_y - self.buffer_hr * wt_D 
-            yhigh_hr_max = wt_y + self.buffer_hr * wt_D 
-            zhigh_hr_max = wt_z + self.buffer_hr * wt_D 
-
-            # Calculate the minimum/maximum HR domain coordinate lengths & number of grid cells
-            xdist_hr_min = xhigh_hr_max - xlow_hr_min  # Minumum possible length of x-extent of HR domain
-            xdist_hr = self.ds_high_les * np.ceil(xdist_hr_min/self.ds_high_les)  
-            nx_hr = int(xdist_hr/self.ds_high_les) + 1
-
-            ydist_hr_min = yhigh_hr_max - ylow_hr_min
-            ydist_hr = self.ds_high_les * np.ceil(ydist_hr_min/self.ds_high_les)
-            ny_hr = int(ydist_hr/self.ds_high_les) + 1
-
-            zdist_hr = self.ds_high_les * np.ceil(zhigh_hr_max/self.ds_high_les)
-            nz_hr = int(zdist_hr/self.ds_high_les) + 1
-
-            # Calculate actual HR domain extent
-            #  NOTE: Sampling planes should measure at AMR-Wind cell centers, not cell edges
-            xlow_hr = self.ds_high_les * np.floor(xlow_hr_min/self.ds_high_les) - 0.5*self.dx_refine + self.prob_lo[0]%self.ds_high_les
-            xhigh_hr = xlow_hr + xdist_hr
-            ylow_hr = self.ds_high_les * np.floor(ylow_hr_min/self.ds_high_les) - 0.5*self.dy_refine + self.prob_lo[1]%self.ds_high_les
-            yhigh_hr = ylow_hr + ydist_hr
-            zlow_hr = self.zlow_lr / (2**self.max_level)
-            zhigh_hr = zlow_hr + zdist_hr
-            zoffsets_hr = np.arange(zlow_hr, zhigh_hr+self.ds_high_les, self.ds_high_les) - zlow_hr
-
-            # Save out info for FFCaseCreation
-            self.extent_high = self.buffer_hr
-
-            hr_turb_info = {'nx_hr': nx_hr, 'ny_hr': ny_hr, 'nz_hr': nz_hr,
-                            'xdist_hr': xdist_hr, 'ydist_hr': ydist_hr, 'zdist_hr': zdist_hr,
-                            'xlow_hr': xlow_hr, 'ylow_hr': ylow_hr, 'zlow_hr': zlow_hr,
-                            'xhigh_hr': xhigh_hr, 'yhigh_hr': yhigh_hr, 'zhigh_hr': zhigh_hr,
-                            'zoffsets_hr': zoffsets_hr}
-            hr_domains[turbkey] = hr_turb_info
-        self.hr_domains = hr_domains
-
-    def _check_sampling_params(self):
+    def _check_grid_placement(self):
         '''
         Check the values of parameters that were calculated by _calc_sampling_params
         '''
-
-        ## Timestep checks
-        if self.dt_low_les < self.dt:
-            raise ValueError(f"AMR-Wind timestep too coarse for low resolution domain! AMR-Wind timestep must be at least {self.dt_low_les} sec.")
-        if self.dt_high_les < self.dt:
-            raise ValueError(f"AMR-Wind timestep too coarse for high resolution domain! AMR-Wind timestep must be at least {self.dt_high_les} sec.")
-        if self.dt_high_les > self.dt_low_les:
-            raise ValueError(f"Low resolution timestep ({self.dt_low_les}) is finer than high resolution timestep ({self.dt_high_les})!")
-        if self.output_frequency_lr % self.output_frequency_hr != 0:
-            raise ValueError(f"Low resolution output frequency of {self.output_frequency_lr} not a multiple of the high resolution frequency {self.output_frequency_hr}!")
-
-        ## Grid resolution checks
-        if self.ds_low_les < self.dx0:
-            raise ValueError(f"AMR-Wind Level 0 x-grid spacing too coarse for low resolution domain! AMR-Wind x-grid spacing must be at least {self.ds_low_les} m.")
-        if self.ds_low_les < self.dy0:
-            raise ValueError(f"AMR-Wind Level 0 y-grid spacing too coarse for low resolution domain! AMR-Wind y-grid spacing must be at least {self.ds_low_les} m.")
-        if self.ds_low_les < self.dz0:
-            raise ValueError(f"AMR-Wind Level 0 z-grid spacing too coarse for low resolution domain! AMR-Wind z-grid spacing must be at least {self.ds_low_les} m.")
-        if self.ds_high_les < self.ds_refine_max:
-            raise ValueError(f"AMR-Wind grid spacing too coarse for high resolution domain! AMR-Wind grid spacing must be at least {self.ds_high_les} m.")
-
-        ## Low resolution domain extent checks
-        if self.xhigh_lr > self.prob_hi[0]:
-            raise ValueError("LR domain extends beyond maximum AMR-Wind x-extent!")
-        if self.xlow_lr < self.prob_lo[0]:
-            raise ValueError("LR domain extends beyond minimum AMR-Wind x-extent!")
-        if self.yhigh_lr > self.prob_hi[1]:
-            raise ValueError("LR domain extends beyond maximum AMR-Wind y-extent!")
-        if self.ylow_lr < self.prob_lo[1]:
-            raise ValueError("LR domain extends beyond minimum AMR-Wind y-extent!")
-        if self.zhigh_lr > self.prob_hi[2]:
-            raise ValueError("LR domain extends beyond maximum AMR-Wind z-extent!")
-        if self.zlow_lr < self.prob_lo[2]:
-            raise ValueError("LR domain extends beyond minimum AMR-Wind z-extent!")
 
         ## Check that sampling grids are at cell centers
         # Low resolution grid
