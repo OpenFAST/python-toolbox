@@ -205,6 +205,8 @@ class AMRWindSimulation:
 
         if self.ds_low_les < self.ds0_max:
             raise ValueError(f"AMR-Wind coarse grid spacing {self.ds0_max} too coarse for high resolution domain! AMR-Wind grid spacing must be at least {self.ds_low_les} m.")
+        if self.ds_low_les % self.ds_high_les != 0:
+            raise ValueError(f"Low resolution grid spacing of {self.ds_low_les} not a multiple of the high resolution grid spacing {self.ds_high_les}!")
 
     def _calc_grid_placement(self):
         '''
