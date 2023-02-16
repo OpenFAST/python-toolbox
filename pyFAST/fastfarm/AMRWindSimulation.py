@@ -251,7 +251,7 @@ class AMRWindSimulation:
             xhigh_hr = xlow_hr + xdist_hr
             ylow_hr = self.ds_high_les * np.floor(ylow_hr_min/self.ds_high_les) - 0.5*self.dy_refine + self.prob_lo[1]%self.ds_high_les
             yhigh_hr = ylow_hr + ydist_hr
-            zlow_hr = self.zlow_lr / (2**self.max_level)
+            zlow_hr = 0.5 * self.dz0 / (2**self.max_level)
             zhigh_hr = zlow_hr + zdist_hr
             zoffsets_hr = np.arange(zlow_hr, zhigh_hr+self.ds_high_les, self.ds_high_les) - zlow_hr
 
