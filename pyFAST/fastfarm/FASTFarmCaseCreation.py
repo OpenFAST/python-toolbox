@@ -13,6 +13,14 @@ from pyFAST.fastfarm.TurbSimCaseCreation import TSCaseCreation, writeTimeSeriesF
 def cosd(t): return np.cos(np.deg2rad(t))
 def sind(t): return np.sin(np.deg2rad(t))
 
+def getMultipleOf(val, multipleof):
+    '''
+    Get integer multiple of a quantity.
+        The val/multipleof quantity can be within numerical error of an integer
+        and so additional care must be take
+    '''
+    valmult = int(round(val/multipleof,6))*multipleof
+    return round(valmult, 4)
 
 class FFCaseCreation:
 
@@ -1479,11 +1487,6 @@ class FFCaseCreation:
 
 
 
-    def _getMultipleOf(self, val, multipleof):
-        valmult = int(val/multipleof)*multipleof
-        return round(valmult, 4)
-
-
     def _getBoxesParamsForFF(self, lowbts, highbts, dt_low_desired, D, HubHt, xWT, yt):
         # Get mean wind speeds at the half height location (advection speed)
         _, meanU_High =  highbts.midValues() # !!!!!!!!!!!!!!!! JJ: does it make sense to get both? the meanu for low will be a lot higher than vhub,
@@ -1502,8 +1505,8 @@ class FFCaseCreation:
     
     
         # ----- Low
-        dT_Low = self._getMultipleOf(dt_low_desired, multipleof=dT_High)
-        dX_Low = self._getMultipleOf(meanU_Low*dT_Low, multipleof=dX_High) # dy and dz high are 5. 
+        dT_Low = self.getMultipleOf(dt_low_desired, multipleof=dT_High)
+        dX_Low = self.getMultipleOf(meanU_Low*dT_Low, multipleof=dX_High) # dy and dz high are 5. 
         dY_Low = lowbts.y[1] - lowbts.y[0]
         dZ_Low = lowbts.z[1] - lowbts.z[0]
     
@@ -1512,11 +1515,11 @@ class FFCaseCreation:
         LT_Low = np.round(lowbts.t[-1]-lowbts.t[0], 4)
     
         X0_Low = np.floor( (min(xWT) - self.extent_low[0]*D ))# - dX_Low)) #  # JJ!!!!!!! # removing EB's -dX_Low from the X0_Low specification
-        X0_Low = self._getMultipleOf(X0_Low, multipleof=dX_Low)
+        X0_Low = self.getMultipleOf(X0_Low, multipleof=dX_Low)
         Y0_Low = np.floor( -LY_Low/2                   )   # Starting on integer value for aesthetics
         Z0_Low = lowbts.z[0]                               # we start at lowest to include tower
     
-        XMax_Low = self._getMultipleOf(max(xWT) + self.extent_low[1]*D, multipleof=dX_Low)
+        XMax_Low = self.getMultipleOf(max(xWT) + self.extent_low[1]*D, multipleof=dX_Low)
         LX_Low = XMax_Low-X0_Low
     
         nX_Low = int(np.ceil(LX_Low/dX_Low)+1)  # plus 1 from the guidance
