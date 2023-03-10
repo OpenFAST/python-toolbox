@@ -198,7 +198,7 @@ class AMRWindSimulation:
         #            just time step and velocity requiements
         if self.ds_lr is None:
             ds_lr_max = self.dt_low_les * self.vhub**2 / 15
-            self.ds_low_les = self.ds0_max * np.floor(ds_lr_max/self.ds0_max)  # Ensure that ds_lr is a multiple of the coarse AMR-Wind grid spacing
+            self.ds_low_les = self.ds_hr * np.floor(ds_lr_max/self.ds_hr)    # ds_hr is already a multiple of the AMR-Wind grid spacing, so here we need to make sure ds_lr is a multiple of ds_hr
             self.ds_lr = self.ds_low_les
         else:
             self.ds_low_les = self.ds_lr
@@ -299,7 +299,7 @@ class AMRWindSimulation:
             wt_all_x_min = min(wt_all_x_min, self.wts[turbkey]['x'])
             wt_all_x_max = max(wt_all_x_max, self.wts[turbkey]['x'])
             wt_all_y_min = min(wt_all_y_min, self.wts[turbkey]['y'])
-            wt_all_y_max = max(wt_all_x_min, self.wts[turbkey]['y'])
+            wt_all_y_max = max(wt_all_y_min, self.wts[turbkey]['y'])
             wt_all_z_max = max(wt_all_z_max, self.wts[turbkey]['zhub'] + 0.5*self.wts[turbkey]['D'])
             Drot_max = max(Drot_max, self.wts[turbkey]['D'])
             
