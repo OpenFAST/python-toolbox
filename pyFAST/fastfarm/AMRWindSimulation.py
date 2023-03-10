@@ -160,7 +160,7 @@ class AMRWindSimulation:
 
         ## Sampling frequency
         self.output_frequency_hr = int(np.floor(self.dt_high_les/self.dt))
-        self.output_frequency_lr = self.output_frequency_hr * np.floor(self.dt_low_les/self.dt_high_les)
+        self.output_frequency_lr = int(self.output_frequency_hr * np.floor(self.dt_low_les/self.dt_high_les))
 
         if self.output_frequency_lr % self.output_frequency_hr != 0:
             raise ValueError(f"Low resolution output frequency of {self.output_frequency_lr} not a multiple of the high resolution frequency {self.output_frequency_hr}!")
@@ -454,9 +454,9 @@ class AMRWindSimulation:
             out.write(f"\n# Low sampling grid spacing = {self.ds_lr} m\n")
             out.write(f"{self.postproc_name_lr}.Low.type         = PlaneSampler\n")
             out.write(f"{self.postproc_name_lr}.Low.num_points   = {self.nx_lr} {self.ny_lr}\n")
-            out.write(f"{self.postproc_name_lr}.Low.origin       = {self.xlow_lr:.1f} {self.ylow_lr:.1f} {self.zlow_lr:.1f}\n")  # Round the float output
-            out.write(f"{self.postproc_name_lr}.Low.axis1        = {self.xdist_lr:.1f} 0.0 0.0\n")  # Assume: axis1 oriented parallel to AMR-Wind x-axis
-            out.write(f"{self.postproc_name_lr}.Low.axis2        = 0.0 {self.ydist_lr:.1f} 0.0\n")  # Assume: axis2 oriented parallel to AMR-Wind y-axis
+            out.write(f"{self.postproc_name_lr}.Low.origin       = {self.xlow_lr:.4f} {self.ylow_lr:.4f} {self.zlow_lr:.4f}\n")  # Round the float output
+            out.write(f"{self.postproc_name_lr}.Low.axis1        = {self.xdist_lr:.4f} 0.0 0.0\n")  # Assume: axis1 oriented parallel to AMR-Wind x-axis
+            out.write(f"{self.postproc_name_lr}.Low.axis2        = 0.0 {self.ydist_lr:.4f} 0.0\n")  # Assume: axis2 oriented parallel to AMR-Wind y-axis
             out.write(f"{self.postproc_name_lr}.Low.normal       = 0.0 0.0 1.0\n")
             out.write(f"{self.postproc_name_lr}.Low.offsets      = {zoffsets_lr_str}\n")
 
@@ -483,8 +483,8 @@ class AMRWindSimulation:
                 out.write(f"\n# Turbine {wt_name} at (x,y) = ({wt_x}, {wt_y}), with D = {wt_D}, grid spacing = {self.ds_hr} m\n")
                 out.write(f"{self.postproc_name_hr}.{sampling_name}.type         = PlaneSampler\n")
                 out.write(f"{self.postproc_name_hr}.{sampling_name}.num_points   = {nx_hr} {ny_hr}\n")
-                out.write(f"{self.postproc_name_hr}.{sampling_name}.origin       = {xlow_hr:.1f} {ylow_hr:.1f} {zlow_hr:.1f}\n")  # Round the float output
-                out.write(f"{self.postproc_name_hr}.{sampling_name}.axis1        = {xdist_hr:.1f} 0.0 0.0\n")  # Assume: axis1 oriented parallel to AMR-Wind x-axis
-                out.write(f"{self.postproc_name_hr}.{sampling_name}.axis2        = 0.0 {ydist_hr:.1f} 0.0\n")  # Assume: axis2 oriented parallel to AMR-Wind y-axis
+                out.write(f"{self.postproc_name_hr}.{sampling_name}.origin       = {xlow_hr:.4f} {ylow_hr:.4f} {zlow_hr:.4f}\n")  # Round the float output
+                out.write(f"{self.postproc_name_hr}.{sampling_name}.axis1        = {xdist_hr:.4f} 0.0 0.0\n")  # Assume: axis1 oriented parallel to AMR-Wind x-axis
+                out.write(f"{self.postproc_name_hr}.{sampling_name}.axis2        = 0.0 {ydist_hr:.4f} 0.0\n")  # Assume: axis2 oriented parallel to AMR-Wind y-axis
                 out.write(f"{self.postproc_name_hr}.{sampling_name}.normal       = 0.0 0.0 1.0\n")
                 out.write(f"{self.postproc_name_hr}.{sampling_name}.offsets      = {zoffsets_hr_str}\n")
