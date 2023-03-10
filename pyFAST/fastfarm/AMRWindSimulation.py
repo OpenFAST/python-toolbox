@@ -1,6 +1,8 @@
 import numpy as np
 import os
 
+from pyFAST.fastfarm.FASTFarmCaseCreation import getMultipleOf
+
 class AMRWindSimulation:
     '''
     This class is used to help prepare sampling planes for an AMR-Wind
@@ -143,7 +145,7 @@ class AMRWindSimulation:
         for turbkey in self.wts:
             fmax_max = max(0, self.wts[turbkey]['fmax'])
         dt_hr_max = 1 / (2 * fmax_max)
-        self.dt_high_les = self.dt * np.floor(dt_hr_max/self.dt)  # Ensure that dt_hr is a multiple of the AMR-Wind timestep
+        self.dt_high_les = getMultipleOf(dt_hr_max, multipleof=self.dt) # Ensure dt_hr is a multiple of the AMR-Wind timestep
 
         if self.dt_high_les < self.dt:
             raise ValueError(f"AMR-Wind timestep {self.dt} too coarse for high resolution domain! AMR-Wind timestep must be at least {self.dt_high_les} sec.")
@@ -166,7 +168,8 @@ class AMRWindSimulation:
             dt_lr_max = dr / (2* self.vhub)
 
 
-        self.dt_low_les = self.dt_high_les * np.floor(dt_lr_max/self.dt_high_les)  # Ensure that dt_lr is a multiple of the high res sampling timestep
+        self.dt_low_les = getMultipleOf(dt_lr_max, multipleof=self.dt_high_les)  # Ensure that dt_lr is a multiple of the high res sampling timestep
+
 
         if self.dt_low_les < self.dt:
             raise ValueError(f"AMR-Wind timestep {self.dt} too coarse for low resolution domain! AMR-Wind timestep must be at least {self.dt_low_les} sec.")
@@ -175,7 +178,7 @@ class AMRWindSimulation:
 
         ## Sampling frequency
         self.output_frequency_hr = int(np.floor(self.dt_high_les/self.dt))
-        self.output_frequency_lr = int(self.output_frequency_hr * np.floor(self.dt_low_les/self.dt_high_les))
+        self.output_frequency_lr = getMultipleOf(self.dt_low_les/self.dt, multipleof=self.output_frequency_hr)
 
         if self.output_frequency_lr % self.output_frequency_hr != 0:
             raise ValueError(f"Low resolution output frequency of {self.output_frequency_lr} not a multiple of the high resolution frequency {self.output_frequency_hr}!")
@@ -196,7 +199,8 @@ class AMRWindSimulation:
                 raise ValueError(f"AMR-Wind grid spacing of {self.ds_refine_max} is too coarse for high resolution domain! The high-resolution domain requires "\
                                  f"AMR-Wind grid spacing to be at least {ds_hr_max} m. If a coarser high-res domain is acceptable, then manually specify the "\
                                  f"high-resolution grid spacing to be at least {self.ds_refine_max} with ds_hr = {self.ds_refine_max}.")
-            self.ds_high_les = self.ds_refine_max * np.floor(ds_hr_max/self.ds_refine_max)  # Ensure that ds_hr is a multiple of the refined AMR-Wind grid spacing
+            self.ds_high_les = getMultipleOf(ds_hr_max, multipleof=self.ds_refine_max)  # Ensure that ds_hr is a multiple of the refined AMR-Wind grid spacing
+
             self.ds_hr = self.ds_high_les
         else:
             self.ds_high_les = self.ds_hr
@@ -210,7 +214,7 @@ class AMRWindSimulation:
         #            just time step and velocity requiements
         if self.ds_lr is None:
             ds_lr_max = self.dt_low_les * self.vhub**2 / 15
-            self.ds_low_les = self.ds_hr * np.floor(ds_lr_max/self.ds_hr)    # ds_hr is already a multiple of the AMR-Wind grid spacing, so here we need to make sure ds_lr is a multiple of ds_hr
+            self.ds_low_les = getMultipleOf(ds_lr_max, multipleof=self.ds_hr)    # ds_hr is already a multiple of the AMR-Wind grid spacing, so here we need to make sure ds_lr is a multiple of ds_hr
             self.ds_lr = self.ds_low_les
         else:
             self.ds_low_les = self.ds_lr
@@ -261,9 +265,9 @@ class AMRWindSimulation:
 
             # Calculate actual HR domain extent
             #  NOTE: Sampling planes should measure at AMR-Wind cell centers, not cell edges
-            xlow_hr = self.ds_high_les * np.floor(xlow_hr_min/self.ds_high_les) - 0.5*self.dx_refine + self.prob_lo[0]%self.ds_high_les
+            xlow_hr = getMultipleOf(xlow_hr_min, multipleof=self.ds_high_les) - 0.5*self.dx_refine + self.prob_lo[0]%self.ds_high_les
             xhigh_hr = xlow_hr + xdist_hr
-            ylow_hr = self.ds_high_les * np.floor(ylow_hr_min/self.ds_high_les) - 0.5*self.dy_refine + self.prob_lo[1]%self.ds_high_les
+            ylow_hr = getMultipleOf(ylow_hr_min, multipleof=self.ds_high_les) - 0.5*self.dy_refine + self.prob_lo[1]%self.ds_high_les
             yhigh_hr = ylow_hr + ydist_hr
             zlow_hr = 0.5 * self.dz0 / (2**self.max_level)
             zhigh_hr = zlow_hr + zdist_hr
@@ -340,9 +344,9 @@ class AMRWindSimulation:
         #   NOTE: Should we use dx/dy/dz values here or ds_lr?
         #           - AR: I think it's correct to use ds_lr to get to the xlow values,
         #               but then offset by 0.5*amr_dx0 if need be
-        self.xlow_lr = self.ds_low_les * np.floor(xlow_lr_min/self.ds_low_les) - 0.5*self.dx0 + self.prob_lo[0]%self.ds_low_les
+        self.xlow_lr = getMultipleOf(xlow_lr_min, multipleof=self.ds_low_les) - 0.5*self.dx0 + self.prob_lo[0]%self.ds_low_les
         self.xhigh_lr = self.xlow_lr + self.xdist_lr
-        self.ylow_lr = self.ds_low_les * np.floor(ylow_lr_min/self.ds_low_les) - 0.5*self.dy0 + self.prob_lo[1]%self.ds_low_les
+        self.ylow_lr = getMultipleOf(ylow_lr_min, multipleof=self.ds_low_les) - 0.5*self.dy0 + self.prob_lo[1]%self.ds_low_les
         self.yhigh_lr = self.ylow_lr + self.ydist_lr
         self.zlow_lr = 0.5 * self.dz0  # Lowest z point is half the height of the lowest grid cell
         self.zhigh_lr = self.zlow_lr + self.zdist_lr
