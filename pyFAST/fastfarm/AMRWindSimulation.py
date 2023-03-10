@@ -449,7 +449,7 @@ class AMRWindSimulation:
             out.write(f"{self.postproc_name_hr}.labels           = {sampling_labels_hr_str}\n")
 
             # Write out low resolution sampling plane info
-            zoffsets_lr_str = " ".join(str(int(item)) for item in self.zoffsets_lr)
+            zoffsets_lr_str = " ".join(str(item) for item in self.zoffsets_lr)
 
             out.write(f"\n# Low sampling grid spacing = {self.ds_lr} m\n")
             out.write(f"{self.postproc_name_lr}.Low.type         = PlaneSampler\n")
@@ -478,7 +478,7 @@ class AMRWindSimulation:
                 xdist_hr = self.hr_domains[turbkey]['xdist_hr']
                 ydist_hr = self.hr_domains[turbkey]['ydist_hr']
                 zoffsets_hr = self.hr_domains[turbkey]['zoffsets_hr']
-                zoffsets_hr_str = " ".join(str(int(item)) for item in zoffsets_hr)
+                zoffsets_hr_str = " ".join(str(item) for item in zoffsets_hr)
 
                 out.write(f"\n# Turbine {wt_name} at (x,y) = ({wt_x}, {wt_y}), with D = {wt_D}, grid spacing = {self.ds_hr} m\n")
                 out.write(f"{self.postproc_name_hr}.{sampling_name}.type         = PlaneSampler\n")
