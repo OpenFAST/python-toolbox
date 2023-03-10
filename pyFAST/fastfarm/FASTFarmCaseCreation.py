@@ -290,7 +290,7 @@ class FFCaseCreation:
                 # Write updated DISCON and *Dyn files. 
                 if writeFiles:
                     self.HydroDynFile.write(os.path.join(currPath, self.HDfilename))
-                    status = os.system(f'cp {self.templatePath}/{self.controllerInputfilename} {currPath}/{self.controllerInputfilename}')
+                    status = os.popen(f'cp {self.templatePath}/{self.controllerInputfilename} {currPath}/{self.controllerInputfilename}')
                 
                 # Depending on the controller, it might need to be in the same level as the fstf input file. The ideal solution would be give the full
                 # path to the controller input, but we have no control over the compilation process and it is likely that a very long string with the full
@@ -307,7 +307,8 @@ class FFCaseCreation:
                         pass
                 os.chdir(notepath)
         
-                # Write InflowWind files
+                # Write InflowWind files. For FAST.FARM, the IW file needs to be inside the Seed* directories. If running standalone openfast,
+                # it needs to be on the same level as the fst file. Here, we copy to both places so that the workflow is general
                 self.InflowWindFile['WindType']       = 3
                 self.InflowWindFile['PropagationDir'] = 0
                 self.InflowWindFile['Filename_BTS']   = '"./TurbSim"'
@@ -331,7 +332,9 @@ class FFCaseCreation:
                         # Update each turbine's ElastoDyn
                         self.ElastoDynFile['NacYaw']   = yaw_deg_ + yaw_mis_deg_
                         # check if this change of EDfile to a variable works as it should with quotes and stuff
+                        status = os.popen(f'cp {self.templatePath}/{self.bladefilename} {currPath}/{self.bladefilename}')
                         self.ElastoDynFile['BldFile1'] = self.ElastoDynFile['BldFile2'] = self.ElastoDynFile['BldFile3'] = f'"{self.bladefilename}"'
+                        status = os.popen(f'cp {self.templatePath}/{self.towerfilename} {currPath}/{self.towerfilename}')
                         self.ElastoDynFile['TwrFile'] = f'"{self.towerfilename}"'
                         self.ElastoDynFile['Azimuth']  = round(np.random.uniform(low=0, high=360)) # start at a random value
                         if writeFiles:
@@ -378,7 +381,7 @@ class FFCaseCreation:
                         self.turbineFile['CompAero']     = 3  # 1: AeroDyn v14;    2: AeroDyn v15;   3: AeroDisk
                         self.turbineFile['AeroFile']     = f'"{self.ADskfilepath}"'
                         if writeFiles:
-                            status = os.system(f'cp {self.coeffTablefilepath} {os.path.join(currPath,self.coeffTablefilename)}')
+                            status = os.popen(f'cp {self.coeffTablefilepath} {os.path.join(currPath,self.coeffTablefilename)}')
                     self.turbineFile['ServoFile']    = f'"./{self.SrvDfilename}{t+1}_mod.dat"'
                     self.turbineFile['HydroFile']    = f'"./{self.HDfilename}"'
                     self.turbineFile['SubFile']      = f'"{self.SubDfilepath}"'
@@ -390,16 +393,39 @@ class FFCaseCreation:
                     if writeFiles:
                         self.turbineFile.write( os.path.join(currPath,f'{self.turbfilename}{t+1}.fst'))
 
+    def modifyProperty(self, fullfilename, entry, value):
+        '''
+        Modify specific properties of certain files
+
+        Inputs
+        ======
+        fullfilename: str
+            Full filepath of the file.
+        entry: str
+            Entry in the input file to be modified
+        value: 
+            Value to go on the entry. No checks are made
+
+        '''
+
+        # Open the proper file
+        f = FASTInputFile(fullfilename)
+        # Change the actual value
+        f[entry] = value
+        # Save the new file
+        f.write(fullfname)
+
+        return
 
                                         
     def setTemplateFilename(self, templatePath=None, EDfilename=None, SEDfilename=None, HDfilename=None, SrvDfilename=None, ADfilename=None, ADskfilename=None, SubDfilename=None, IWfilename=None, BDfilepath=None, bladefilename=None, towerfilename=None, turbfilename=None, libdisconfilepath=None, controllerInputfilename=None, coeffTablefilename=None, turbsimLowfilepath=None, turbsimHighfilepath=None, FFfilename=None):
         '''                             
                                         
         *filename: str                  
-        The filename of the current O   penFAST submodule, no complete path. Assumes it is
+        The filename of the current OpenFAST submodule, no complete path. Assumes it is
         inside `templatePath`           
         *filepath: str                  
-        Complete path of the file. Ma   y or may not be inside `templatePath`
+        Complete path of the file. May or may not be inside `templatePath`
 
         '''
 
@@ -571,7 +597,7 @@ class FFCaseCreation:
             self.DLLfilepath = os.path.join(os.path.dirname(self.libdisconfilepath), f'{libdisconfilename}.T')
             if not os.path.isfile(currLibdiscon):
                 if self.verbose>0: print(f'    Creating a copy of the controller {libdisconfilename}.so in {currLibdiscon}')
-                status = os.system(f'cp {self.libdisconfilepath} {currLibdiscon}')
+                status = os.popen(f'cp {self.libdisconfilepath} {currLibdiscon}')
                 copied=True
         
         if copied == False and self.verbose>0:
@@ -845,7 +871,7 @@ class FFCaseCreation:
        #         for seed in range(self.nSeeds):
        #             
        #             fname = f'runFASTFarm_cond{cond}_case{case}_seed{seed}.sh'
-       #             status = os.system(f'cp {slurmfilepath} {os.path.join(self.path,fname)}')
+       #             status = os.popen(f'cp {slurmfilepath} {os.path.join(self.path,fname)}')
        # 
        #             # Change job name (for convenience only)
        #             sed_command = f"sed -i 's|#SBATCH --job-name=runFF|#SBATCH --job-name=c{cond}_c{case}_s{seed}_runFF_{os.path.basename(self.path)}|g' {fname}"
@@ -880,7 +906,7 @@ class FFCaseCreation:
         self.slurmfilename_low = os.path.basename(slurmfilepath)
 
         import subprocess
-        status = os.system(f'cp {slurmfilepath} {self.path}/{self.slurmfilename_low}')
+        status = os.popen(f'cp {slurmfilepath} {self.path}/{self.slurmfilename_low}')
         
         # Change job name (for convenience only)
         _ = subprocess.call(f"sed -i 's|#SBATCH --job-name=lowBox|#SBATCH --job-name=lowBox_{os.path.basename(self.path)}|g' {self.slurmfilename_low}", cwd=self.path, shell=True)
@@ -1102,7 +1128,7 @@ class FFCaseCreation:
         self.slurmfilename_high = os.path.basename(slurmfilepath)
 
         ntasks = self.nConditions*self.nHighBoxCases*self.nSeeds*self.nTurbines
-        status = os.system(f'cp {slurmfilepath} {self.path}/{self.slurmfilename_high}')
+        status = os.popen(f'cp {slurmfilepath} {self.path}/{self.slurmfilename_high}')
         
         # Change job name (for convenience only)
         _ = subprocess.call(f"sed -i 's|#SBATCH --job-name=highBox|#SBATCH --job-name=highBox_{os.path.basename(self.path)}|g' {self.slurmfilename_high}", cwd=self.path, shell=True)
@@ -1260,12 +1286,12 @@ class FFCaseCreation:
         # Clean unnecessary directories and files created by the general setup
         for cond in range(self.nConditions):
             for seed in range(self.nSeeds):
-                os.system(f"rm -rf {os.path.join(self.path,self.condDirList[cond],f'Seed_{seed}')}")
+                os.popen(f"rm -rf {os.path.join(self.path,self.condDirList[cond],f'Seed_{seed}')}")
     
             for case in range(self.nCases):
-                #os.system(f"rm -rf {os.path.join(path,condDirList[cond],caseDirList[case], f'Seed_0','InflowWind.dat')}") # needs to exist
+                #os.popen(f"rm -rf {os.path.join(path,condDirList[cond],caseDirList[case], f'Seed_0','InflowWind.dat')}") # needs to exist
                 for seed in range(seedsToKeep,self.nSeeds):
-                    os.system(f"rm -rf {os.path.join(self.path,self.condDirList[cond],self.caseDirList[case], f'Seed_{seed}')}")
+                    os.popen(f"rm -rf {os.path.join(self.path,self.condDirList[cond],self.caseDirList[case], f'Seed_{seed}')}")
                         
                         
         
@@ -1276,7 +1302,7 @@ class FFCaseCreation:
             for case in range(self.nCases):
                 for seed in range(self.seedsToKeep):
                     # Remove TurbSim dir and create LES boxes dir
-                    _ = os.system(f"rm -rf {os.path.join(self.path,self.condDirList[cond],self.caseDirList[case], f'Seed_{seed}', 'TurbSim')}")
+                    _ = os.popen(f"rm -rf {os.path.join(self.path,self.condDirList[cond],self.caseDirList[case], f'Seed_{seed}', 'TurbSim')}")
                     if not os.path.exists(os.path.join(self.path,self.condDirList[cond],self.caseDirList[case],f'Seed_{seed}',LESboxesDirName)):
                         os.makedirs(os.path.join(self.path,self.condDirList[cond],self.caseDirList[case],f'Seed_{seed}',LESboxesDirName))
         
@@ -1611,7 +1637,7 @@ class FFCaseCreation:
                 for seed in range(self.nSeeds):
                     
                     fname = f'runFASTFarm_cond{cond}_case{case}_seed{seed}.sh'
-                    status = os.system(f'cp {slurmfilepath} {os.path.join(self.path,fname)}')
+                    status = os.popen(f'cp {slurmfilepath} {os.path.join(self.path,fname)}')
         
                     # Change job name (for convenience only)
                     sed_command = f"sed -i 's|#SBATCH --job-name=runFF|#SBATCH --job-name=c{cond}_c{case}_s{seed}_runFF_{os.path.basename(self.path)}|g' {fname}"
