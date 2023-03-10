@@ -70,6 +70,48 @@ class AMRWindSimulation:
         self._calc_simple_params()
         self._calc_sampling_params()
 
+
+    def __repr__(self):
+        s  = f'<{type(self).__name__} object>\n'
+        s += f'Requested parameters:\n'
+        s += f' - Wake model: {self.wake_mod} (1:Polar; 2:Curl; 3:Cartesian)\n'
+        s += f' - Extent of high-res boxes: {self.extent_high} D to each side\n'
+        s += f' - Extent of low-res box: xmin={self.extent_low[0]} D, xmax={self.extent_low[1]} D, ymin={self.extent_low[2]} D, ymax={self.extent_low[3]} D, zmax={self.extent_low[4]} D\n'
+
+        s += f'\n'
+        s += f'LES parameters:\n'
+        s += f' - velocity hub height: {self.incflo_velocity_hh} m/s\n'
+        s += f' - ds LES: ({self.dx0}, {self.dy0}, {self.dz0}) m\n'
+        s += f' - dt LES: {self.dt} s\n'
+        s += f' - Extents: ({self.prob_hi[0]-self.prob_lo[0]}, {self.prob_hi[1]-self.prob_lo[1]}, {self.prob_hi[2]-self.prob_lo[2]}) m\n'
+        s += f'   - x: {self.prob_lo[0]}:{self.dx0}:{self.prob_hi[0]} m,\t  ({self.n_cell[0]} points)\n'
+        s += f'   - y: {self.prob_lo[1]}:{self.dy0}:{self.prob_hi[1]} m,\t  ({self.n_cell[1]} points)\n'
+        s += f'   - z: {self.prob_lo[2]}:{self.dz0}:{self.prob_hi[2]} m,\t  ({self.n_cell[2]} points)\n'
+
+        s += f'\n'
+        s += f'Low-res domain: \n'
+        s += f' - ds low: {self.ds_low_les} m\n'
+        s += f' - dt low: {self.dt_low_les} s (with LES dt = {self.dt} s, output frequency is {self.output_frequency_lr})\n'
+        s += f' - Sampling labels: {self.sampling_labels_lr}\n'
+        s += f' - Extents: ({self.xdist_lr}, {self.ydist_lr}, {self.zdist_lr}) m\n'
+        s += f'   - x: {self.xlow_lr}:{self.ds_low_les}:{self.xhigh_lr} m,\t  ({self.nx_lr} points)\n'
+        s += f'   - y: {self.ylow_lr}:{self.ds_low_les}:{self.yhigh_lr} m,\t  ({self.ny_lr} points)\n'
+        s += f'   - z: {self.zlow_lr}:{self.ds_low_les}:{self.zhigh_lr} m,\t  ({self.nz_lr} points)\n'
+
+        s += f'\n'
+        s += f'High-res domain: \n'
+        s += f' - ds high: {self.ds_high_les} m\n'
+        s += f' - dt high: {self.dt_high_les} s (with LES dt = {self.dt} s, output frequency is {self.output_frequency_hr})\n'
+        s += f' - Sampling labels: {self.sampling_labels_hr}\n'
+        for t in np.arange(len(self.hr_domains)):
+            s += f" - Turbine {t}\n"
+            s += f"   - Extents: ({self.hr_domains[t]['xdist_hr']}, {self.hr_domains[t]['ydist_hr']}, {self.hr_domains[t]['zdist_hr']}) m\n"
+            s += f"     - x: {self.hr_domains[t]['xlow_hr']}:{self.ds_high_les}:{self.hr_domains[t]['xhigh_hr']} m,\t  ({self.hr_domains[t]['nx_hr']} points)\n"
+            s += f"     - y: {self.hr_domains[t]['ylow_hr']}:{self.ds_high_les}:{self.hr_domains[t]['yhigh_hr']} m,\t  ({self.hr_domains[t]['ny_hr']} points)\n"
+            s += f"     - z: {self.hr_domains[t]['zlow_hr']}:{self.ds_high_les}:{self.hr_domains[t]['zhigh_hr']} m,\t  ({self.hr_domains[t]['nz_hr']} points)\n"
+        return s
+
+
     def _checkInputs(self):
         '''
         Check that the AMR-Wind inputs make sense
@@ -177,7 +219,7 @@ class AMRWindSimulation:
             raise ValueError(f"Low resolution timestep ({self.dt_low_les}) is finer than high resolution timestep ({self.dt_high_les})!")
 
         ## Sampling frequency
-        self.output_frequency_hr = int(np.floor(self.dt_high_les/self.dt))
+        self.output_frequency_hr = int(np.floor(round(self.dt_high_les/self.dt,4)))
         self.output_frequency_lr = getMultipleOf(self.dt_low_les/self.dt, multipleof=self.output_frequency_hr)
 
         if self.output_frequency_lr % self.output_frequency_hr != 0:
