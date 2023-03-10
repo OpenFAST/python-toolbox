@@ -19,7 +19,8 @@ class AMRWindSimulation:
                     postproc_name='sampling',
                     buffer_lr = [3,6,3,3,2],
                     buffer_hr = 0.6,
-                    ds_hr = None, ds_lr = None):
+                    ds_hr = None, ds_lr = None,
+                    wake_mod = 1):
         '''
         Values from the AMR-Wind input file
         Inputs:
@@ -27,6 +28,7 @@ class AMRWindSimulation:
           * incflo_velocity_hh: velocity vector, specifically at hub height
           * buffer_lr: buffer for [xmin, xmax, ymin, ymax, zmax] in low-res box, in D
           * buffer_hr: buffer for all directions (constant) in high-res box, in D
+          * wake_mod: Wake formulations within FAST.Farm. 1:polar; 2:curl; 3:cartesian.
         '''
         # Process inputs
         self.wts                = wts
@@ -42,6 +44,7 @@ class AMRWindSimulation:
         self.buffer_hr          = buffer_hr
         self.ds_hr              = ds_hr
         self.ds_lr              = ds_lr
+        self.wake_mod           = wake_mod
 
         # Placeholder variables, to be calculated by FFCaseCreation
         self.output_frequency_lr = None
@@ -81,6 +84,8 @@ class AMRWindSimulation:
             raise ValueError("y-component of prob_lo larger than y-component of prob_hi")
         if (self.prob_lo[2] >= self.prob_hi[2]):
             raise ValueError("z-component of prob_lo larger than z-component of prob_hi")
+        if self.wake_mod not in [1,2,3]:
+            raise ValueError (f'Wake_mod parameter can only be 1 (polar), 2 (curl), or 3 (cartesian). Received {self.wake_mod}.')
 
     def _calc_simple_params(self):
         '''
@@ -150,7 +155,17 @@ class AMRWindSimulation:
             cmeander_min = min(cmeander_min, self.wts[turbkey]['Cmeander'])
             Dwake_min = min(Dwake_min, self.wts[turbkey]['D'])  # Approximate D_wake as D_rotor
 
-        dt_lr_max = cmeander_min * Dwake_min / (10 * self.vhub)
+        cmax_min = float("inf")
+        for turbkey in self.wts:
+            self.cmax_min = min(cmax_min, self.wts[turbkey]['cmax'])
+
+        if self.wake_mod == 1:
+            dt_lr_max = cmeander_min * Dwake_min / (10 * self.vhub)
+        else: # wake_mod == 2 or 3
+            dr = self.cmax_min
+            dt_lr_max = dr / (2* self.vhub)
+
+
         self.dt_low_les = self.dt_high_les * np.floor(dt_lr_max/self.dt_high_les)  # Ensure that dt_lr is a multiple of the high res sampling timestep
 
         if self.dt_low_les < self.dt:
@@ -174,10 +189,7 @@ class AMRWindSimulation:
         #    ASSUME: FAST.Farm HR zone lies within the region of maxmum AMR-Wind grid refinement
         #    NOTE: ds_hr is calculated independent of any x/y/z requirements,
         #            just blade chord length requirements
-        cmax_min = float("inf")
-        for turbkey in self.wts:
-            cmax_min = min(cmax_min, self.wts[turbkey]['cmax'])
-        ds_hr_max = cmax_min
+        ds_hr_max = self.cmax_min
 
         if self.ds_hr is None:  # Calculate ds_hr if it is not specified as an input
             if ds_hr_max < self.ds_refine_max:
