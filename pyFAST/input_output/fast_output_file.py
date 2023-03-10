@@ -155,6 +155,9 @@ class FASTOutputFile(File):
                 raise BrokenFormatError('Inconstistent number of columns between headers ({}) and data ({}) for file {}'.format(len(cols), self.data.shape[1], self.filename))
             df = pd.DataFrame(data=self.data,columns=cols)
 
+        # Remove duplicate columns if they are present
+        df = df.loc[:,~df.columns.duplicated()].copy()
+
         return df
 
     def writeDataFrame(self, df, filename, binary=True):
