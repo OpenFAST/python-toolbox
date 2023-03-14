@@ -12,7 +12,6 @@ from pyFAST.fastfarm.TurbSimCaseCreation import TSCaseCreation, writeTimeSeriesF
 
 def cosd(t): return np.cos(np.deg2rad(t))
 def sind(t): return np.sin(np.deg2rad(t))
-
 def getMultipleOf(val, multipleof):
     '''
     Get integer multiple of a quantity.
@@ -22,12 +21,17 @@ def getMultipleOf(val, multipleof):
     valmult = int(round(val/multipleof,6))*multipleof
     return round(valmult, 4)
 
-class FFCaseCreation:
 
+class FFCaseCreation:
 
     def __init__(self, path, wts, cmax, fmax, Cmeander, tmax, zbot, vhub, shear, TIvalue, inflow_deg, dt_high_les, ds_high_les, extent_high, dt_low_les, ds_low_les, extent_low, ffbin, yaw_init=None, ADmodel=None, EDmodel=None, nSeeds=6, LESpath=None, sweepWakeSteering=False, sweepYawMisalignment=False, seedValues=None, refTurb_rot=0, verbose=0):
         '''
+        Full setup of a FAST.Farm simulations, can create setups for LES- or TurbSim-driven scenarios.
         
+        LESpath: str or list of strings
+            Full path of the LES data, if driven by LES. If None, the setup will be for TurbSim inflow.
+            LESpath can be a single path, or a list of paths of the same length as the sweep in conditions.
+            For example, if TIvalue=[8,10,12], then LESpath can be 3 paths, related to each condition.
         ffbin: str
             Full path of the FAST.Farm binary to be executed
         refTurb_rot: int
@@ -194,9 +198,11 @@ class FFCaseCreation:
         if self.LESpath is None:
             self.inflowStr = 'TurbSim'
         else:
-            if not os.path.isdir(self.LESpath):
-                raise ValueError (f'The path {self.LESpath} does not exist')
+            if isinstance(self.LESpath,str): self.LESpath = [self.LESpath]*len(self.vhub)
             self.inflowStr = 'LES'
+            for p in self.LESpath:
+                if not os.path.isdir(p):
+                    raise ValueError (f'The path {p} does not exist')
 
         # Check the reference turbine for rotation
         if self.refTurb_rot >= self.nTurbines:
@@ -421,7 +427,7 @@ class FFCaseCreation:
         # Change the actual value
         f[entry] = value
         # Save the new file
-        f.write(fullfname)
+        f.write(fullfilename)
 
         return
 
@@ -787,21 +793,21 @@ class FFCaseCreation:
   
         if self.D == 220: # 12 MW turbine
             self.bins = xr.Dataset({'WaveHs':      (['wspd'], [ 1.429, 1.429]), # 1.429 comes from Matt's hydrodyn input file
-                               'WaveTp':      (['wspd'], [ 7.073, 7.073]), # 7.073 comes from Matt's hydrodyn input file
-                               'RotSpeed':    (['wspd'], [ 4.0, 4.0]), # 4 rpm comes from Matt's ED input file
-                               'BlPitch':     (['wspd'], [ 0.0, 0.0]), # 0 deg comes from Matt's ED input file
-                               #'WvHiCOffD':   (['wspd'], [0,   0]), # 2nd order wave info. Unused for now
-                               #'WvLowCOffS':  (['wspd'], [0,   0]), # 2nd order wave info. Unused for now
-                              },  coords={'wspd': [10, 15]} )  # 15 m/s is 'else', since method='nearest' is used on the variable `bins`
+                                    'WaveTp':      (['wspd'], [ 7.073, 7.073]), # 7.073 comes from Matt's hydrodyn input file
+                                    'RotSpeed':    (['wspd'], [ 4.0, 4.0]), # 4 rpm comes from Matt's ED input file
+                                    'BlPitch':     (['wspd'], [ 0.0, 0.0]), # 0 deg comes from Matt's ED input file
+                                    #'WvHiCOffD':   (['wspd'], [0,   0]), # 2nd order wave info. Unused for now
+                                    #'WvLowCOffS':  (['wspd'], [0,   0]), # 2nd order wave info. Unused for now
+                                   },  coords={'wspd': [10, 15]} )  # 15 m/s is 'else', since method='nearest' is used on the variable `bins`
             
-        elif self.D == 250: # IEA 15 MW
+        elif self.D == 240: # IEA 15 MW
             self.bins = xr.Dataset({'WaveHs':      (['wspd'], [1.172, 1.323, 1.523, 1.764, 2.255]),  # higher values on default input from the repository (4.52)
-                               'WaveTp':      (['wspd'], [7.287, 6.963, 7.115, 6.959, 7.067]),  # higher values on default input from the repository (9.45)
-                               'RotSpeed':    (['wspd'], [4.995, 6.087, 7.557, 7.557, 7.557]),
-                               'BlPitch':     (['wspd'], [0.315, 0,     0.645, 7.6,   13.8 ]),
-                               #'WvHiCOffD':   (['wspd'], [0,     0,     0,     0,     0    ]), # 2nd order wave info. Unused for now. 3.04292 from repo; 0.862 from KS
-                               #'WvLowCOffS':  (['wspd'], [0,     0,     0,     0,     0    ]), # 2nd order wave info. Unused for now  0.314159 from repo; 0.862 from KS
-                              },  coords={'wspd': [6.6, 8.6, 10.6, 12.6, 15]} )  # 15 m/s is 'else', since method='nearest' is used on the variable `bins`
+                                    'WaveTp':      (['wspd'], [7.287, 6.963, 7.115, 6.959, 7.067]),  # higher values on default input from the repository (9.45)
+                                    'RotSpeed':    (['wspd'], [4.995, 6.087, 7.557, 7.557, 7.557]),
+                                    'BlPitch':     (['wspd'], [0.315, 0,     0.645, 7.6,   13.8 ]),
+                                    #'WvHiCOffD':   (['wspd'], [0,     0,     0,     0,     0    ]), # 2nd order wave info. Unused for now. 3.04292 from repo; 0.862 from KS
+                                    #'WvLowCOffS':  (['wspd'], [0,     0,     0,     0,     0    ]), # 2nd order wave info. Unused for now  0.314159 from repo; 0.862 from KS
+                                   },  coords={'wspd': [6.6, 8.6, 10.6, 12.6, 15]} )  # 15 m/s is 'else', since method='nearest' is used on the variable `bins`
             
         else:
             raise ValueError(f'Unknown turbine with diameter {self.D}. Add values to the `_setRotorParameters` function.')
@@ -939,7 +945,7 @@ class FFCaseCreation:
         # ----- Run turbSim Low boxes -----
         # ---------------------------------
         # Submit the script to SLURM
-        _ = subprocess.call('sbatch {self.slurmfilename_low}', cwd=self.path, shell=True)
+        _ = subprocess.call(f'sbatch {self.slurmfilename_low}', cwd=self.path, shell=True)
 
 
     def TS_low_createSymlinks(self):
@@ -997,7 +1003,7 @@ class FFCaseCreation:
         boxType='highres'
         for cond in range(self.nConditions):
             for seed in range(self.nSeeds):
-                condSeedPath = os.path.join(path, self.condDirList[cond], f'Seed_{seed}')
+                condSeedPath = os.path.join(self.path, self.condDirList[cond], f'Seed_{seed}')
         
                 # Read output .bts for current seed
                 bts = TurbSimFile(os.path.join(condSeedPath, 'Low.bts'))
@@ -1010,7 +1016,7 @@ class FFCaseCreation:
                     
                     caseSeedPath = os.path.join(self.path, self.condDirList[cond], self.caseDirList[case], f'Seed_{seed}', 'TurbSim')
                     
-                    for t in range(nTurbines):
+                    for t in range(self.nTurbines):
                         # Recover turbine properties of the current case
                         HubHt_   = self.allCases.sel(case=case, turbine=t)['zhub'].values
                         xloc_    = self.allCases.sel(case=case, turbine=t)['Tx'  ].values
@@ -1073,6 +1079,9 @@ class FFCaseCreation:
 
         # Create symbolic links for the low-res boxes
         self.TS_low_createSymlinks()
+
+        # Open low-res boxes and extract time-series at turbine locations
+        self.TS_high_get_time_series()
 
         # Loop on all conditions/cases/seeds setting up the High boxes
         boxType='highres'
@@ -1166,7 +1175,7 @@ class FFCaseCreation:
         # ----- Run turbSim High boxes -----
         # ----------------------------------
         # Submit the script to SLURM
-        _ = subprocess.call('sbatch {self.slurmfilename_high}', cwd=self.path, shell=True)
+        _ = subprocess.call(f'sbatch {self.slurmfilename_high}', cwd=self.path, shell=True)
 
     
     def TS_high_create_symlink(self):
@@ -1316,7 +1325,7 @@ class FFCaseCreation:
         
                     # Low-res box
                     try:
-                        src = os.path.join(self.LESpath, 'Low')
+                        src = os.path.join(self.LESpath[cond], 'Low')
                         dst = os.path.join(self.path, self.condDirList[cond], self.caseDirList[case], f'Seed_{seed}', LESboxesDirName, 'Low')
                         os.symlink(src, dst)                
                     except FileExistsError:
@@ -1325,7 +1334,7 @@ class FFCaseCreation:
                     # High-res boxes
                     for t in range(self.nTurbines):
                         try:
-                            src = os.path.join(self.LESpath, f"HighT{t+1}_inflow{str(self.allCases.sel(case=case).inflow_deg.values).replace('-','m')}deg")
+                            src = os.path.join(self.LESpath[cond], f"HighT{t+1}_inflow{str(self.allCases.sel(case=case).inflow_deg.values).replace('-','m')}deg")
                             dst = os.path.join(self.path,self.condDirList[cond], self.caseDirList[case], f'Seed_{seed}', LESboxesDirName, f'HighT{t+1}')
                             os.symlink(src, dst)                
                         except FileExistsError:
