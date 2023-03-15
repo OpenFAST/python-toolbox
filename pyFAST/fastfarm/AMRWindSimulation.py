@@ -22,6 +22,7 @@ class AMRWindSimulation:
                     buffer_lr = [3,6,3,3,2],
                     buffer_hr = 0.6,
                     ds_hr = None, ds_lr = None,
+                    dt_hr = None, dt_lr = None,
                     wake_mod = None):
         '''
         Values from the AMR-Wind input file
@@ -46,6 +47,8 @@ class AMRWindSimulation:
         self.buffer_hr          = buffer_hr
         self.ds_hr              = ds_hr
         self.ds_lr              = ds_lr
+        self.dt_hr              = dt_hr
+        self.dt_lr              = dt_lr
         self.wake_mod           = wake_mod
 
         # Placeholder variables, to be calculated by FFCaseCreation
@@ -186,8 +189,13 @@ class AMRWindSimulation:
         fmax_max = 0
         for turbkey in self.wts:
             fmax_max = max(0, self.wts[turbkey]['fmax'])
-        dt_hr_max = 1 / (2 * fmax_max)
-        self.dt_high_les = getMultipleOf(dt_hr_max, multipleof=self.dt) # Ensure dt_hr is a multiple of the AMR-Wind timestep
+        if self.dt_hr is None:
+            # Calculate dt of high-res per guidelines
+            dt_hr_max = 1 / (2 * fmax_max)
+            self.dt_high_les = getMultipleOf(dt_hr_max, multipleof=self.dt) # Ensure dt_hr is a multiple of the AMR-Wind timestep
+        else:
+            # dt of high-res is given
+            self.dt_high_les = self.dt_hr
 
         if self.dt_high_les < self.dt:
             raise ValueError(f"AMR-Wind timestep {self.dt} too coarse for high resolution domain! AMR-Wind timestep must be at least {self.dt_high_les} sec.")
@@ -211,7 +219,12 @@ class AMRWindSimulation:
             dt_lr_max = self.dr / (2* self.vhub)
 
 
-        self.dt_low_les = getMultipleOf(dt_lr_max, multipleof=self.dt_high_les)  # Ensure that dt_lr is a multiple of the high res sampling timestep
+        if self.dt_lr is None:
+            # Calculate dt of low-res per guidelines
+            self.dt_low_les = getMultipleOf(dt_lr_max, multipleof=self.dt_high_les)  # Ensure that dt_lr is a multiple of the high res sampling timestep
+        else:
+            # dt of low-res is given
+            self.dt_low_les = self.dt_lr
 
 
         if self.dt_low_les < self.dt:
