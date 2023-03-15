@@ -24,7 +24,7 @@ def getMultipleOf(val, multipleof):
 
 class FFCaseCreation:
 
-    def __init__(self, path, wts, cmax, fmax, Cmeander, tmax, zbot, vhub, shear, TIvalue, inflow_deg, dt_high_les, ds_high_les, extent_high, dt_low_les, ds_low_les, extent_low, ffbin, yaw_init=None, ADmodel=None, EDmodel=None, nSeeds=6, LESpath=None, sweepWakeSteering=False, sweepYawMisalignment=False, seedValues=None, refTurb_rot=0, verbose=0):
+    def __init__(self, path, wts, cmax, fmax, Cmeander, tmax, zbot, vhub, shear, TIvalue, inflow_deg, dt_high_les, ds_high_les, extent_high, dt_low_les, ds_low_les, extent_low, ffbin, mod_wake=1, yaw_init=None, ADmodel=None, EDmodel=None, nSeeds=6, LESpath=None, sweepWakeSteering=False, sweepYawMisalignment=False, seedValues=None, refTurb_rot=0, verbose=0):
         '''
         Full setup of a FAST.Farm simulations, can create setups for LES- or TurbSim-driven scenarios.
         
@@ -56,6 +56,7 @@ class FFCaseCreation:
         self.extent_low  = extent_low
         self.extent_high = extent_high
         self.ffbin       = ffbin
+        self.mod_wake    = mod_wake
         self.yaw_init    = yaw_init
         self.ADmodel     = ADmodel
         self.EDmodel     = EDmodel
@@ -153,7 +154,7 @@ class FFCaseCreation:
         # Check the ds and dt for the high- and low-res boxes
         if not (np.array(self.extent_low)>=0).all():
             raise ValueError(f'The array for low-res box extents should be given with positive values')
-        if self.dt_low_les%(self.dt_high_les-1e-15) > 1e-14:
+        if self.dt_low_les%(self.dt_high_les-1e-15) > 1e-12:
             raise ValueError(f'The temporal resolution dT_Low should be a multiple of dT_High')
         if self.dt_low_les < self.dt_high_les:
             raise ValueError(f'The temporal resolution dT_High should not be greater than dT_Low on the LES side')
@@ -207,6 +208,10 @@ class FFCaseCreation:
         # Check the reference turbine for rotation
         if self.refTurb_rot >= self.nTurbines:
             raise ValueError(f'The index for the reference turbine for the farm to be rotated around is greater than the number of turbines')
+
+        # Check the wake model (1:Polar; 2:Curl; 3:Cartesian)
+        if self.mod_wake not in [1,2,3]:
+            raise ValueError(f'Wake model `mod_wake` should be 1 (Polar), 2 (Curl), or 3 (Cartesian). Received {self.mod_wake}.')
 
         # Set aux variable
         self.templateFilesCreatedBool = False
@@ -1033,7 +1038,7 @@ class FFCaseCreation:
                         # Get indices of the half height position (TurbSim's hub height)
                         jMid, kMid = bts.iMid
         
-                        # Get time series at the box center to get mean vhub and create time array. JJ: get at the Turbsim hub height
+                        # Get time series at the box center to get mean vhub and create time array.
                         #Vhub = bts['u'][0,:,jTurb,kTurb]
                         Vmid = bts['u'][0,:,jMid,kMid]
                         time = bts.t
@@ -1234,9 +1239,9 @@ class FFCaseCreation:
             #    "WkAxsXT1D1   , WkAxsXT1D2   , WkAxsXT1D3   , WkAxsXT1D4   , WkAxsXT1D5   , WkAxsXT1D6   , WkAxsXT1D7",
             #    "WkAxsYT1D1   , WkAxsYT1D2   , WkAxsYT1D3   , WkAxsYT1D4   , WkAxsYT1D5   , WkAxsYT1D6   , WkAxsYT1D7",
             #    "WkAxsZT1D1   , WkAxsZT1D2   , WkAxsZT1D3   , WkAxsZT1D4   , WkAxsZT1D5   , WkAxsZT1D6   , WkAxsZT1D7",
-            #    "WkPosXT1D1   , WkPosXT1D2   , WkPosXT1D3   , WkPosXT1D4   , WkPosXT1D5   , WkPosXT1D6   , WkPosXT1D7",
-            #    "WkPosYT1D1   , WkPosYT1D2   , WkPosYT1D3   , WkPosYT1D4   , WkPosYT1D5   , WkPosYT1D6   , WkPosYT1D7",
-            #    "WkPosZT1D1   , WkPosZT1D2   , WkPosZT1D3   , WkPosZT1D4   , WkPosZT1D5   , WkPosZT1D6   , WkPosZT1D7",
+                "WkPosXT1D1   , WkPosXT1D2   , WkPosXT1D3   , WkPosXT1D4   , WkPosXT1D5   , WkPosXT1D6   , WkPosXT1D7   , WkPosXT1D8   , WkPosXT1D9",
+                "WkPosYT1D1   , WkPosYT1D2   , WkPosYT1D3   , WkPosYT1D4   , WkPosYT1D5   , WkPosYT1D6   , WkPosYT1D7   , WkPosYT1D8   , WkPosYT1D9",
+                "WkPosZT1D1   , WkPosZT1D2   , WkPosZT1D3   , WkPosZT1D4   , WkPosZT1D5   , WkPosZT1D6   , WkPosZT1D7   , WkPosZT1D8   , WkPosZT1D9",
             #    "WkDfVxT1N01D1, WkDfVxT1N02D1, WkDfVxT1N03D1, WkDfVxT1N04D1, WkDfVxT1N05D1, WkDfVxT1N06D1, WkDfVxT1N07D1, WkDfVxT1N08D1, WkDfVxT1N09D1, WkDfVxT1N10D1, WkDfVxT1N11D1, WkDfVxT1N12D1, WkDfVxT1N13D1, WkDfVxT1N14D1, WkDfVxT1N15D1, WkDfVxT1N16D1, WkDfVxT1N17D1, WkDfVxT1N18D1, WkDfVxT1N19D1, WkDfVxT1N20D1",
             #    "WkDfVxT1N01D2, WkDfVxT1N02D2, WkDfVxT1N03D2, WkDfVxT1N04D2, WkDfVxT1N05D2, WkDfVxT1N06D2, WkDfVxT1N07D2, WkDfVxT1N08D2, WkDfVxT1N09D2, WkDfVxT1N10D2, WkDfVxT1N11D2, WkDfVxT1N12D2, WkDfVxT1N13D2, WkDfVxT1N14D2, WkDfVxT1N15D2, WkDfVxT1N16D2, WkDfVxT1N17D2, WkDfVxT1N18D2, WkDfVxT1N19D2, WkDfVxT1N20D2",
             #    "WkDfVxT1N01D3, WkDfVxT1N02D3, WkDfVxT1N03D3, WkDfVxT1N04D3, WkDfVxT1N05D3, WkDfVxT1N06D3, WkDfVxT1N07D3, WkDfVxT1N08D3, WkDfVxT1N09D3, WkDfVxT1N10D3, WkDfVxT1N11D3, WkDfVxT1N12D3, WkDfVxT1N13D3, WkDfVxT1N14D3, WkDfVxT1N15D3, WkDfVxT1N16D3, WkDfVxT1N17D3, WkDfVxT1N18D3, WkDfVxT1N19D3, WkDfVxT1N20D3",
@@ -1385,8 +1390,13 @@ class FFCaseCreation:
                     ff_file['SC_FileName'] = '/path/to/SC_DLL.dll'
         
                     # Wake dynamics
-                    ff_file['dr'] = self.cmax
-                    ff_file['NumRadii']  = int(np.ceil(3*D_/(2*self.cmax) + 1))
+                    ff_file['Mod_Wake'] = self.mod_wake
+                    if self.mod_wake == 1: # Polar model
+                        self.dr = self.cmax
+                    else: # Curled; Cartesian
+                        self.dr = round(self.D/10)
+                    ff_file['dr'] = self.dr
+                    ff_file['NumRadii']  = int(np.ceil(3*D_/(2*self.dr) + 1))
                     ff_file['NumPlanes'] = int(np.ceil( 20*D_/(self.dt_low_les*Vhub_*(1-1/6)) ) )
         
                     # Vizualization outputs
@@ -1457,7 +1467,7 @@ class FFCaseCreation:
         
                     # Open saved file and change additional values manually or make sure we have the correct ones
                     ff_file = FASTInputFile(outputFSTF)
-                    ff_file['InflowFile'] = f'"../{self.IWfilename}"'     #!!!!!!!! this path is not filled. should it be?
+                    ff_file['InflowFile'] = f'"../{self.IWfilename}"'
                     #ff_file['DT']=1.0
                     ff_file['Mod_AmbWind'] = 3  # 1: LES boxes; 2: single TurbSim; 3: multiple TurbSim
                     ff_file['TMax'] = self.tmax
@@ -1466,9 +1476,14 @@ class FFCaseCreation:
                     ff_file['UseSC'] = False
                     ff_file['SC_FileName'] = '/path/to/SC_DLL.dll'
         
-                    # Wake dynamics # !!!!!!!!!!!!!!!!!!!!!! are these values good? (Emmanuel's sample file had 3, 50, 80. KS had 5, 75, 80)
-                    ff_file['dr'] = self.cmax
-                    ff_file['NumRadii']  = int(np.ceil(3*D_/(2*self.cmax) + 1))
+                    # Wake dynamics
+                    ff_file['Mod_Wake'] = self.mod_wake
+                    if self.mod_wake == 1: # Polar model
+                        self.dr = self.cmax
+                    else: # Curled; Cartesian
+                        self.dr = round(self.D/10)
+                    ff_file['dr'] = self.dr
+                    ff_file['NumRadii']  = int(np.ceil(3*D_/(2*self.dr) + 1))
                     ff_file['NumPlanes'] = int(np.ceil( 20*D_/(dt_low_desired*Vhub_*(1-1/6)) ) )
         
                     # Vizualization outputs
@@ -1484,7 +1499,7 @@ class FFCaseCreation:
                     # Modify wake outputs
                     ff_file['NOutDist'] = 7
                     ff_file['OutDist']  = ' '.join(map(str,  [1,1.5,2,2.5,3,3.5,4]*D_))
-                    # Mofidy wind output # !!!!! JJ why only 9?
+                    # Mofidy wind output
                     ff_file['NWindVel'] = 9
                     ff_file['WindVelX'] = ' '.join(map(str, xWT[:9]))
                     ff_file['WindVelY'] = ' '.join(map(str, yWT[:9]))
