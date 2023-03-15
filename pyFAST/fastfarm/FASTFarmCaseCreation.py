@@ -4,7 +4,6 @@ import os, sys, shutil
 import subprocess
 import numpy as np
 import xarray as xr
-import matplotlib.pyplot as plt
 
 from pyFAST.input_output import FASTInputFile, FASTOutputFile, TurbSimFile, VTKFile
 from pyFAST.fastfarm import writeFastFarm, fastFarmTurbSimExtent, plotFastFarmSetup
@@ -309,7 +308,9 @@ class FFCaseCreation:
                 # Write updated DISCON and *Dyn files. 
                 if writeFiles:
                     self.HydroDynFile.write(os.path.join(currPath, self.HDfilename))
-                    status = os.popen(f'cp {self.templatePath}/{self.controllerInputfilename} {currPath}/{self.controllerInputfilename}')
+                    shutil.copy2(os.path.join(self.templatePath,self.controllerInputfilename), os.path.join(currPath,self.controllerInputfilename))
+
+
                 
                 # Depending on the controller, it might need to be in the same level as the fstf input file. The ideal solution would be give the full
                 # path to the controller input, but we have no control over the compilation process and it is likely that a very long string with the full
@@ -351,9 +352,9 @@ class FFCaseCreation:
                         # Update each turbine's ElastoDyn
                         self.ElastoDynFile['NacYaw']   = yaw_deg_ + yaw_mis_deg_
                         # check if this change of EDfile to a variable works as it should with quotes and stuff
-                        status = os.popen(f'cp {self.templatePath}/{self.bladefilename} {currPath}/{self.bladefilename}')
+                        shutil.copy2(os.path.join(self.templatePath,self.bladefilename), os.path.join(currPath,self.bladefilename))
                         self.ElastoDynFile['BldFile1'] = self.ElastoDynFile['BldFile2'] = self.ElastoDynFile['BldFile3'] = f'"{self.bladefilename}"'
-                        status = os.popen(f'cp {self.templatePath}/{self.towerfilename} {currPath}/{self.towerfilename}')
+                        shutil.copy2(os.path.join(self.templatePath,self.towerfilename), os.path.join(currPath,self.towerfilename))
                         self.ElastoDynFile['TwrFile'] = f'"{self.towerfilename}"'
                         self.ElastoDynFile['Azimuth']  = round(np.random.uniform(low=0, high=360)) # start at a random value
                         if writeFiles:
@@ -400,7 +401,7 @@ class FFCaseCreation:
                         self.turbineFile['CompAero']     = 3  # 1: AeroDyn v14;    2: AeroDyn v15;   3: AeroDisk
                         self.turbineFile['AeroFile']     = f'"{self.ADskfilepath}"'
                         if writeFiles:
-                            status = os.popen(f'cp {self.coeffTablefilepath} {os.path.join(currPath,self.coeffTablefilename)}')
+                            shutil.copy2(self.coeffTablefilepath, os.path.join(currPath,self.coeffTablefilename))
                     self.turbineFile['ServoFile']    = f'"./{self.SrvDfilename}{t+1}_mod.dat"'
                     self.turbineFile['HydroFile']    = f'"./{self.HDfilename}"'
                     self.turbineFile['SubFile']      = f'"{self.SubDfilepath}"'
@@ -616,7 +617,7 @@ class FFCaseCreation:
             self.DLLfilepath = os.path.join(os.path.dirname(self.libdisconfilepath), f'{libdisconfilename}.T')
             if not os.path.isfile(currLibdiscon):
                 if self.verbose>0: print(f'    Creating a copy of the controller {libdisconfilename}.so in {currLibdiscon}')
-                status = os.popen(f'cp {self.libdisconfilepath} {currLibdiscon}')
+                shutil.copy2(self.libdisconfilepath, currLibdiscon)
                 copied=True
         
         if copied == False and self.verbose>0:
@@ -890,7 +891,7 @@ class FFCaseCreation:
        #         for seed in range(self.nSeeds):
        #             
        #             fname = f'runFASTFarm_cond{cond}_case{case}_seed{seed}.sh'
-       #             status = os.popen(f'cp {slurmfilepath} {os.path.join(self.path,fname)}')
+       #             shutil.copy2(slurmfilepath, os.path.join(self.path, fname))
        # 
        #             # Change job name (for convenience only)
        #             sed_command = f"sed -i 's|#SBATCH --job-name=runFF|#SBATCH --job-name=c{cond}_c{case}_s{seed}_runFF_{os.path.basename(self.path)}|g' {fname}"
@@ -924,8 +925,7 @@ class FFCaseCreation:
             raise ValueError (f'SLURM script for low-res box {slurmfilepath} does not exist.')
         self.slurmfilename_low = os.path.basename(slurmfilepath)
 
-        import subprocess
-        status = os.popen(f'cp {slurmfilepath} {self.path}/{self.slurmfilename_low}')
+        shutil.copy2(slurmfilepath, os.path.join(self.path, self.slurmfilename_low))
         
         # Change job name (for convenience only)
         _ = subprocess.call(f"sed -i 's|#SBATCH --job-name=lowBox|#SBATCH --job-name=lowBox_{os.path.basename(self.path)}|g' {self.slurmfilename_low}", cwd=self.path, shell=True)
@@ -1150,7 +1150,7 @@ class FFCaseCreation:
         self.slurmfilename_high = os.path.basename(slurmfilepath)
 
         ntasks = self.nConditions*self.nHighBoxCases*self.nSeeds*self.nTurbines
-        status = os.popen(f'cp {slurmfilepath} {self.path}/{self.slurmfilename_high}')
+        shutil.copy2(slurmfilepath, os.path.join(self.path, self.slurmfilename_high))
         
         # Change job name (for convenience only)
         _ = subprocess.call(f"sed -i 's|#SBATCH --job-name=highBox|#SBATCH --job-name=highBox_{os.path.basename(self.path)}|g' {self.slurmfilename_high}", cwd=self.path, shell=True)
@@ -1295,7 +1295,7 @@ class FFCaseCreation:
                 last = None
                 for last in (line for line in f if line.rstrip('\n')):  pass
 
-            if 'TurbSim terminated normally' not in last:
+            if last is None or 'TurbSim terminated normally' not in last:
                 raise ValueError(f'All TurbSim boxes need to be completed before this step can be done.')
 
             self._FF_setup_TS(**kwargs)
@@ -1308,12 +1308,12 @@ class FFCaseCreation:
         # Clean unnecessary directories and files created by the general setup
         for cond in range(self.nConditions):
             for seed in range(self.nSeeds):
-                os.popen(f"rm -rf {os.path.join(self.path,self.condDirList[cond],f'Seed_{seed}')}")
+                shutil.rmtree(os.path.join(self.path, self.condDirList[cond], f'Seed_{seed}'))
     
             for case in range(self.nCases):
-                #os.popen(f"rm -rf {os.path.join(path,condDirList[cond],caseDirList[case], f'Seed_0','InflowWind.dat')}") # needs to exist
+                #shutil.rmtree(os.path.join(path, condDirList[cond], caseDirList[case], f'Seed_0','InflowWind.dat')) # needs to exist
                 for seed in range(seedsToKeep,self.nSeeds):
-                    os.popen(f"rm -rf {os.path.join(self.path,self.condDirList[cond],self.caseDirList[case], f'Seed_{seed}')}")
+                    shutil.rmtree(os.path.join(self.path, self.condDirList[cond], self.caseDirList[case], f'Seed_{seed}'))
                         
                         
         
@@ -1324,7 +1324,7 @@ class FFCaseCreation:
             for case in range(self.nCases):
                 for seed in range(self.seedsToKeep):
                     # Remove TurbSim dir and create LES boxes dir
-                    _ = os.popen(f"rm -rf {os.path.join(self.path,self.condDirList[cond],self.caseDirList[case], f'Seed_{seed}', 'TurbSim')}")
+                    shutil.rmtree(os.path.join(self.path, self.condDirList[cond], self.caseDirList[case], f'Seed_{seed}', 'TurbSim'))
                     if not os.path.exists(os.path.join(self.path,self.condDirList[cond],self.caseDirList[case],f'Seed_{seed}',LESboxesDirName)):
                         os.makedirs(os.path.join(self.path,self.condDirList[cond],self.caseDirList[case],f'Seed_{seed}',LESboxesDirName))
         
@@ -1664,7 +1664,7 @@ class FFCaseCreation:
                 for seed in range(self.nSeeds):
                     
                     fname = f'runFASTFarm_cond{cond}_case{case}_seed{seed}.sh'
-                    status = os.popen(f'cp {slurmfilepath} {os.path.join(self.path,fname)}')
+                    shutil.copy2(slurmfilepath, os.path.join(self.path, fname))
         
                     # Change job name (for convenience only)
                     sed_command = f"sed -i 's|#SBATCH --job-name=runFF|#SBATCH --job-name=c{cond}_c{case}_s{seed}_runFF_{os.path.basename(self.path)}|g' {fname}"
@@ -1708,3 +1708,5 @@ class FFCaseCreation:
                     print(f'Calling: {sub_command}')
                     subprocess.call(sub_command, cwd=self.path, shell=True)
                     time.sleep(4) # Sometimes the same job gets submitted twice. This gets around it.
+
+
