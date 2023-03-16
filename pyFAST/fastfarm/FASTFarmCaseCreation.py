@@ -1410,8 +1410,8 @@ class FFCaseCreation:
                     ff_file['OutDisWindY']   = ' '.join(map(str, self.planes_xz))
         
                     # Modify wake outputs
-                    ff_file['NOutDist'] = 7
-                    ff_file['OutDist']  = ' '.join(map(str,  [1,1.5,2,2.5,3,3.5,4]*D_))
+                    ff_file['NOutDist'] = 9
+                    ff_file['OutDist']  = ' '.join(map(str, [d*D_ for d in [0.5,1,1.5,2,3,4,5,6,7]]))
                     # Mofidy wind output
                     ff_file['NWindVel'] = 9
                     ff_file['WindVelX'] = ' '.join(map(str, xWT[:9]))
