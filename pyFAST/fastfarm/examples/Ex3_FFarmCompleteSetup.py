@@ -16,37 +16,41 @@ def main():
 
     # -----------------------------------------------------------------------------
     # USER INPUT: Modify these
+    #             For the d{t,s}_{high,low}_les paramters, use AMRWindSimulation.py
     # -----------------------------------------------------------------------------
 
     # ----------- Case absolute path
     path = '/complete/path/of/your/case'
     
-    # ----------- Wind farm
-    wts  = {
-              0 :{'x':0.0,     'y':0,       'z':0.0,  'D':250,  'zhub':150},
-              1 :{'x':1852.0,  'y':0,       'z':0.0,  'D':250,  'zhub':150},
-              2 :{'x':3704.0,  'y':0,       'z':0.0,  'D':250,  'zhub':150},
-              3 :{'x':5556.0,  'y':0,       'z':0.0,  'D':250,  'zhub':150},
-              4 :{'x':7408.0,  'y':0,       'z':0.0,  'D':250,  'zhub':150},
-              5 :{'x':1852.0,  'y':1852.0,  'z':0.0,  'D':250,  'zhub':150},
-              6 :{'x':3704.0,  'y':1852.0,  'z':0.0,  'D':250,  'zhub':150},
-              7 :{'x':5556.0,  'y':1852.0,  'z':0.0,  'D':250,  'zhub':150},
-              8 :{'x':7408.0,  'y':1852.0,  'z':0.0,  'D':250,  'zhub':150},
-              9 :{'x':3704.0,  'y':3704.0,  'z':0.0,  'D':250,  'zhub':150},
-              10:{'x':5556.0,  'y':3704.0,  'z':0.0,  'D':250,  'zhub':150},
-              11:{'x':7408.0,  'y':3704.0,  'z':0.0,  'D':250,  'zhub':150},
-            }
-    refTurb_rot = 0
-    
     # ----------- General hard-coded parameters
     cmax     = 5      # maximum blade chord (m)
     fmax     = 10/6   # maximum excitation frequency (Hz)
     Cmeander = 1.9    # Meandering constant (-)
+
+    # ----------- Wind farm
+    D = 240
+    zhub = 150
+    wts  = {
+              0 :{'x':0.0,     'y':0,       'z':0.0,  'D':D,  'zhub':zhub,  'cmax':cmax,  'fmax':fmax,  'Cmeander':Cmeander}},
+              1 :{'x':1852.0,  'y':0,       'z':0.0,  'D':D,  'zhub':zhub,  'cmax':cmax,  'fmax':fmax,  'Cmeander':Cmeander}},
+              2 :{'x':3704.0,  'y':0,       'z':0.0,  'D':D,  'zhub':zhub,  'cmax':cmax,  'fmax':fmax,  'Cmeander':Cmeander}},
+              3 :{'x':5556.0,  'y':0,       'z':0.0,  'D':D,  'zhub':zhub,  'cmax':cmax,  'fmax':fmax,  'Cmeander':Cmeander}},
+              4 :{'x':7408.0,  'y':0,       'z':0.0,  'D':D,  'zhub':zhub,  'cmax':cmax,  'fmax':fmax,  'Cmeander':Cmeander}},
+              5 :{'x':1852.0,  'y':1852.0,  'z':0.0,  'D':D,  'zhub':zhub,  'cmax':cmax,  'fmax':fmax,  'Cmeander':Cmeander}},
+              6 :{'x':3704.0,  'y':1852.0,  'z':0.0,  'D':D,  'zhub':zhub,  'cmax':cmax,  'fmax':fmax,  'Cmeander':Cmeander}},
+              7 :{'x':5556.0,  'y':1852.0,  'z':0.0,  'D':D,  'zhub':zhub,  'cmax':cmax,  'fmax':fmax,  'Cmeander':Cmeander}},
+              8 :{'x':7408.0,  'y':1852.0,  'z':0.0,  'D':D,  'zhub':zhub,  'cmax':cmax,  'fmax':fmax,  'Cmeander':Cmeander}},
+              9 :{'x':3704.0,  'y':3704.0,  'z':0.0,  'D':D,  'zhub':zhub,  'cmax':cmax,  'fmax':fmax,  'Cmeander':Cmeander}},
+              10:{'x':5556.0,  'y':3704.0,  'z':0.0,  'D':D,  'zhub':zhub,  'cmax':cmax,  'fmax':fmax,  'Cmeander':Cmeander}},
+              11:{'x':7408.0,  'y':3704.0,  'z':0.0,  'D':D,  'zhub':zhub,  'cmax':cmax,  'fmax':fmax,  'Cmeander':Cmeander}},
+            }
+    refTurb_rot = 0
     
     # ----------- Additional variables
-    tmax = 1800
-    nSeeds = 6
-    zbot = 1
+    tmax = 1800     # Total simulation time
+    nSeeds = 6      # Number of different seeds
+    zbot = 1        # Bottom of your domain
+    mod_wake = 1    # Wake model. 1: Polar, 2: Curl, 3: Cartesian
     
     # ----------- Desired sweeps
     vhub       = [10]
@@ -67,7 +71,7 @@ def main():
     # Low-res boxes settings
     dt_low_les  = 3                  # sampling frequency of low-res files
     ds_low_les  = 20.0               # dx, dy, dz of low-res files
-    extent_low  = [3, 8,  3, 3, 2] 
+    extent_low  = [3, 8,  3, 3, 2]   # extent in xmin, xmax, ymin, ymax, zmax, in D
     
     
     # ----------- Execution parameters
@@ -83,6 +87,7 @@ def main():
     templatePath            = '/full/path/where/template/files/are'
     
     # Put 'unused' to any input that is not applicable to your case
+    # Files should be in templatePath
     EDfilename              = 'ElastoDyn.T'
     SEDfilename             = 'SimplifiedElastoDyn.T'
     HDfilename              = 'HydroDyn.dat'
@@ -118,7 +123,7 @@ def main():
     # Initial setup
     case = FFCaseCreation(path, wts, cmax, fmax, Cmeander, tmax, zbot, vhub, shear,
                           TIvalue, inflow_deg, dt_high_les, ds_high_les, extent_high,
-                          dt_low_les, ds_low_les, extent_low, ffbin, LESpath=LESpath,
+                          dt_low_les, ds_low_les, extent_low, ffbin, mod_wake, LESpath=LESpath,
                           verbose=1)
 
     case.setTemplateFilename(templatePath, EDfilename, SEDfilename, HDfilename, SrvDfilename, ADfilename,
@@ -126,8 +131,11 @@ def main():
                              turbfilename, libdisconfilepath, controllerInputfilename, coeffTablefilename,
                              turbsimLowfilepath, turbsimHighfilepath, FFfilename)
 
-    case.copyTurbineFilesForEachCase()
+    # Get domain paramters
     case.getDomainParameters()
+
+    # Organize file structure
+    case.copyTurbineFilesForEachCase()
 
     # TurbSim setup
     if LESpath is None:
@@ -146,5 +154,5 @@ def main():
 
 
 if __name__ == '__main__':
-    # This example cannot be fully run if TurbSim inflow is requested.
-    main()
+    # This example cannot be fully run.
+    pass

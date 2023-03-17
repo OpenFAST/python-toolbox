@@ -20,6 +20,27 @@ def getMultipleOf(val, multipleof):
     valmult = int(round(val/multipleof,6))*multipleof
     return round(valmult, 4)
 
+def modifyProperty(fullfilename, entry, value):
+    '''
+    Modify specific properties of certain files
+
+    Inputs
+    ======
+    fullfilename: str
+        Full filepath of the file.
+    entry: str
+        Entry in the input file to be modified
+    value: 
+        Value to go on the entry. No checks are made
+
+    '''
+    # Open the proper file
+    f = FASTInputFile(fullfilename)
+    # Change the actual value
+    f[entry] = value
+    # Save the new file
+    f.write(fullfilename)
+    return
 
 class FFCaseCreation:
 
@@ -412,30 +433,6 @@ class FFCaseCreation:
         
                     if writeFiles:
                         self.turbineFile.write( os.path.join(currPath,f'{self.turbfilename}{t+1}.fst'))
-
-    def modifyProperty(self, fullfilename, entry, value):
-        '''
-        Modify specific properties of certain files
-
-        Inputs
-        ======
-        fullfilename: str
-            Full filepath of the file.
-        entry: str
-            Entry in the input file to be modified
-        value: 
-            Value to go on the entry. No checks are made
-
-        '''
-
-        # Open the proper file
-        f = FASTInputFile(fullfilename)
-        # Change the actual value
-        f[entry] = value
-        # Save the new file
-        f.write(fullfilename)
-
-        return
 
                                         
     def setTemplateFilename(self, templatePath=None, EDfilename=None, SEDfilename=None, HDfilename=None, SrvDfilename=None, ADfilename=None, ADskfilename=None, SubDfilename=None, IWfilename=None, BDfilepath=None, bladefilename=None, towerfilename=None, turbfilename=None, libdisconfilepath=None, controllerInputfilename=None, coeffTablefilename=None, turbsimLowfilepath=None, turbsimHighfilepath=None, FFfilename=None):
@@ -1403,20 +1400,20 @@ class FFCaseCreation:
                     ff_file['WrDisWind'] = 'False'
                     ff_file['WrDisDT']   = ff_file['DT_Low-VTK']*10    # writeFastFarm sets this to be the same as DT_Low
                     ff_file['NOutDisWindXY'] = len(self.planes_xy)
-                    ff_file['OutDisWindZ']   = ' '.join(map(str, self.planes_xy))
+                    ff_file['OutDisWindZ']   = ', '.join(map(str, self.planes_xy))
                     ff_file['NOutDisWindYZ'] = len(self.planes_yz)
-                    ff_file['OutDisWindX']   = ' '.join(map(str, self.planes_yz))
+                    ff_file['OutDisWindX']   = ', '.join(map(str, self.planes_yz))
                     ff_file['NOutDisWindXZ'] = len(self.planes_xz)
-                    ff_file['OutDisWindY']   = ' '.join(map(str, self.planes_xz))
+                    ff_file['OutDisWindY']   = ', '.join(map(str, self.planes_xz))
         
                     # Modify wake outputs
                     ff_file['NOutDist'] = 9
-                    ff_file['OutDist']  = ' '.join(map(str, [d*D_ for d in [0.5,1,1.5,2,3,4,5,6,7]]))
+                    ff_file['OutDist']  = ', '.join(map(str, [d*D_ for d in [0.5,1,1.5,2,3,4,5,6,7]]))
                     # Mofidy wind output
-                    ff_file['NWindVel'] = 9
-                    ff_file['WindVelX'] = ' '.join(map(str, xWT[:9]))
-                    ff_file['WindVelY'] = ' '.join(map(str, yWT[:9]))
-                    ff_file['WindVelZ'] = ' '.join(map(str, zWT[:9]))
+                    ff_file['NWindVel'] = len(xWT[:9])
+                    ff_file['WindVelX'] = ', '.join(map(str, xWT[:9]))
+                    ff_file['WindVelY'] = ', '.join(map(str, yWT[:9]))
+                    ff_file['WindVelZ'] = ', '.join(map(str, zWT[:9]+self.zhub))
         
                     ff_file.write(outputFSTF)
 
@@ -1706,7 +1703,7 @@ class FFCaseCreation:
                     fname = f'runFASTFarm_cond{cond}_case{case}_seed{seed}.sh'
                     sub_command = f"sbatch {fname}"
                     print(f'Calling: {sub_command}')
-                    subprocess.call(sub_command, cwd=self.path, shell=True)
+                    _ = subprocess.call(sub_command, cwd=self.path, shell=True)
                     time.sleep(4) # Sometimes the same job gets submitted twice. This gets around it.
 
 
