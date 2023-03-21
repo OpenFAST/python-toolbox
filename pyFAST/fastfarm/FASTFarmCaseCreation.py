@@ -109,10 +109,6 @@ class FFCaseCreation:
         if self.verbose>0: print(f'Creating directory structure and copying files... Done.')
 
 
-        #if self.verbose: print(f'Setting up FAST.Farm based on {self.inflowStr} inflow...', end='\r')
-        #if self.verbose: print(f'Setting up FAST.Farm based on {self.inflowStr} inflow... Done.'
-
-
     def _checkInputs(self):
   
         # Create case path is doesn't exist
@@ -281,12 +277,8 @@ class FFCaseCreation:
                     turbsimPath = os.path.join(seedPath, 'TurbSim')
                     if not os.path.exists(turbsimPath):  os.makedirs(turbsimPath)
                     
-            # The following loop creates the turbsim files for low box. That should really only happen if inflowStr is `TurbSim`, as I have commented out below.
-            # However, as of now I need to copy some files to obtain the limits of the turbsim box to be able to shift the coordinate system. Later on i delete these dirs
-            # if inflowStr == 'TurbSim':
-            #     for seed in range(nSeeds):
-            #         seedPath = os.path.join(condPath, f'Seed_{seed}')
-            #         if not os.path.exists(seedPath):  os.makedirs(seedPath)
+            # The following loop creates the turbsim files for low box. That should really only happen if inflowStr is `TurbSim`.
+            # It does happen regardless because when the inflow is LES, it will be later on deleted.
             for seed in range(self.nSeeds):
                 seedPath = os.path.join(condPath, f'Seed_{seed}')
                 if not os.path.exists(seedPath):  os.makedirs(seedPath)
@@ -331,12 +323,11 @@ class FFCaseCreation:
                     self.HydroDynFile.write(os.path.join(currPath, self.HDfilename))
                     shutil.copy2(os.path.join(self.templatePath,self.controllerInputfilename), os.path.join(currPath,self.controllerInputfilename))
 
-
-                
-                # Depending on the controller, it might need to be in the same level as the fstf input file. The ideal solution would be give the full
-                # path to the controller input, but we have no control over the compilation process and it is likely that a very long string with the full
-                # path will get cut. So we need to give the relative path. We give the path as the current one, so here we create a link to ensure it will
-                # work regardless of how the controller was compiled. There is no hard in having this extra link even if it's not needed.
+                # Depending on the controller, the controller input file might need to be in the same level as the .fstf input file.
+                # The ideal solution would be to give the full path to the controller input file, but we may not have control over
+                # the compilation process and it is likely that a very long string with the full path will get cut. So we need to
+                # give the relative path. We give the path as the current one, so here we create a link to ensure it will work
+                # regardless of how the controller was compiled. There is no harm in having this extra link even if it's not needed.
                 notepath = os.getcwd();  os.chdir(self.path)
                 for seed in range(self.nSeeds):
                     try:
@@ -372,12 +363,11 @@ class FFCaseCreation:
                     if EDmodel_ == 'FED':
                         # Update each turbine's ElastoDyn
                         self.ElastoDynFile['NacYaw']   = yaw_deg_ + yaw_mis_deg_
-                        # check if this change of EDfile to a variable works as it should with quotes and stuff
                         shutil.copy2(os.path.join(self.templatePath,self.bladefilename), os.path.join(currPath,self.bladefilename))
                         self.ElastoDynFile['BldFile1'] = self.ElastoDynFile['BldFile2'] = self.ElastoDynFile['BldFile3'] = f'"{self.bladefilename}"'
                         shutil.copy2(os.path.join(self.templatePath,self.towerfilename), os.path.join(currPath,self.towerfilename))
                         self.ElastoDynFile['TwrFile'] = f'"{self.towerfilename}"'
-                        self.ElastoDynFile['Azimuth']  = round(np.random.uniform(low=0, high=360)) # start at a random value
+                        self.ElastoDynFile['Azimuth']  = round(np.random.uniform(low=0, high=360)) # start at a random value  #JJ is this needed?
                         if writeFiles:
                             self.ElastoDynFile.write(os.path.join(currPath,f'{self.EDfilename}{t+1}_mod.dat'))
         
@@ -418,7 +408,7 @@ class FFCaseCreation:
                         self.turbineFile['CompAero']     = 2  # 1: AeroDyn v14;    2: AeroDyn v15;   3: AeroDisk
                         self.turbineFile['AeroFile']     = f'"{self.ADfilepath}"'
                     elif ADmodel_ == 'ADsk':
-                        # from Andy's email on 2022-11-01 So if you use AeroDisk with ElastoDyn, just set the blade DOFs to false for now.
+                        # If you use AeroDisk with ElastoDyn, set the blade DOFs to false.
                         self.turbineFile['CompAero']     = 3  # 1: AeroDyn v14;    2: AeroDyn v15;   3: AeroDisk
                         self.turbineFile['AeroFile']     = f'"{self.ADskfilepath}"'
                         if writeFiles:
@@ -797,11 +787,11 @@ class FFCaseCreation:
         if self.D == 220: # 12 MW turbine
             self.bins = xr.Dataset({'WaveHs':      (['wspd'], [ 1.429, 1.429]), # 1.429 comes from Matt's hydrodyn input file
                                     'WaveTp':      (['wspd'], [ 7.073, 7.073]), # 7.073 comes from Matt's hydrodyn input file
-                                    'RotSpeed':    (['wspd'], [ 4.0, 4.0]), # 4 rpm comes from Matt's ED input file
-                                    'BlPitch':     (['wspd'], [ 0.0, 0.0]), # 0 deg comes from Matt's ED input file
-                                    #'WvHiCOffD':   (['wspd'], [0,   0]), # 2nd order wave info. Unused for now
-                                    #'WvLowCOffS':  (['wspd'], [0,   0]), # 2nd order wave info. Unused for now
-                                   },  coords={'wspd': [10, 15]} )  # 15 m/s is 'else', since method='nearest' is used on the variable `bins`
+                                    'RotSpeed':    (['wspd'], [ 4.0, 4.0]),     # 4 rpm comes from Matt's ED input file
+                                    'BlPitch':     (['wspd'], [ 0.0, 0.0]),     # 0 deg comes from Matt's ED input file
+                                    #'WvHiCOffD':   (['wspd'], [0,   0]),       # 2nd order wave info. Unused for now  # JJ should we have this?
+                                    #'WvLowCOffS':  (['wspd'], [0,   0]),       # 2nd order wave info. Unused for now  # JJ: ditto
+                                   },  coords={'wspd': [10, 15]} )              # 15 m/s is 'else', since method='nearest' is used on the variable `bins`
             
         elif self.D == 240: # IEA 15 MW
             self.bins = xr.Dataset({'WaveHs':      (['wspd'], [1.172, 1.323, 1.523, 1.764, 2.255]),  # higher values on default input from the repository (4.52)
@@ -842,8 +832,8 @@ class FFCaseCreation:
                 Lambda1 = 0.7*HubHt_ if HubHt_<60 else 42  # IEC 61400-3 ed4, sec 6.3.1, eq 5 
         
                 # Create and write new Low.inp files creating the proper box with proper resolution
-                # By passing low_ext, manual mode for the domain size is activated, and by passing ds_low, manual mode
-                # for discretization (and further domain size) is also activated
+                # By passing low_ext, manual mode for the domain size is activated, and by passing ds_low,
+                # manual mode for discretization (and further domain size) is also activated
                 currentTS = TSCaseCreation(D_, HubHt_, Vhub_, tivalue_, shear_, x=xlocs_, y=ylocs_, zbot=self.zbot, cmax=self.cmax,
                                            fmax=self.fmax, Cmeander=self.Cmeander, boxType=boxType, low_ext=self.extent_low, ds_low=self.ds_low_les)
                 self.TSlowbox = currentTS
@@ -855,7 +845,7 @@ class FFCaseCreation:
                 Lowinp = FASTInputFile(currentTSLowFile)
                 Lowinp['RandSeed1'] = self.seedValues[seed]
                 Lowinp['PLExp']     = shear_
-                #Lowinp['latitude']  = latitude # Not used when IECKAI model is selected.
+                #Lowinp['latitude']  = latitude  # Not used when IECKAI model is selected.
                 Lowinp['InCDec1']   = Lowinp['InCDec2'] = Lowinp['InCDec3'] = f'"{a} {b/(8.1*Lambda1):.8f}"'
                 # The dt was computed for a proper low-res box but here we will want to compare with the high-res
                 # and it is convenient to have the same time step. Let's do that change here
@@ -870,49 +860,6 @@ class FFCaseCreation:
 
 
     def TS_low_slurm_prepare(self, slurmfilepath):
-
-
-
-       # # --------------------------------------------------
-       # # ----- Prepare SLURM script for Low-res boxes -----
-       # # --------------- ONE SCRIPT PER CASE --------------
-       # # --------------------------------------------------
-       # 
-       # if not os.path.isfile(slurmfilepath):
-       #     raise ValueError (f'SLURM script for FAST.Farm {slurmfilepath} does not exist.')
-       # self.slurmfilename_ff = os.path.basename(slurmfilepath)
-
-
-       # for cond in range(self.nConditions):
-       #     for case in range(self.nCases):
-       #         for seed in range(self.nSeeds):
-       #             
-       #             fname = f'runFASTFarm_cond{cond}_case{case}_seed{seed}.sh'
-       #             shutil.copy2(slurmfilepath, os.path.join(self.path, fname))
-       # 
-       #             # Change job name (for convenience only)
-       #             sed_command = f"sed -i 's|#SBATCH --job-name=runFF|#SBATCH --job-name=c{cond}_c{case}_s{seed}_runFF_{os.path.basename(self.path)}|g' {fname}"
-       #             _ = subprocess.call(sed_command, cwd=self.path, shell=True)
-       #             # Change logfile name (for convenience only)
-       #             sed_command = f"sed -i 's|#SBATCH --output log.fastfarm_c0_c0_seed0|#SBATCH --output log.fastfarm_c{cond}_c{case}_s{seed}|g' {fname}"
-       #             _ = subprocess.call(sed_command, cwd=self.path, shell=True)
-       #             # Change the fastfarm binary to be called
-       #             sed_command = f"""sed -i "s|^fastfarmbin.*|fastfarmbin='{self.ffbin}'|g" {fname}"""
-       #             _ = subprocess.call(sed_command, cwd=self.path, shell=True)
-       #             # Change the path inside the script to the desired one
-       #             sed_command = f"sed -i 's|/projects/shellwind/rthedin/Task2_2regis|{self.path}|g' {fname}"
-       #             _ = subprocess.call(sed_command, cwd=self.path, shell=True)
-       #             # Write condition
-       #             sed_command = f"""sed -i "s|^cond.*|cond='{self.condDirList[cond]}'|g" {fname}"""
-       #             _ = subprocess.call(sed_command, cwd=self.path, shell=True)
-       #             # Write case
-       #             sed_command = f"""sed -i "s|^case.*|case='{self.caseDirList[case]}'|g" {fname}"""
-       #             _ = subprocess.call(sed_command, cwd=self.path, shell=True)
-       #             # Write seed
-       #             sed_command = f"""sed -i "s|^seed.*|seed={seed}|g" {fname}"""
-       #             _ = subprocess.call(sed_command, cwd=self.path, shell=True)
-
-
 
         # --------------------------------------------------
         # ----- Prepare SLURM script for Low-res boxes -----
@@ -1181,8 +1128,8 @@ class FFCaseCreation:
 
     
     def TS_high_create_symlink(self):
+
         # Create symlink of all the high boxes for the cases with wake steering and yaw misalignment. These are the "repeated" boxes
-        
         notepath = os.getcwd()
         os.chdir(self.path)
         for cond in range(self.nConditions):
@@ -1219,11 +1166,10 @@ class FFCaseCreation:
         '''
 
         if outlistFF is None:
-            # Output list for FAST.Farm runs. Use 1 at the end for turbines (they will be replicated for all turbines). Combination of sample input file and KS's input
+            # Output list for FAST.Farm runs. Use 1 at the end for turbines (they will be replicated for all turbines)
             outlistFF = [
                 "RtAxsXT1     , RtAxsYT1     , RtAxsZT1",
                 "RtPosXT1     , RtPosYT1     , RtPosZT1",
-                #"RtDiamT1",
                 "YawErrT1",
                 "TIAmbT1",
                 'RtVAmbT1',
@@ -1268,7 +1214,7 @@ class FFCaseCreation:
             xWT = alignedTurbs['Tx'].values
             yWT = alignedTurbs['Ty'].values
         
-        offset=50
+        offset=10
         planes_xy = [self.zhub+self.zbot]
         planes_yz = np.unique(xWT+offset)
         planes_xz = np.unique(yWT)
@@ -1341,8 +1287,6 @@ class FFCaseCreation:
                             os.symlink(src, dst)                
                         except FileExistsError:
                             print(f'Directory {dst} already exists. Skipping symlink.')
-        
-                        # Make a link for Amb.t0.vtk pointing to Amb.t1.vtk 
         
         
         
@@ -1424,7 +1368,7 @@ class FFCaseCreation:
 
     def _FF_setup_TS(self):
 
-        # Loops on all conditions/cases and cases for FAST.Farm  (following python-toolbox/pyFAST/fastfarm/examples/Ex2_FFarmInputSetup.py)
+        # Loops on all conditions/cases and cases for FAST.Farm
         for cond in range(self.nConditions):
             for case in range(self.nCases):
                 for seed in range(self.nSeeds):
@@ -1513,7 +1457,7 @@ class FFCaseCreation:
         _, meanU_High =  highbts.midValues() # !!!!!!!!!!!!!!!! JJ: does it make sense to get both? the meanu for low will be a lot higher than vhub,
         _, meanU_Low  =  lowbts.midValues()  # !!!!!!!!!!!!!!!! JJ: and the meanu for high can be a bit higher than vhub
     
-        dT_High = np.round(highbts.dt, 4) # 0.3
+        dT_High = np.round(highbts.dt, 4)
         # dX_High can sometimes be too high. So get the closest to the cmax, but multiple of what should have been
         dX_High = round(meanU_High*dT_High)
         if self.verbose>1:
@@ -1526,8 +1470,8 @@ class FFCaseCreation:
     
     
         # ----- Low
-        dT_Low = self.getMultipleOf(dt_low_desired, multipleof=dT_High)
-        dX_Low = self.getMultipleOf(meanU_Low*dT_Low, multipleof=dX_High) # dy and dz high are 5. 
+        dT_Low = getMultipleOf(dt_low_desired, multipleof=dT_High)
+        dX_Low = getMultipleOf(meanU_Low*dT_Low, multipleof=dX_High)
         dY_Low = lowbts.y[1] - lowbts.y[0]
         dZ_Low = lowbts.z[1] - lowbts.z[0]
     
@@ -1536,14 +1480,14 @@ class FFCaseCreation:
         LT_Low = np.round(lowbts.t[-1]-lowbts.t[0], 4)
     
         X0_Low = np.floor( (min(xWT) - self.extent_low[0]*D ))# - dX_Low)) #  # JJ!!!!!!! # removing EB's -dX_Low from the X0_Low specification
-        X0_Low = self.getMultipleOf(X0_Low, multipleof=dX_Low)
+        X0_Low = getMultipleOf(X0_Low, multipleof=dX_Low)
         Y0_Low = np.floor( -LY_Low/2                   )   # Starting on integer value for aesthetics
         Z0_Low = lowbts.z[0]                               # we start at lowest to include tower
     
-        XMax_Low = self.getMultipleOf(max(xWT) + self.extent_low[1]*D, multipleof=dX_Low)
+        XMax_Low = getMultipleOf(max(xWT) + self.extent_low[1]*D, multipleof=dX_Low)
         LX_Low = XMax_Low-X0_Low
     
-        nX_Low = int(np.ceil(LX_Low/dX_Low)+1)  # plus 1 from the guidance
+        nX_Low = int(np.ceil(LX_Low/dX_Low)+1)
         nY_Low = len(lowbts.y)    # !!!!!!! JJ: different from what EB has
         nZ_Low = len(lowbts.z)
     
