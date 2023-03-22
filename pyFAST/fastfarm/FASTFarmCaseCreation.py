@@ -346,6 +346,9 @@ class FFCaseCreation:
                 self.InflowWindFile['Filename_BTS']   = '"./TurbSim"'
                 if writeFiles:
                     self.InflowWindFile.write( os.path.join(currPath,f'InflowWind.dat'))
+                    for seed in range(self.nSeeds):
+                        self.InflowWindFile.write( os.path.join(currPath,f'Seed_{seed}','InflowWind.dat'))
+
         
                 for t in range(self.nTurbines):
                     # Recover info about the current turbine in CondXX_*/CaseYY_
@@ -1315,7 +1318,7 @@ class FFCaseCreation:
                     ff_file = FASTInputFile(outputFSTF)
         
                     # Open output file and change additional values manually or make sure we have the correct ones
-                    ff_file['InflowFile']  = f'"../{self.IWfilename}"'   
+                    ff_file['InflowFile']  = f'"./{self.IWfilename}"'   
                     ff_file['Mod_AmbWind'] = 1  # 1: LES boxes; 2: single TurbSim; 3: multiple TurbSim
                     ff_file['TMax'] = self.tmax
         
@@ -1400,7 +1403,8 @@ class FFCaseCreation:
         
                     # Get dictionary with all the D{X,Y,Z,t}, L{X,Y,Z,t}, N{X,Y,Z,t}, {X,Y,Z}0
                     dt_low_desired = self.Cmeander*D_/(10*Vhub_) # will be made multiple of dT_High inside _getBoxesParamsForFF
-                    d = self._getBoxesParamsForFF(lowbts, highbts, dt_low_desired, D_, HubHt_, xWT, yt)
+                    #d = self._getBoxesParamsForFF(lowbts, highbts, dt_low_desired, D_, HubHt_, xWT, yt)
+                    d = self._getBoxesParamsForFF(lowbts, highbts, self.dt_low_les, D_, HubHt_, xWT, yt)
         
                     # Write the file
                     writeFastFarm(outputFSTF, templateFSTF, xWT, yt, zWT, d, OutListT1=self.outlistFF, noLeadingZero=True)
@@ -1408,7 +1412,7 @@ class FFCaseCreation:
         
                     # Open saved file and change additional values manually or make sure we have the correct ones
                     ff_file = FASTInputFile(outputFSTF)
-                    ff_file['InflowFile'] = f'"../{self.IWfilename}"'
+                    ff_file['InflowFile'] = f'"./{self.IWfilename}"'
                     #ff_file['DT']=1.0
                     ff_file['Mod_AmbWind'] = 3  # 1: LES boxes; 2: single TurbSim; 3: multiple TurbSim
                     ff_file['TMax'] = self.tmax
@@ -1425,26 +1429,27 @@ class FFCaseCreation:
                         self.dr = round(self.D/10)
                     ff_file['dr'] = self.dr
                     ff_file['NumRadii']  = int(np.ceil(3*D_/(2*self.dr) + 1))
-                    ff_file['NumPlanes'] = int(np.ceil( 20*D_/(dt_low_desired*Vhub_*(1-1/6)) ) )
+                    #ff_file['NumPlanes'] = int(np.ceil( 20*D_/(dt_low_desired*Vhub_*(1-1/6)) ) )
+                    ff_file['NumPlanes'] = int(np.ceil( 20*D_/(self.dt_low_les*Vhub_*(1-1/6)) ) )
         
                     # Vizualization outputs
                     ff_file['WrDisWind'] = 'False'
                     ff_file['WrDisDT']   = ff_file['DT_Low']*10    # writeFastFarm sets this to be the same as DT_Low
                     ff_file['NOutDisWindXY'] = len(self.planes_xy)
-                    ff_file['OutDisWindZ']   = ' '.join(map(str, self.planes_xy))
+                    ff_file['OutDisWindZ']   = ', '.join(map(str, self.planes_xy))
                     ff_file['NOutDisWindYZ'] = len(self.planes_yz)
-                    ff_file['OutDisWindX']   = ' '.join(map(str, self.planes_yz))
+                    ff_file['OutDisWindX']   = ', '.join(map(str, self.planes_yz))
                     ff_file['NOutDisWindXZ'] = len(self.planes_xz)
-                    ff_file['OutDisWindY']   = ' '.join(map(str, self.planes_xz))
+                    ff_file['OutDisWindY']   = ', '.join(map(str, self.planes_xz))
         
                     # Modify wake outputs
-                    ff_file['NOutDist'] = 7
-                    ff_file['OutDist']  = ' '.join(map(str,  [1,1.5,2,2.5,3,3.5,4]*D_))
+                    ff_file['NOutDist'] = 9
+                    ff_file['OutDist']  = ', '.join(map(str,  [1,1.5,2,2.5,3,3.5,4,5,6]*D_))
                     # Mofidy wind output
-                    ff_file['NWindVel'] = 9
-                    ff_file['WindVelX'] = ' '.join(map(str, xWT[:9]))
-                    ff_file['WindVelY'] = ' '.join(map(str, yWT[:9]))
-                    ff_file['WindVelZ'] = ' '.join(map(str, zWT[:9]+self.zhub))
+                    ff_file['NWindVel'] = len(xWT[:9])
+                    ff_file['WindVelX'] = ', '.join(map(str, xWT[:9]))
+                    ff_file['WindVelY'] = ', '.join(map(str, yWT[:9]))
+                    ff_file['WindVelZ'] = ', '.join(map(str, zWT[:9]+self.zhub))
         
                     ff_file.write(outputFSTF)
 
