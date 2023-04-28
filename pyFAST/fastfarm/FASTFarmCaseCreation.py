@@ -58,7 +58,7 @@ def modifyProperty(fullfilename, entry, value):
 
 class FFCaseCreation:
 
-    def __init__(self, path, wts, cmax, fmax, Cmeander, tmax, zbot, vhub, shear, TIvalue, inflow_deg, dt_high_les, ds_high_les, extent_high, dt_low_les, ds_low_les, extent_low, ffbin, mod_wake=1, yaw_init=None, ADmodel=None, EDmodel=None, nSeeds=6, LESpath=None, sweepWakeSteering=False, sweepYawMisalignment=False, seedValues=None, refTurb_rot=0, verbose=0):
+    def __init__(self, path, wts, cmax, fmax, Cmeander, tmax, zbot, vhub, shear, TIvalue, inflow_deg, dt_high_les=None, ds_high_les=None, extent_high=None, dt_low_les=None, ds_low_les=None, extent_low=None, ffbin=None, mod_wake=1, yaw_init=None, ADmodel=None, EDmodel=None, nSeeds=6, LESpath=None, sweepWakeSteering=False, sweepYawMisalignment=False, seedValues=None, refTurb_rot=0, wake_mod=1, verbose=0):
         '''
         Full setup of a FAST.Farm simulations, can create setups for LES- or TurbSim-driven scenarios.
         
@@ -70,6 +70,8 @@ class FFCaseCreation:
             Full path of the FAST.Farm binary to be executed
         refTurb_rot: int
             Index of reference turbine which the rotation of the farm will occur. Default is 0, the first one.
+        wake_mod: int
+            Wake model to be used on the computation of high- and low-res boxes temporal and spatial resolutions
         '''
 
         self.path        = path
@@ -101,6 +103,7 @@ class FFCaseCreation:
         self.seedValues  = seedValues
         self.refTurb_rot = refTurb_rot
         self.verbose     = verbose
+        self.wake_mod    = wake_mod
         self.attempt     = 1
                                         
                                         
@@ -181,16 +184,18 @@ class FFCaseCreation:
         for t in self.TIvalue:
             if t<0:  raise ValueError(f'TI cannot be negative. Received {t}.')
             if t<1:  raise ValueError(f'TI should be given in percentage (e.g. "10" for a 10% TI). Received {t}.')
+        
+        # Set domain extents defaults if needed
+        default_extent_low  = [3,6,3,3,2]
+        default_extent_high = 0.6
+        if self.extent_low is None:
+            self.extent_low = default_extent_low
+        if self.extent_high is None:
+            self.extent_high = default_extent_high
 
-        # Check the ds and dt for the high- and low-res boxes
+        # Check domain extents
         if not (np.array(self.extent_low)>=0).all():
             raise ValueError(f'The array for low-res box extents should be given with positive values')
-        if self.dt_low_les%(self.dt_high_les-1e-15) > 1e-12:
-            raise ValueError(f'The temporal resolution dT_Low should be a multiple of dT_High')
-        if self.dt_low_les < self.dt_high_les:
-            raise ValueError(f'The temporal resolution dT_High should not be greater than dT_Low on the LES side')
-        if self.ds_low_les < self.ds_high_les:
-            raise ValueError(f'The grid resolution dS_High should not be greater than dS_Low on the LES side')
         if not isinstance(self.extent_high, (float,int)):
             raise ValueError(f'The extent_high should be a scalar')
         if self.extent_high<=0:
@@ -198,8 +203,14 @@ class FFCaseCreation:
 
 
         # Check the FAST.Farm binary
-        if not os.path.isfile(self.ffbin):
-            raise ValueError (f'The FAST.Farm binary given does not appear to exist')
+        if self.ffbin is None:
+            self.ffbin = shutil.which('FAST.Farm')
+            if not self.ffbin:
+                raise ValueError(f'No FAST.Farm binary was given and none could be found in $PATH.')
+            if self.verbose>1:
+                print('WARNING: No FAST.Farm binary has been given. Using {self.ffbin}')
+        elif not os.path.isfile(self.ffbin):
+            raise ValueError (f'The FAST.Farm binary given does not exist.')
 
 
         # Check turbine conditions arrays for consistency
@@ -223,7 +234,7 @@ class FFCaseCreation:
         if self.seedValues is None:
             self.seedValues = [2318573, 122299, 123456, 389432, -432443, 9849898]
         if len(self.seedValues) != self.nSeeds:
-            raise ValueError(f'Number of seeds is {self.nSeeds} but {len(self.seedValues)} seed values were given. '
+            raise ValueError(f'Number of seeds is {self.nSeeds} but {len(self.seedValues)} seed values were given. '\
                              f'Adjust the seedValues array accordingly')
   
         # Check LES parameters
@@ -234,19 +245,84 @@ class FFCaseCreation:
             self.inflowStr = 'LES'
             for p in self.LESpath:
                 if not os.path.isdir(p):
-                    raise ValueError (f'The path {p} does not exist')
-
-        # Check the reference turbine for rotation
-        if self.refTurb_rot >= self.nTurbines:
-            raise ValueError(f'The index for the reference turbine for the farm to be rotated around is greater than the number of turbines')
+                    raise ValueError (f'The LES path {p} does not exist')
+            # LES is requested, so domain limits must be given
+            if None in (self.dt_high_les, self.ds_high_les, self.dt_low_les, self.ds_low_les):
+                raise ValueError (f'An LES-driven case was requested, but one or more grid parameters were not given. '\
+                                   'Set `dt_high_les`, `ds_high_les`, `dt_low_les`, and `ds_low_les` based on your LES boxes.')
+            
 
         # Check the wake model (1:Polar; 2:Curl; 3:Cartesian)
         if self.mod_wake not in [1,2,3]:
             raise ValueError(f'Wake model `mod_wake` should be 1 (Polar), 2 (Curl), or 3 (Cartesian). Received {self.mod_wake}.')
 
+
+        # Check the ds and dt for the high- and low-res boxes. If not given, call the
+        # AMR-Wind auxiliary function with dummy domain limits. 
+        if None in (self.dt_high_les, self.ds_high_les, self.dt_low_les, self.ds_low_les):
+            wake_mod_str = ['','polar', 'curled', 'cartesian']
+            print(f'WARNING: One or more temporal or spatial resolution for low- and high-res domains were not given.')
+            print(f'         Estimated values for {wake_mod_str[self.wake_mod]} wake model shown below.')
+            self._determine_resolutions_from_dummy_amrwind_grid()
+            
+        # Check the domain extents
+        if self.dt_low_les%(self.dt_high_les-1e-15) > 1e-12:
+            raise ValueError(f'The temporal resolution dT_Low should be a multiple of dT_High')
+        if self.dt_low_les < self.dt_high_les:
+            raise ValueError(f'The temporal resolution dT_High should not be greater than dT_Low on the LES side')
+        if self.ds_low_les < self.ds_high_les:
+            raise ValueError(f'The grid resolution dS_High should not be greater than dS_Low on the LES side')
+
+
+
+        # Check the reference turbine for rotation
+        if self.refTurb_rot >= self.nTurbines:
+            raise ValueError(f'The index for the reference turbine for the farm to be rotated around is greater than the number of turbines')
+
         # Set aux variable
         self.templateFilesCreatedBool = False
         self.TSlowBoxFilesCreatedBool = False
+
+
+
+    def _determine_resolutions_from_dummy_amrwind_grid(self):
+
+        from pyFAST.fastfarm.AMRWindSimulation import AMRWindSimulation
+
+        # Create values and keep variable names consistent across interfaces
+        dummy_dt = 0.1
+        dummy_ds = 1
+        prob_lo = (-10005, -10005, 0)     # The 5 m offset is such that we
+        prob_hi = ( 10005,  10005, 1000)  # have a cell center at (0,0)
+        n_cell  = ((prob_hi[0]-prob_lo[0])/dummy_ds,
+                   (prob_hi[1]-prob_lo[1])/dummy_ds,
+                   (prob_hi[2]-prob_lo[2])/dummy_ds)
+        max_level = 0
+        incflo_velocity_hh = (max(self.vhub), 0, 0)
+        buffer_lr = self.extent_low
+        buffer_hr = self.extent_high
+
+        amr = AMRWindSimulation(self.wts, dummy_dt, prob_lo, prob_hi,
+                                n_cell, max_level, incflo_velocity_hh,
+                                buffer_lr = self.extent_low,
+                                buffer_hr = self.extent_high,
+                                wake_mod = self.wake_mod)
+
+        print(f'         High-resolution: ds: {amr.ds_hr} m, dt: {amr.dt_high_les} s')
+        print(f'         Low-resolution:  ds: {amr.ds_lr} m, dt: {amr.dt_low_les} s\n')
+        print(f'WARNING: If the above values are too fine or manual tuning is warranted, specify them manually.')
+        print(f'         To do that, specify, e.g., `dt_high_les = {2*amr.dt_high_les}` to the call to `FFCaseCreation`.')
+        print(f'                                    `ds_high_les = {2*amr.ds_high_les}`')
+        print(f'                                    `dt_low_les  = {2*amr.dt_low_les}`')
+        print(f'                                    `ds_low_les  = {2*amr.ds_low_les}`')
+        print(f'         If the values above are okay, you can safely ignore this warning.\n')
+
+        self.dt_high_les = amr.dt_high_les
+        self.ds_high_les = amr.dt_high_les
+        self.dt_low_les  = amr.dt_low_les
+        self.ds_low_les  = amr.dt_low_les
+
+
 
 
     def _create_dir_structure(self):     
@@ -745,8 +821,8 @@ class FFCaseCreation:
         if len(self.vhub)==len(self.shear) and len(self.shear)==len(self.TIvalue):
             self.nConditions = len(self.vhub)
 
-            if self.verbose>1: print(f'The length of vhub, shear, and TI are the same. Assuming each position is a condition.')
-            if self.verbose>0: print(f'Creating {self.nConditions} conditions')
+            if self.verbose>1: print(f'\nThe length of vhub, shear, and TI are the same. Assuming each position is a condition.', end='\r')
+            if self.verbose>0: print(f'\nCreating {self.nConditions} conditions')
 
             self.allCond = xr.Dataset({'vhub':    (['cond'], self.vhub   ),
                                        'shear':   (['cond'], self.shear  ),
