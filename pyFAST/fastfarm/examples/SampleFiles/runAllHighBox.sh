@@ -3,8 +3,9 @@
 #SBATCH --output log.highBox
 #SBATCH --nodes=3
 #SBATCH --ntasks-per-node=36
-#SBATCH --time=4-00
-#SBATCH --account=car
+#SBATCH --time=4:00:00
+#SBATCH --mem=150G
+#SBATCH --account=osw
 
 source $HOME/.bash_profile
 
@@ -32,13 +33,16 @@ nSeeds=6
 nTurbines=12
 # ******************************************************************************** #
 
+rampercpu=$((149000/36))
+
 for cond in ${condList[@]}; do
     for case in ${caseList[@]}; do
         for ((seed=0; seed<$nSeeds; seed++)); do
             for ((t=1; t<=$nTurbines; t++)); do
                 dir=$(printf "%s/%s/%s/Seed_%01d/TurbSim" $basepath $cond $case $seed)
                 echo "Submitting $dir/HighT$t.inp"
-                srun -n1 -N1 --exclusive $turbsimbin $dir/HighT$t.inp > $dir/log.hight$t.seed$seed.txt 2>&1 &
+                srun -n1 -N1 --exclusive --mem-per-cpu=$rampercpu $turbsimbin $dir/HighT$t.inp > $dir/log.hight$t.seed$seed.txt 2>&1 &
+                sleep 0.1
             done
         done
     done

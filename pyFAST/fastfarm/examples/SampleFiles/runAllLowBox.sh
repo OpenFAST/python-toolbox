@@ -3,8 +3,9 @@
 #SBATCH --output log.lowBox
 #SBATCH --nodes=2
 #SBATCH --ntasks-per-node=12
-#SBATCH --time=4-00
-#SBATCH --account=shellwind
+#SBATCH --time=2-00
+#SBATCH --mem=150G
+#SBATCH --account=osw
 
 source $HOME/.bash_profile
 
@@ -39,7 +40,7 @@ for cond in ${condList[@]}; do
     for((seed=0; seed<$nSeeds; seed++)); do
        dir=$(printf "%s/%s/Seed_%01d" $basepath $cond $seed)
        echo "Submitting $dir/Low.inp in node $currNode"
-       srun -n1 -N1 --exclusive --nodelist=$currNode $turbsimbin $dir/Low.inp > $dir/log.low.seed$seed.txt &
+       srun -n1 -N1 --exclusive --nodelist=$currNode --mem-per-cpu=25000M $turbsimbin $dir/Low.inp > $dir/log.low.seed$seed.txt 2>&1 &
    done
    (( nodeToUse++ ))
 done
