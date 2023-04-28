@@ -11,6 +11,19 @@ from pyFAST.fastfarm.TurbSimCaseCreation import TSCaseCreation, writeTimeSeriesF
 
 def cosd(t): return np.cos(np.deg2rad(t))
 def sind(t): return np.sin(np.deg2rad(t))
+def checkIfExists(f):
+    if os.path.isfile(f):
+        return True
+    else:
+        print(f'File {f} does not exist.')
+        return False
+
+def shutilcopy2_untilSuccessful(src, dst):
+    shutil.copy2(src, dst)
+    if not checkIfExists(dst):
+        print(f'File {dst} not created. Trying again.\n')
+        shutilcopy2_untilSuccessful(src,dst)
+
 def getMultipleOf(val, multipleof):
     '''
     Get integer multiple of a quantity.
@@ -41,6 +54,7 @@ def modifyProperty(fullfilename, entry, value):
     # Save the new file
     f.write(fullfilename)
     return
+
 
 class FFCaseCreation:
 
@@ -87,6 +101,7 @@ class FFCaseCreation:
         self.seedValues  = seedValues
         self.refTurb_rot = refTurb_rot
         self.verbose     = verbose
+        self.attempt     = 1
                                         
                                         
         if self.verbose>0: print(f'Checking inputs...', end='\r')
@@ -260,12 +275,24 @@ class FFCaseCreation:
                 yawCase_      = self.allCases['yawCase'        ].sel(case=case).values
             
                 # Set current path name string. The case is of the following form: Case00_wdirp10_WSfalse_YMfalse_12fED_12ADyn
-                caseStr = f"Case{case:02d}_wdir{f'{int(inflow_deg_):+03d}'.replace('+','p').replace('-','m')}"\
-                          f"_WS{str(wakeSteering_).lower()}_YM{str(misalignment_).lower()}"\
-                          f"_{nFED_}fED_{nADyn_}ADyn"
+                ndigits = len(str(self.nCases))
+                caseStr = f"Case{case:0{ndigits}d}_wdir{f'{int(inflow_deg_):+03d}'.replace('+','p').replace('-','m')}"
+                # Add standard sweeps to the case name
+                if self.sweepWS:
+                    caseStr += f"_WS{str(wakeSteering_).lower()}"
+                if self.sweepYM:
+                    caseStr += f"_YM{str(misalignment_).lower()}"
+                if self.sweepEDmodel:
+                    caseStr += f"_{nFED_}fED"
+                if self.sweepADmodel:
+                    caseStr += f"_{nADyn_}ADyn"
+
+                #caseStr = f"Case{case:0{ndigits}d}_wdir{f'{int(inflow_deg_):+03d}'.replace('+','p').replace('-','m')}"\
+                #          f"_WS{str(wakeSteering_).lower()}_YM{str(misalignment_).lower()}"\
+                #          f"_{nFED_}fED_{nADyn_}ADyn"
                 # If sweeping on yaw, then add yaw case to dir name
                 if len(np.unique(self.allCases.yawCase)) > 1:
-                    caseStr = caseStr + f"_yawCase{yawCase_}"
+                    caseStr += f"_yawCase{yawCase_}"
                 
                 caseDirList_.append(caseStr)
                 casePath = os.path.join(condPath, caseStr)
@@ -297,7 +324,9 @@ class FFCaseCreation:
 
         # Loops on all conditions/cases creating DISCON and *Dyn files
         for cond in range(self.nConditions):
+            print(f'Processing condition {self.condDirList[cond]}')
             for case in range(self.nCases):
+                print(f'    Processing case {self.caseDirList[case]}', end='\r')
                 currPath = os.path.join(self.path, self.condDirList[cond], self.caseDirList[case])
         
                 # Recover info about the current CondXX_*/CaseYY_*
@@ -321,7 +350,7 @@ class FFCaseCreation:
                 # Write updated DISCON and *Dyn files. 
                 if writeFiles:
                     self.HydroDynFile.write(os.path.join(currPath, self.HDfilename))
-                    shutil.copy2(os.path.join(self.templatePath,self.controllerInputfilename), os.path.join(currPath,self.controllerInputfilename))
+                    shutilcopy2_untilSuccessful(os.path.join(self.templatePath,self.controllerInputfilename), os.path.join(currPath,self.controllerInputfilename))
 
                 # Depending on the controller, the controller input file might need to be in the same level as the .fstf input file.
                 # The ideal solution would be to give the full path to the controller input file, but we may not have control over
@@ -366,12 +395,12 @@ class FFCaseCreation:
                     if EDmodel_ == 'FED':
                         # Update each turbine's ElastoDyn
                         self.ElastoDynFile['NacYaw']   = yaw_deg_ + yaw_mis_deg_
-                        shutil.copy2(os.path.join(self.templatePath,self.bladefilename), os.path.join(currPath,self.bladefilename))
                         self.ElastoDynFile['BldFile1'] = self.ElastoDynFile['BldFile2'] = self.ElastoDynFile['BldFile3'] = f'"{self.bladefilename}"'
-                        shutil.copy2(os.path.join(self.templatePath,self.towerfilename), os.path.join(currPath,self.towerfilename))
-                        self.ElastoDynFile['TwrFile'] = f'"{self.towerfilename}"'
+                        self.ElastoDynFile['TwrFile']  = f'"{self.towerfilename}"'
                         self.ElastoDynFile['Azimuth']  = round(np.random.uniform(low=0, high=360)) # start at a random value  #JJ is this needed?
                         if writeFiles:
+                            if t==0: shutilcopy2_untilSuccessful(os.path.join(self.templatePath,self.bladefilename), os.path.join(currPath,self.bladefilename))
+                            if t==0: shutilcopy2_untilSuccessful(os.path.join(self.templatePath,self.towerfilename), os.path.join(currPath,self.towerfilename))
                             self.ElastoDynFile.write(os.path.join(currPath,f'{self.EDfilename}{t+1}_mod.dat'))
         
                     elif EDmodel_ == 'SED':
@@ -415,7 +444,7 @@ class FFCaseCreation:
                         self.turbineFile['CompAero']     = 3  # 1: AeroDyn v14;    2: AeroDyn v15;   3: AeroDisk
                         self.turbineFile['AeroFile']     = f'"{self.ADskfilepath}"'
                         if writeFiles:
-                            shutil.copy2(self.coeffTablefilepath, os.path.join(currPath,self.coeffTablefilename))
+                            if t==0: shutilcopy2_untilSuccessful(self.coeffTablefilepath, os.path.join(currPath,self.coeffTablefilename))
                     self.turbineFile['ServoFile']    = f'"./{self.SrvDfilename}{t+1}_mod.dat"'
                     self.turbineFile['HydroFile']    = f'"./{self.HDfilename}"'
                     self.turbineFile['SubFile']      = f'"{self.SubDfilepath}"'
@@ -426,6 +455,73 @@ class FFCaseCreation:
         
                     if writeFiles:
                         self.turbineFile.write( os.path.join(currPath,f'{self.turbfilename}{t+1}.fst'))
+
+            print(f'Done processing condition {self.condDirList[cond]}                                              ')
+
+        # Some files, for some reason, do not get copied properly. This leads to a case crashing due to missing file.
+        # Let's check if all files have been indded properly copied. If not, the copyTurbineFilesForEachCase will be
+        # called again until it does (up to 5 times)
+        if writeFiles:
+            if self._were_all_turbine_files_copied() == False and self.attempt<=5:
+                self.attempt += 1
+                print(f'Not all files were copied successfully. Trying again. Attempt number {self.attempt}.')
+                self.copyTurbineFilesForEachCase()
+            elif self.attempt > 5:
+                print(f"WARNING: Not all turbine files were copied successfully after 5 tries.")
+                print(f"         Check them manually. This shouldn't occur. Consider finding ")
+                print(f"         and fixing the bug and submitting a PR.")
+            else:
+                print(f'Passed check: all files were copied successfully.')
+
+
+    def _were_all_turbine_files_copied(self):
+        '''
+        Check if all files created in copyTurbineFilesForEachCase exist
+        '''
+
+        for cond in range(self.nConditions):
+            for case in range(self.nCases):
+                currPath = os.path.join(self.path, self.condDirList[cond], self.caseDirList[case])
+        
+                _ = checkIfExists(os.path.join(currPath, self.HDfilename))
+                if not _: return False
+                _ = checkIfExists(os.path.join(currPath,self.controllerInputfilename))
+                if not _: return False
+                _ = checkIfExists( os.path.join(currPath,f'InflowWind.dat'))
+                if not _: return False
+
+                for seed in range(self.nSeeds):
+                    _ = checkIfExists(os.path.join(currPath,f'Seed_{seed}','InflowWind.dat'))
+                    if not _: return False
+
+                for t in range(self.nTurbines):
+                    ADmodel_     = self.allCases.sel(case=case, turbine=t)['ADmodel'].values
+                    EDmodel_     = self.allCases.sel(case=case, turbine=t)['EDmodel'].values
+                    if EDmodel_ == 'FED':
+                        _ = checkIfExists(os.path.join(currPath,self.bladefilename))
+                        if not _: return False
+                        _ = checkIfExists(os.path.join(currPath,self.towerfilename))
+                        if not _: return False
+                        _ = checkIfExists(os.path.join(currPath,f'{self.EDfilename}{t+1}_mod.dat'))
+                        if not _: return False
+        
+                    elif EDmodel_ == 'SED':
+                        _ = checkIfExists(os.path.join(currPath,f'{self.SEDfilename}{t+1}_mod.dat'))
+                        if not _: return False
+        
+                    _ = checkIfExists(os.path.join(currPath,f'{self.SrvDfilename}{t+1}_mod.dat'))
+                    if not _: return False
+        
+                    if ADmodel_ == 'ADsk':
+                        _ = checkIfExists(os.path.join(currPath,self.coeffTablefilename))
+                        if not _: return False
+
+                    _ = checkIfExists(os.path.join(currPath,f'{self.turbfilename}{t+1}.fst'))
+                    if not _: return False
+
+        # If we get to this point, all files exist
+        return True
+
 
                                         
     def setTemplateFilename(self, templatePath=None, EDfilename=None, SEDfilename=None, HDfilename=None, SrvDfilename=None, ADfilename=None, ADskfilename=None, SubDfilename=None, IWfilename=None, BDfilepath=None, bladefilename=None, towerfilename=None, turbfilename=None, libdisconfilepath=None, controllerInputfilename=None, coeffTablefilename=None, turbsimLowfilepath=None, turbsimHighfilepath=None, FFfilename=None):
@@ -674,8 +770,8 @@ class FFCaseCreation:
   
 
     def _create_all_cases(self):
-        # Generate the different "cases" (inflow angle, and misalignment and wakesteer bools). She reads from ../NewFFParams_Shell.csv
-        # If misalignment true, then the actual yaw is yaw[turb]=np.random.uniform(low=-8.0, high=8.0). CaseSetup/ParameterManipulation.py:166
+        # Generate the different "cases" (inflow angle, and misalignment and wakesteer bools).
+        # If misalignment true, then the actual yaw is yaw[turb]=np.random.uniform(low=-8.0, high=8.0).
         
         # Calculate the total number of cases given sweeps requested. Multipliers for wake steering, yaw misalignment, and reduced-order models
         nWindDir = len(np.unique(self.inflow_deg))
@@ -725,12 +821,16 @@ class FFCaseCreation:
         # Count number of simplified models to add that information to the xarray. If their length is 1, it means they weren't requested
         if len(self.ADmodel) == 1:
             nADyn = self.nTurbines
+            self.sweepADmodel = False
         else:
             nADyn = [ self.ADmodel[i].count('ADyn') for i in range(len(self.ADmodel)) ]
+            self.sweepADmodel = True
         if len(self.EDmodel) == 1:
            nFED = self.nTurbines
+           self.sweepEDmodel = False
         else:
             nFED = [ self.EDmodel[i].count('FED') for i in range(len(self.EDmodel)) ]
+            self.sweepADmodel = True
         
         # Come up with an ordered "yaw case" numbering for dir name
         yawCase =  np.arange(nCasesYawmultiplier)+1
@@ -1254,12 +1354,14 @@ class FFCaseCreation:
         # Clean unnecessary directories and files created by the general setup
         for cond in range(self.nConditions):
             for seed in range(self.nSeeds):
-                shutil.rmtree(os.path.join(self.path, self.condDirList[cond], f'Seed_{seed}'))
+                currpath = os.path.join(self.path, self.condDirList[cond], f'Seed_{seed}')
+                if os.path.isdir(currpath):  shutil.rmtree(currpath)
     
             for case in range(self.nCases):
                 #shutil.rmtree(os.path.join(path, condDirList[cond], caseDirList[case], f'Seed_0','InflowWind.dat')) # needs to exist
                 for seed in range(seedsToKeep,self.nSeeds):
-                    shutil.rmtree(os.path.join(self.path, self.condDirList[cond], self.caseDirList[case], f'Seed_{seed}'))
+                    currpath = os.path.join(self.path, self.condDirList[cond], self.caseDirList[case], f'Seed_{seed}')
+                    if os.path.isdir(currpath):  shutil.rmtree(currpath)
                         
                         
         
@@ -1269,10 +1371,12 @@ class FFCaseCreation:
         for cond in range(self.nConditions):
             for case in range(self.nCases):
                 for seed in range(self.seedsToKeep):
-                    # Remove TurbSim dir and create LES boxes dir
-                    shutil.rmtree(os.path.join(self.path, self.condDirList[cond], self.caseDirList[case], f'Seed_{seed}', 'TurbSim'))
-                    if not os.path.exists(os.path.join(self.path,self.condDirList[cond],self.caseDirList[case],f'Seed_{seed}',LESboxesDirName)):
-                        os.makedirs(os.path.join(self.path,self.condDirList[cond],self.caseDirList[case],f'Seed_{seed}',LESboxesDirName))
+                    # Remove TurbSim dir
+                    currpath = os.path.join(self.path, self.condDirList[cond], self.caseDirList[case], f'Seed_{seed}', 'TurbSim')
+                    if os.path.isdir(currpath):  shutil.rmtree(currpath)
+                    # Create LES boxes dir
+                    currpath = os.path.join(self.path,self.condDirList[cond],self.caseDirList[case],f'Seed_{seed}',LESboxesDirName)
+                    if not os.path.isdir(currpath):  os.makedirs(currpath)
         
                     # Low-res box
                     try:
@@ -1293,7 +1397,7 @@ class FFCaseCreation:
         
         
         
-        # Loops on all conditions/cases and cases for FAST.Farm  (following python-toolbox/pyFAST/fastfarm/examples/Ex2_FFarmInputSetup.py)
+        # Loops on all conditions/cases and cases for FAST.Farm
         for cond in range(self.nConditions):
             for case in range(self.nCases):
                 for seed in range(seedsToKeep):
@@ -1345,7 +1449,7 @@ class FFCaseCreation:
         
                     # Vizualization outputs
                     ff_file['WrDisWind'] = 'False'
-                    ff_file['WrDisDT']   = ff_file['DT_Low-VTK']*10    # writeFastFarm sets this to be the same as DT_Low
+                    ff_file['WrDisDT']   = ff_file['DT_Low-VTK']    # default is the same as DT_Low-VTK
                     ff_file['NOutDisWindXY'] = len(self.planes_xy)
                     ff_file['OutDisWindZ']   = ', '.join(map(str, self.planes_xy))
                     ff_file['NOutDisWindYZ'] = len(self.planes_yz)
@@ -1434,7 +1538,7 @@ class FFCaseCreation:
         
                     # Vizualization outputs
                     ff_file['WrDisWind'] = 'False'
-                    ff_file['WrDisDT']   = ff_file['DT_Low']*10    # writeFastFarm sets this to be the same as DT_Low
+                    ff_file['WrDisDT']   = ff_file['DT_Low']      # default is the same as DT_Low
                     ff_file['NOutDisWindXY'] = len(self.planes_xy)
                     ff_file['OutDisWindZ']   = ', '.join(map(str, self.planes_xy))
                     ff_file['NOutDisWindYZ'] = len(self.planes_yz)
@@ -1636,7 +1740,7 @@ class FFCaseCreation:
 
 
 
-    def FF_slurm_submit(self):
+    def FF_slurm_submit(self, A=None, t=None, delay=4):
 
         # ----------------------------------
         # ---------- Run FAST.Farm ---------
@@ -1650,9 +1754,16 @@ class FFCaseCreation:
                     
                     # Submit the script to SLURM
                     fname = f'runFASTFarm_cond{cond}_case{case}_seed{seed}.sh'
-                    sub_command = f"sbatch {fname}"
+
+                    options = ''
+                    if A is not None:
+                        options += f'-A {A} '
+                    if t is not None:
+                        options += f'-t {t}'
+
+                    sub_command = f"sbatch {options} {fname}"
                     print(f'Calling: {sub_command}')
                     _ = subprocess.call(sub_command, cwd=self.path, shell=True)
-                    time.sleep(4) # Sometimes the same job gets submitted twice. This gets around it.
+                    time.sleep(delay) # Sometimes the same job gets submitted twice. This gets around it.
 
 
