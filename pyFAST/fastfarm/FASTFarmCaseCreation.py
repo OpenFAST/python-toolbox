@@ -56,29 +56,106 @@ def modifyProperty(fullfilename, entry, value):
     return
 
 
+
 class FFCaseCreation:
 
-    def __init__(self, path, wts, cmax, fmax, Cmeander, tmax, zbot, vhub, shear, TIvalue, inflow_deg, dt_high_les=None, ds_high_les=None, extent_high=None, dt_low_les=None, ds_low_les=None, extent_low=None, ffbin=None, mod_wake=1, yaw_init=None, ADmodel=None, EDmodel=None, nSeeds=6, LESpath=None, sweepWakeSteering=False, sweepYawMisalignment=False, seedValues=None, refTurb_rot=0, wake_mod=1, verbose=0):
+    def __init__(self,
+                 path,
+                 wts,
+                 tmax,
+                 zbot,
+                 vhub,
+                 shear,
+                 TIvalue,
+                 inflow_deg,
+                 dt_high_les = None,
+                 ds_high_les = None,
+                 extent_high = None,
+                 dt_low_les  = None,
+                 ds_low_les  = None,
+                 extent_low  = None,
+                 ffbin = None,
+                 mod_wake = 1,
+                 yaw_init = None,
+                 ADmodel = None,
+                 EDmodel = None,
+                 nSeeds = 6,
+                 seedValues = None,
+                 LESpath = None,
+                 sweepWakeSteering = False,
+                 sweepYawMisalignment = False,
+                 refTurb_rot = 0,
+                 verbose = 0):
         '''
         Full setup of a FAST.Farm simulations, can create setups for LES- or TurbSim-driven scenarios.
         
+        Inputs
+        ------
+        path: str
+            Full path for the target case directory
+        wts: dictionary
+            Wind farm layout and turbine parameters in dictionary form
+        tmax: scalar
+            Max simulation time given in seconds
+        vhub: list of scalars or single scalar
+            Wind speeds at hub height to sweep on. Accepts a list or single value
+        shear: list of scalars or single scalar
+            Shear values (power-law exponents) to sweep on. Accepts a list or single value
+        TIvalue: list of scalars or single scalar
+            TI values at hub height to sweep on. Accepts a list or single value
+        inflow_deg: list of scalars or single scalar
+            Inflow angles to sweep on. Accepts a list or single value
+        dt_high_les: scalar
+            Time step of the desired high-resolution box. If LES boxes given, should
+            match LES box; otherwise desired TurbSim boxes. Default values as given in the
+            modeling guidances are used if none is given
+        ds_high_les: scalar
+            Grid resolution of the desired high-resolution box. If LES boxes given, should
+            match LES box; otherwise desired TurbSim boxes. Default values as given in the
+            modeling guidances are used if none is given
+        dt_low_les: scalar
+            Time step of the desired low-resolution box. If LES boxes given, should match
+            match LES box; otherwise desired TurbSim boxes. Default values as given in the
+            modeling guidances are used if none is given
+        ds_low_les: scalar
+            Grid resolution of the desired low-resolution box. If LES boxes given, should
+            match LES box; otherwise desired TurbSim boxes. Default values as given in the
+            modeling guidances are used if none is given
+        ff_bin: str
+            Full path of the FAST.Farm binary to be used. If not specified, the one available
+            in the $PATH will be used
+        mod_wake: int
+            Wake model to be used on the computation of high- and low-res boxes temporal and
+            spatial resolutions if those are not specified
+        yaw_init: list of scalars or single scalar
+            List of yaw to sweep on. Given as a 2-D array if len(inflow_deg)>1. One row of yaw
+            per wind direction given in inflow_deg. Each row has nTurbines values
+        ADmodel: list of strings
+            List of AeroDyn/AeroDisk models to use for each case
+        EDmodel: list of strings
+            List of ElastoDym/SimplifiedElastoDyn models to use for each case
+        nSeeds: int
+            Number of seeds used for TurbSim simulations. If changing this value, give seedValues
+        seedValues: list of int
+            Seed value for each seed of requested TurbSim simulations if nSeeds!=6
         LESpath: str or list of strings
             Full path of the LES data, if driven by LES. If None, the setup will be for TurbSim inflow.
             LESpath can be a single path, or a list of paths of the same length as the sweep in conditions.
             For example, if TIvalue=[8,10,12], then LESpath can be 3 paths, related to each condition.
-        ffbin: str
-            Full path of the FAST.Farm binary to be executed
+        sweepWakeSteering: bool
+            Whether or not to perform a sweep with wake steering
+        sweepYawMisalignment: bool
+            Whether or not to perform a sweep with and without yaw misalignment perturbations
         refTurb_rot: int
             Index of reference turbine which the rotation of the farm will occur. Default is 0, the first one.
-        wake_mod: int
-            Wake model to be used on the computation of high- and low-res boxes temporal and spatial resolutions
+            Not fully tested.
+        verbose: int
+            Verbosity level, given as integers <5
+
         '''
 
         self.path        = path
         self.wts         = wts
-        self.cmax        = cmax
-        self.fmax        = fmax
-        self.Cmeander    = Cmeander
         self.tmax        = tmax
         self.zbot        = zbot
         self.vhub        = vhub
@@ -103,7 +180,7 @@ class FFCaseCreation:
         self.seedValues  = seedValues
         self.refTurb_rot = refTurb_rot
         self.verbose     = verbose
-        self.wake_mod    = wake_mod
+        self.mod_wake    = mod_wake
         self.attempt     = 1
                                         
                                         
@@ -134,23 +211,36 @@ class FFCaseCreation:
             os.makedirs(self.path)
 
         # Check the wind turbine dict
-        if not  isinstance(self.wts,dict):
-            raise ValueError (f'`wts` needs to be a dictionary with the following entries for each turbine: x, y, z, D, zhub.')
+        if not isinstance(self.wts,dict):
+            raise ValueError (f'`wts` needs to be a dictionary with the following entries for each turbine: x, y, z, D, zhub, cmax, fmax, Cmeander.')
         self.nTurbines = len(self.wts)
         self.D         = self.wts[0]['D']
         self.zhub      = self.wts[0]['zhub']
+        self.cmax      = self.wts[0]['cmax']
+        self.fmax      = self.wts[0]['fmax']
+        self.Cmeander  = self.wts[0]['Cmeander']
 
         # Check values of each turbine
         for t in range(self.nTurbines):
-            t_x    = self.wts[t]['x']
-            t_y    = self.wts[t]['y']
-            t_z    = self.wts[t]['z']
-            t_D    = self.wts[t]['D']
-            t_zhub = self.wts[t]['zhub']
+            t_x        = self.wts[t]['x']
+            t_y        = self.wts[t]['y']
+            t_z        = self.wts[t]['z']
+            t_D        = self.wts[t]['D']
+            t_zhub     = self.wts[t]['zhub']
+            t_cmax     = self.wts[t]['cmax']
+            t_fmax     = self.wts[t]['fmax']
+            t_Cmeander = self.wts[t]['Cmeander']
             if t_D != self.D:
                 raise ValueError(f'Different turbines are not currently supported. Turbine {t+1} has a different diamenter.')
             if t_zhub != self.zhub:
                 raise ValueError(f'Different turbines are not currently supported. Turbine {t+1} has a different hub height.')
+            if t_cmax != self.cmax:
+                raise ValueError(f'Different turbines are not currently supported. Turbine {t+1} has a different max chord.')
+            if t_fmax != self.fmax:
+                raise ValueError(f'Different turbines are not currently supported. Turbine {t+1} has a different max excitation frequency.')
+            if t_Cmeander != self.Cmeander:
+                raise ValueError(f'Different turbines are not currently supported. Turbine {t+1} has a different meandering constant.')
+
             if not isinstance(t_x,(float,int)):
                 raise ValueError (f'The `x` value for the turbine {t+1} should be an integer or float. Received {t_x}.')
             if not isinstance(t_y,(float,int)):
@@ -187,7 +277,7 @@ class FFCaseCreation:
         
         # Set domain extents defaults if needed
         default_extent_low  = [3,6,3,3,2]
-        default_extent_high = 0.6
+        default_extent_high = 1.2
         if self.extent_low is None:
             self.extent_low = default_extent_low
         if self.extent_high is None:
@@ -260,9 +350,9 @@ class FFCaseCreation:
         # Check the ds and dt for the high- and low-res boxes. If not given, call the
         # AMR-Wind auxiliary function with dummy domain limits. 
         if None in (self.dt_high_les, self.ds_high_les, self.dt_low_les, self.ds_low_les):
-            wake_mod_str = ['','polar', 'curled', 'cartesian']
+            mod_wake_str = ['','polar', 'curled', 'cartesian']
             print(f'WARNING: One or more temporal or spatial resolution for low- and high-res domains were not given.')
-            print(f'         Estimated values for {wake_mod_str[self.wake_mod]} wake model shown below.')
+            print(f'         Estimated values for {mod_wake_str[self.mod_wake]} wake model shown below.')
             self._determine_resolutions_from_dummy_amrwind_grid()
             
         # Check the domain extents
@@ -306,7 +396,7 @@ class FFCaseCreation:
                                 n_cell, max_level, incflo_velocity_hh,
                                 buffer_lr = self.extent_low,
                                 buffer_hr = self.extent_high,
-                                wake_mod = self.wake_mod)
+                                mod_wake = self.mod_wake)
 
         print(f'         High-resolution: ds: {amr.ds_hr} m, dt: {amr.dt_high_les} s')
         print(f'         Low-resolution:  ds: {amr.ds_lr} m, dt: {amr.dt_low_les} s\n')
@@ -411,9 +501,8 @@ class FFCaseCreation:
                 # Update parameters to be changed in the *Dyn files
                 self.HydroDynFile['WaveHs']     = self.bins.sel(wspd=Vhub_, method='nearest').WaveHs.values
                 self.HydroDynFile['WaveTp']     = self.bins.sel(wspd=Vhub_, method='nearest').WaveTp.values
-                self.HydroDynFile['WvHiCOffD']  = 2.0*np.pi/self.HydroDynFile['WaveTp']   # check with JJ
+                self.HydroDynFile['WvHiCOffD']  = 2.0*np.pi/self.HydroDynFile['WaveTp']
                 self.HydroDynFile['WvLowCOffS'] = 2.0*np.pi/self.HydroDynFile['WaveTp']
-                # !!! JJ: do i need to change the first 3 values of HD? can they be 'default'?
         
                 self.ElastoDynFile['RotSpeed']   = self.bins.sel(wspd=Vhub_, method='nearest').RotSpeed.values
                 self.ElastoDynFile['BlPitch(1)'] = self.bins.sel(wspd=Vhub_, method='nearest').BlPitch.values
@@ -473,7 +562,7 @@ class FFCaseCreation:
                         self.ElastoDynFile['NacYaw']   = yaw_deg_ + yaw_mis_deg_
                         self.ElastoDynFile['BldFile1'] = self.ElastoDynFile['BldFile2'] = self.ElastoDynFile['BldFile3'] = f'"{self.bladefilename}"'
                         self.ElastoDynFile['TwrFile']  = f'"{self.towerfilename}"'
-                        self.ElastoDynFile['Azimuth']  = round(np.random.uniform(low=0, high=360)) # start at a random value  #JJ is this needed?
+                        self.ElastoDynFile['Azimuth']  = round(np.random.uniform(low=0, high=360)) # start at a random value
                         if writeFiles:
                             if t==0: shutilcopy2_untilSuccessful(os.path.join(self.templatePath,self.bladefilename), os.path.join(currPath,self.bladefilename))
                             if t==0: shutilcopy2_untilSuccessful(os.path.join(self.templatePath,self.towerfilename), os.path.join(currPath,self.towerfilename))
@@ -600,7 +689,26 @@ class FFCaseCreation:
 
 
                                         
-    def setTemplateFilename(self, templatePath=None, EDfilename=None, SEDfilename=None, HDfilename=None, SrvDfilename=None, ADfilename=None, ADskfilename=None, SubDfilename=None, IWfilename=None, BDfilepath=None, bladefilename=None, towerfilename=None, turbfilename=None, libdisconfilepath=None, controllerInputfilename=None, coeffTablefilename=None, turbsimLowfilepath=None, turbsimHighfilepath=None, FFfilename=None):
+    def setTemplateFilename(self,
+                            templatePath=None,
+                            EDfilename=None,
+                            SEDfilename=None,
+                            HDfilename=None,
+                            SrvDfilename=None,
+                            ADfilename=None,
+                            ADskfilename=None,
+                            SubDfilename=None,
+                            IWfilename=None,
+                            BDfilepath=None,
+                            bladefilename=None,
+                            towerfilename=None,
+                            turbfilename=None,
+                            libdisconfilepath=None,
+                            controllerInputfilename=None,
+                            coeffTablefilename=None,
+                            turbsimLowfilepath=None,
+                            turbsimHighfilepath=None,
+                            FFfilename=None):
         '''                             
                                         
         *filename: str                  
@@ -802,18 +910,14 @@ class FFCaseCreation:
         self.InflowWindFile  = _check_and_open(self.IWfilepath)  
             
 
-
-
     def print_template_files(self):
         raise NotImplementedError (f'Placeholder. Not implemented.')
 
 
     def createAuxArrays(self):
-
         self._rotate_wts()
         self._create_all_cond()
         self._create_all_cases()
-
 
 
     def _create_all_cond(self):
@@ -960,16 +1064,16 @@ class FFCaseCreation:
         self.wts_rot_ds = pd.DataFrame.from_dict(wts_rot, orient='index').to_xarray().rename({'level_0':'inflow_deg','level_1':'turbine'})
   
   
+
     def _setRotorParameters(self):
-  
   
         if self.D == 220: # 12 MW turbine
             self.bins = xr.Dataset({'WaveHs':      (['wspd'], [ 1.429, 1.429]), # 1.429 comes from Matt's hydrodyn input file
                                     'WaveTp':      (['wspd'], [ 7.073, 7.073]), # 7.073 comes from Matt's hydrodyn input file
                                     'RotSpeed':    (['wspd'], [ 4.0, 4.0]),     # 4 rpm comes from Matt's ED input file
                                     'BlPitch':     (['wspd'], [ 0.0, 0.0]),     # 0 deg comes from Matt's ED input file
-                                    #'WvHiCOffD':   (['wspd'], [0,   0]),       # 2nd order wave info. Unused for now  # JJ should we have this?
-                                    #'WvLowCOffS':  (['wspd'], [0,   0]),       # 2nd order wave info. Unused for now  # JJ: ditto
+                                    #'WvHiCOffD':   (['wspd'], [0,   0]),       # 2nd order wave info. Unused for now 
+                                    #'WvLowCOffS':  (['wspd'], [0,   0]),       # 2nd order wave info. Unused for now
                                    },  coords={'wspd': [10, 15]} )              # 15 m/s is 'else', since method='nearest' is used on the variable `bins`
             
         elif self.D == 240: # IEA 15 MW
@@ -1067,6 +1171,7 @@ class FFCaseCreation:
 
         if self.nSeeds != 6:
             print(f'--- WARNING: The memory-per-cpu on the low-res boxes SLURM script is configured for 6 seeds, not {self.nSeeds}.')
+
 
     def TS_low_slurm_submit(self):
         # ---------------------------------
@@ -1423,6 +1528,7 @@ class FFCaseCreation:
             self._FF_setup_TS(**kwargs)
 
 
+
     def _FF_setup_LES(self, seedsToKeep=1):
 
         self.seedsToKeep = seedsToKeep
@@ -1438,7 +1544,6 @@ class FFCaseCreation:
                 for seed in range(seedsToKeep,self.nSeeds):
                     currpath = os.path.join(self.path, self.condDirList[cond], self.caseDirList[case], f'Seed_{seed}')
                     if os.path.isdir(currpath):  shutil.rmtree(currpath)
-                        
                         
         
        # Create symlinks for the processed-and-renamed vtk files
@@ -1470,7 +1575,6 @@ class FFCaseCreation:
                             os.symlink(src, dst)                
                         except FileExistsError:
                             print(f'Directory {dst} already exists. Skipping symlink.')
-        
         
         
         # Loops on all conditions/cases and cases for FAST.Farm
@@ -1639,8 +1743,8 @@ class FFCaseCreation:
 
     def _getBoxesParamsForFF(self, lowbts, highbts, dt_low_desired, D, HubHt, xWT, yt):
         # Get mean wind speeds at the half height location (advection speed)
-        _, meanU_High =  highbts.midValues() # !!!!!!!!!!!!!!!! JJ: does it make sense to get both? the meanu for low will be a lot higher than vhub,
-        _, meanU_Low  =  lowbts.midValues()  # !!!!!!!!!!!!!!!! JJ: and the meanu for high can be a bit higher than vhub
+        _, meanU_High =  highbts.midValues()
+        _, meanU_Low  =  lowbts.midValues()
     
         dT_High = np.round(highbts.dt, 4)
         # dX_High can sometimes be too high. So get the closest to the cmax, but multiple of what should have been
@@ -1664,7 +1768,7 @@ class FFCaseCreation:
         LZ_Low = lowbts.z[-1]-lowbts.z[0]
         LT_Low = np.round(lowbts.t[-1]-lowbts.t[0], 4)
     
-        X0_Low = np.floor( (min(xWT) - self.extent_low[0]*D ))# - dX_Low)) #  # JJ!!!!!!! # removing EB's -dX_Low from the X0_Low specification
+        X0_Low = np.floor( (min(xWT) - self.extent_low[0]*D ))
         X0_Low = getMultipleOf(X0_Low, multipleof=dX_Low)
         Y0_Low = np.floor( -LY_Low/2                   )   # Starting on integer value for aesthetics
         Z0_Low = lowbts.z[0]                               # we start at lowest to include tower
@@ -1673,7 +1777,7 @@ class FFCaseCreation:
         LX_Low = XMax_Low-X0_Low
     
         nX_Low = int(np.ceil(LX_Low/dX_Low)+1)
-        nY_Low = len(lowbts.y)    # !!!!!!! JJ: different from what EB has
+        nY_Low = len(lowbts.y)
         nZ_Low = len(lowbts.z)
     
         assert nY_Low == int(np.ceil(LY_Low/dY_Low)+1)
@@ -1689,10 +1793,6 @@ class FFCaseCreation:
         LY_High = highbts.y[-1]-highbts.y[0]
         LZ_High = highbts.z[-1]-highbts.z[0]
         LT_High = np.round(highbts.t[-1]-highbts.t[0], 4)
-        # !!!!!!!!!!!!!!!!! JJ: EB had these below. Why is that?
-        #Max_High = HubHt+extent_high*D  # !!!!!!!!!!!!!!!!!! actual hh or midpoint?
-        #LY_High =  min(LY_Box, extent_YZ*D      ) # Bounding to not exceed the box dimension
-        #LZ_High =  min(LZ_Box, ZMax_High-Z0_High) # Bounding to not exceed the box dimension
     
         nX_High = int(np.ceil(LX_High/dX_High) + 1)  # plus 1 from the guidance
         nY_High = len(highbts.y)
@@ -1769,8 +1869,6 @@ class FFCaseCreation:
             raise Exception('Some Y0_High are not on an integer multiple of the high-res grid')
             
         return d
-
-
 
 
 

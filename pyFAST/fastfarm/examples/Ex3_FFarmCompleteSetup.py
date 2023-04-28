@@ -64,10 +64,11 @@ def main():
     
     # ----------- Low- and high-res boxes parameters
     # Should match LES if comparisons are to be made; otherwise, set desired values
+    # For an automatic computation of such parameters, omit them from the call to FFCaseCreation
     # High-res boxes settings
     dt_high_les = 0.6                # sampling frequency of high-res files
     ds_high_les = 10.0               # dx, dy, dz that you want these high-res files at
-    extent_high = 1.2                # high-res box extent in y and x for each turbine, in D.
+    extent_high = 1.2               # high-res box extent in y and x for each turbine, in D.
     # Low-res boxes settings
     dt_low_les  = 3                  # sampling frequency of low-res files
     ds_low_les  = 20.0               # dx, dy, dz of low-res files
@@ -121,7 +122,7 @@ def main():
 
 
     # Initial setup
-    case = FFCaseCreation(path, wts, cmax, fmax, Cmeander, tmax, zbot, vhub, shear,
+    case = FFCaseCreation(path, wts, tmax, zbot, vhub, shear,
                           TIvalue, inflow_deg, dt_high_les, ds_high_les, extent_high,
                           dt_low_les, ds_low_les, extent_low, ffbin, mod_wake, LESpath=LESpath,
                           verbose=1)

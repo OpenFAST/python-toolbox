@@ -23,7 +23,7 @@ class AMRWindSimulation:
                     buffer_hr = 0.6,
                     ds_hr = None, ds_lr = None,
                     dt_hr = None, dt_lr = None,
-                    wake_mod = None):
+                    mod_wake = None):
         '''
         Values from the AMR-Wind input file
         Inputs:
@@ -31,7 +31,7 @@ class AMRWindSimulation:
           * incflo_velocity_hh: velocity vector, specifically at hub height
           * buffer_lr: buffer for [xmin, xmax, ymin, ymax, zmax] in low-res box, in D
           * buffer_hr: buffer for all directions (constant) in high-res box, in D
-          * wake_mod: Wake formulations within FAST.Farm. 1:polar; 2:curl; 3:cartesian.
+          * mod_wake: Wake formulations within FAST.Farm. 1:polar; 2:curl; 3:cartesian.
         '''
         # Process inputs
         self.wts                = wts
@@ -49,7 +49,7 @@ class AMRWindSimulation:
         self.ds_lr              = ds_lr
         self.dt_hr              = dt_hr
         self.dt_lr              = dt_lr
-        self.wake_mod           = wake_mod
+        self.mod_wake           = mod_wake
 
         # Placeholder variables, to be calculated by FFCaseCreation
         self.output_frequency_lr = None
@@ -77,7 +77,7 @@ class AMRWindSimulation:
     def __repr__(self):
         s  = f'<{type(self).__name__} object>\n'
         s += f'Requested parameters:\n'
-        s += f' - Wake model: {self.wake_mod} (1:Polar; 2:Curl; 3:Cartesian)\n'
+        s += f' - Wake model: {self.mod_wake} (1:Polar; 2:Curl; 3:Cartesian)\n'
         s += f' - Extent of high-res boxes: {self.extent_high} D to each side\n'
         s += f' - Extent of low-res box: xmin={self.extent_low[0]} D, xmax={self.extent_low[1]} D, ymin={self.extent_low[2]} D, ymax={self.extent_low[3]} D, zmax={self.extent_low[4]} D\n'
 
@@ -131,8 +131,8 @@ class AMRWindSimulation:
             raise ValueError("y-component of prob_lo larger than y-component of prob_hi")
         if (self.prob_lo[2] >= self.prob_hi[2]):
             raise ValueError("z-component of prob_lo larger than z-component of prob_hi")
-        if self.wake_mod not in [1,2,3]:
-            raise ValueError (f'Wake_mod parameter can only be 1 (polar), 2 (curl), or 3 (cartesian). Received {self.wake_mod}.')
+        if self.mod_wake not in [1,2,3]:
+            raise ValueError (f'mod_wake parameter can only be 1 (polar), 2 (curl), or 3 (cartesian). Received {self.mod_wake}.')
 
     def _calc_simple_params(self):
         '''
@@ -211,10 +211,10 @@ class AMRWindSimulation:
         for turbkey in self.wts:
             self.cmax_min = min(cmax_min, self.wts[turbkey]['cmax'])
 
-        if self.wake_mod == 1:
+        if self.mod_wake == 1:
             self.dr = self.cmax_min
             dt_lr_max = cmeander_min * Dwake_min / (10 * self.vhub)
-        else: # wake_mod == 2 or 3
+        else: # mod_wake == 2 or 3
             self.dr = Dwake_min/10
             dt_lr_max = self.dr / (2* self.vhub)
 
