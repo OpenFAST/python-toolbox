@@ -38,7 +38,8 @@ setup(
         "scipy",
         "sympy",
         "openpyxl",
-        "pytest"
+        "pytest",
+        "xarray"
     ],
     test_suite="pytest",
     tests_require=["pytest"],
