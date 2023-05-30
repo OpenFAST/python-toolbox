@@ -204,6 +204,72 @@ class FFCaseCreation:
         if self.verbose>0: print(f'Creating directory structure and copying files... Done.')
 
 
+    def __repr__(self):
+        s  = f'Requested parameters:\n'
+        s += f' - Case path: {self.path}\n'
+        s += f' - Wake model:              {self.mod_wake} (1:Polar; 2:Curl; 3:Cartesian)\n'
+        if self.LESpath is None: 
+            s += f' - Number of TurbSim seeds: {self.nSeeds}\n'
+        s += f' - End time:                {self.tmax} s\n'
+        s += f'Requested farm:\n'
+        s += f' - Number of turbines:  {self.nTurbines}\n'
+        s += f' - Diameter:            {self.D} m\n'
+        s += f' - Hub height:          {self.zhub} m\n'
+        s += f' - Max chord:           {self.cmax} m\n'
+        s += f' - Max excitation freq: {self.fmax:.3f} Hz\n'
+        s += f' - Meandering constant: {self.Cmeander}\n'
+        s += f'Requested sweeps:\n'
+        s += f' - Wind speeds at hub height (m/s): {self.vhub}\n'
+        s += f' - Shear exponent:                  {self.shear}\n'
+        s += f' - TI (%):                          {self.TIvalue}\n'
+        s += f'\nCase details:\n'
+        s += f' - Number of conditions: {self.nConditions}\n'
+        for c in self.condDirList:
+            s += f"                         {c}\n"
+        s += f' - Number of cases for each condition: {self.nCases}\n'
+        if self.nCases < 11:
+            for c in self.caseDirList:
+                s += f"                         {c}\n"
+        else:
+            for c in self.caseDirList[:5]:
+                s += f"                         {c}\n"
+            s += f"                             ...\n" 
+            for c in self.caseDirList[-5:]:
+                s += f"                         {c}\n"
+        s += f"\n\n" 
+        
+        
+        if self.LESpath is None:
+            s += f'Turbulence boxes: TurbSim\n'
+            s += f'TurbSim turbulence boxes details:\n'
+        else:
+            s += f'Turbulence boxes: LES\n'
+            s += f'LES turbulence boxes details:\n'
+            s += f'  Path: {self.LESpath}\n'
+        
+        
+        if self.TSlowBoxFilesCreatedBool or self.LESpath is not None:
+            s += f'  Low-resolution domain: \n'
+            s += f'   - ds low: {self.ds_low_les} m\n'
+            s += f'   - dt low: {self.dt_low_les} s\n'
+            s += f'   - Extent of low-res box (in D): xmin = {self.extent_low[0]}, xmax = {self.extent_low[1]}, '
+            s += f'ymin = {self.extent_low[2]}, ymax = {self.extent_low[3]}, zmax = {self.extent_low[4]}\n'
+        else:
+            s += f'Low-res boxes not created yet.\n'
+        
+        
+        if self.TShighBoxFilesCreatedBool or self.LESpath is not None:
+            s += f'  High-resolution domain: \n'
+            s += f'   - ds high: {self.ds_high_les} m\n'
+            s += f'   - dt high: {self.dt_high_les} s\n'
+            s += f'   - Extent of high-res boxes: {self.extent_high} D total\n'
+        else:
+            s += f'High-res boxes not created yet.\n'
+        s += f"\n" 
+
+        return s
+
+
     def _checkInputs(self):
   
         # Create case path is doesn't exist
@@ -277,7 +343,7 @@ class FFCaseCreation:
         
         # Set domain extents defaults if needed
         default_extent_low  = [3,6,3,3,2]
-        default_extent_high = 1.2
+        default_extent_high = 1.2          # total extent, half of that to each side.
         if self.extent_low is None:
             self.extent_low = default_extent_low
         if self.extent_high is None:
@@ -290,6 +356,9 @@ class FFCaseCreation:
             raise ValueError(f'The extent_high should be a scalar')
         if self.extent_high<=0:
             raise ValueError(f'The extent of high boxes should be positive')
+        if self.extent_high<1:
+            raise ValueError(f'The extent of high boxes is not enough to cover the rotor diameter. '\
+                              'The extent high is given as the total extent, and it needs to be greater than 1.')
 
 
         # Check the FAST.Farm binary
@@ -370,8 +439,9 @@ class FFCaseCreation:
             raise ValueError(f'The index for the reference turbine for the farm to be rotated around is greater than the number of turbines')
 
         # Set aux variable
-        self.templateFilesCreatedBool = False
-        self.TSlowBoxFilesCreatedBool = False
+        self.templateFilesCreatedBool  = False
+        self.TSlowBoxFilesCreatedBool  = False
+        self.TShighBoxFilesCreatedBool = False
 
 
 
@@ -1173,12 +1243,20 @@ class FFCaseCreation:
             print(f'--- WARNING: The memory-per-cpu on the low-res boxes SLURM script is configured for 6 seeds, not {self.nSeeds}.')
 
 
-    def TS_low_slurm_submit(self):
+    def TS_low_slurm_submit(self, qos='normal', A=None, t=None):
         # ---------------------------------
         # ----- Run turbSim Low boxes -----
         # ---------------------------------
         # Submit the script to SLURM
-        _ = subprocess.call(f'sbatch {self.slurmfilename_low}', cwd=self.path, shell=True)
+        options = f"--qos='{qos}' "
+        if A is not None:
+            options += f'-A {A} '
+        if t is not None:
+            options += f'-t {t} '
+
+        sub_command = f"sbatch {options}{self.slurmfilename_low}"
+        print(f'Calling: {sub_command}')
+        _ = subprocess.call(sub_command, cwd=self.path, shell=True)
 
 
     def TS_low_createSymlinks(self):
@@ -1366,6 +1444,8 @@ class FFCaseCreation:
                 
                         # Let's remove the original file
                         os.remove(os.path.join(seedPath, f'HighT{t+1}_stillToBeModified.inp'))
+
+        self.TShighBoxFilesCreatedBool = True
         
 
     def TS_high_slurm_prepare(self, slurmfilepath):
@@ -1403,12 +1483,20 @@ class FFCaseCreation:
 
 
 
-    def TS_high_slurm_submit(self):
+    def TS_high_slurm_submit(self, qos='normal', A=None, t=None):
         # ----------------------------------
         # ----- Run turbSim High boxes -----
         # ----------------------------------
         # Submit the script to SLURM
-        _ = subprocess.call(f'sbatch {self.slurmfilename_high}', cwd=self.path, shell=True)
+        options = f"--qos='{qos}' "
+        if A is not None:
+            options += f'-A {A} '
+        if t is not None:
+            options += f'-t {t} '
+
+        sub_command = f"sbatch {options}{self.slurmfilename_high}"
+        print(f'Calling: {sub_command}')
+        _ = subprocess.call(sub_command, cwd=self.path, shell=True)
 
     
     def TS_high_create_symlink(self):
@@ -1914,7 +2002,7 @@ class FFCaseCreation:
 
 
 
-    def FF_slurm_submit(self, A=None, t=None, delay=4):
+    def FF_slurm_submit(self, qos='normal', A=None, t=None, delay=4):
 
         # ----------------------------------
         # ---------- Run FAST.Farm ---------
@@ -1929,13 +2017,13 @@ class FFCaseCreation:
                     # Submit the script to SLURM
                     fname = f'runFASTFarm_cond{cond}_case{case}_seed{seed}.sh'
 
-                    options = ''
+                    options = f"--qos='{qos}' "
                     if A is not None:
                         options += f'-A {A} '
                     if t is not None:
-                        options += f'-t {t}'
+                        options += f'-t {t} '
 
-                    sub_command = f"sbatch {options} {fname}"
+                    sub_command = f"sbatch {options}{fname}"
                     print(f'Calling: {sub_command}')
                     _ = subprocess.call(sub_command, cwd=self.path, shell=True)
                     time.sleep(delay) # Sometimes the same job gets submitted twice. This gets around it.
