@@ -568,24 +568,19 @@ class FFCaseCreation:
                 # Recover info about the current CondXX_*/CaseYY_*
                 Vhub_ = self.allCond.sel(cond=cond)['vhub'].values
         
-                # Update parameters to be changed in the *Dyn files
-                self.HydroDynFile['WaveHs']     = self.bins.sel(wspd=Vhub_, method='nearest').WaveHs.values
-                self.HydroDynFile['WaveTp']     = self.bins.sel(wspd=Vhub_, method='nearest').WaveTp.values
-                self.HydroDynFile['WvHiCOffD']  = 2.0*np.pi/self.HydroDynFile['WaveTp']
-                self.HydroDynFile['WvLowCOffS'] = 2.0*np.pi/self.HydroDynFile['WaveTp']
+                # Update parameters to be changed in the HydroDyn files
+                if self.HydroDynFile != 'unused':
+                    self.HydroDynFile['WaveHs']     = self.bins.sel(wspd=Vhub_, method='nearest').WaveHs.values
+                    self.HydroDynFile['WaveTp']     = self.bins.sel(wspd=Vhub_, method='nearest').WaveTp.values
+                    self.HydroDynFile['WvHiCOffD']  = 2.0*np.pi/self.HydroDynFile['WaveTp']
+                    self.HydroDynFile['WvLowCOffS'] = 2.0*np.pi/self.HydroDynFile['WaveTp']
+                    if writeFiles:
+                        self.HydroDynFile.write(os.path.join(currPath, self.HDfilename))
         
-                self.ElastoDynFile['RotSpeed']   = self.bins.sel(wspd=Vhub_, method='nearest').RotSpeed.values
-                self.ElastoDynFile['BlPitch(1)'] = self.bins.sel(wspd=Vhub_, method='nearest').BlPitch.values
-                self.ElastoDynFile['BlPitch(2)'] = self.bins.sel(wspd=Vhub_, method='nearest').BlPitch.values
-                self.ElastoDynFile['BlPitch(3)'] = self.bins.sel(wspd=Vhub_, method='nearest').BlPitch.values
-        
-                self.SElastoDynFile['RotSpeed']  = self.bins.sel(wspd=Vhub_, method='nearest').RotSpeed.values
-                self.SElastoDynFile['BlPitch']   = self.bins.sel(wspd=Vhub_, method='nearest').BlPitch.values
-        
-                # Write updated DISCON and *Dyn files. 
+                # Write updated DISCON
                 if writeFiles:
-                    self.HydroDynFile.write(os.path.join(currPath, self.HDfilename))
-                    shutilcopy2_untilSuccessful(os.path.join(self.templatePath,self.controllerInputfilename), os.path.join(currPath,self.controllerInputfilename))
+                    shutilcopy2_untilSuccessful(os.path.join(self.templatePath,self.controllerInputfilename),
+                                                os.path.join(currPath,self.controllerInputfilename))
 
                 # Depending on the controller, the controller input file might need to be in the same level as the .fstf input file.
                 # The ideal solution would be to give the full path to the controller input file, but we may not have control over
@@ -629,6 +624,11 @@ class FFCaseCreation:
         
                     if EDmodel_ == 'FED':
                         # Update each turbine's ElastoDyn
+                        self.ElastoDynFile['RotSpeed']   = self.bins.sel(wspd=Vhub_, method='nearest').RotSpeed.values
+                        self.ElastoDynFile['BlPitch(1)'] = self.bins.sel(wspd=Vhub_, method='nearest').BlPitch.values
+                        self.ElastoDynFile['BlPitch(2)'] = self.bins.sel(wspd=Vhub_, method='nearest').BlPitch.values
+                        self.ElastoDynFile['BlPitch(3)'] = self.bins.sel(wspd=Vhub_, method='nearest').BlPitch.values
+        
                         self.ElastoDynFile['NacYaw']   = yaw_deg_ + yaw_mis_deg_
                         self.ElastoDynFile['BldFile1'] = self.ElastoDynFile['BldFile2'] = self.ElastoDynFile['BldFile3'] = f'"{self.bladefilename}"'
                         self.ElastoDynFile['TwrFile']  = f'"{self.towerfilename}"'
@@ -640,6 +640,9 @@ class FFCaseCreation:
         
                     elif EDmodel_ == 'SED':
                         # Update each turbine's Simplified ElastoDyn
+                        self.SElastoDynFile['RotSpeed']  = self.bins.sel(wspd=Vhub_, method='nearest').RotSpeed.values
+                        self.SElastoDynFile['BlPitch']   = self.bins.sel(wspd=Vhub_, method='nearest').BlPitch.values
+
                         self.SElastoDynFile['BlPitch']  = self.bins.sel(wspd=Vhub_, method='nearest').BlPitch.values
                         self.SElastoDynFile['RotSpeed'] = self.bins.sel(wspd=Vhub_, method='nearest').RotSpeed.values
                         self.SElastoDynFile['NacYaw']   = yaw_deg_ + yaw_mis_deg_
@@ -813,7 +816,7 @@ class FFCaseCreation:
 
 
         def checkIfExists(f):
-            if f == 'unused':
+            if os.path.basename(f) == 'unused':
                 return
             if not os.path.isfile(f):
                 raise ValueError (f'File {f} does not exist.')
@@ -840,7 +843,7 @@ class FFCaseCreation:
             self.HDfilename = HDfilename
 
         if SrvDfilename is not None:
-            if not EDfilename.endswith('.T'):
+            if SrvDfilename != 'unused' and not SrvDfilename.endswith('.T'):
                 raise ValueError (f'Name the template ServoDyn file "*.T.dat" and give "*.T" as `SrvDfilename`')
             self.SrvDfilepath = os.path.join(self.templatePath,f"{SrvDfilename}.dat")
             checkIfExists(self.SrvDfilepath)
@@ -861,7 +864,7 @@ class FFCaseCreation:
             self.ADskfilename = ADskfilename
 
         if SubDfilename is not None:
-            if not SubDfilename.endswith('.dat'):
+            if SubDfilename != 'unused' and not SubDfilename.endswith('.dat'):
                 raise ValueError (f'The SubDyn filename should end in `.dat`.')
             self.SubDfilepath = os.path.join(self.templatePath,SubDfilename)
             checkIfExists(self.SubDfilepath)
@@ -968,8 +971,10 @@ class FFCaseCreation:
 
         # Open template files
         def _check_and_open(f):
-            if f != 'unused':
-              return FASTInputFile(f)
+            if os.path.basename(f) == 'unused':
+                return 'unused'
+            else:
+                return FASTInputFile(f)
 
         self.ElastoDynFile   = _check_and_open(self.EDfilepath)  
         self.SElastoDynFile  = _check_and_open(self.SEDfilepath) 
