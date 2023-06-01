@@ -821,64 +821,64 @@ class FFCaseCreation:
             if not os.path.isfile(f):
                 raise ValueError (f'File {f} does not exist.')
 
-        if EDfilename is not None:
-            if EDfilename != 'unused' and not EDfilename.endswith('.T'):
+        if EDfilename is not None and EDfilename != 'unused':
+            if not EDfilename.endswith('.T'):
                 raise ValueError (f'Name the template ED file "*.T.dat" and give "*.T" as `EDfilename`')
             self.EDfilepath = os.path.join(self.templatePath,f"{EDfilename}.dat")
             checkIfExists(self.EDfilepath)
             self.EDfilename = EDfilename
 
-        if SEDfilename is not None:
-            if SEDfilename != 'unused' and not SEDfilename.endswith('.T'):
+        if SEDfilename is not None and SEDfilename != 'unused':
+            if not SEDfilename.endswith('.T'):
                 raise ValueError (f'Name the template SED file "*.T.dat" and give "*.T" as `SEDfilename`')
             self.SEDfilepath = os.path.join(self.templatePath,f"{SEDfilename}.dat")
             checkIfExists(self.SEDfilepath)
             self.SEDfilename = SEDfilename
 
-        if HDfilename is not None:
-            if HDfilename != 'unused' and not HDfilename.endswith('.dat'):
+        if HDfilename is not None and HDfilename != 'unused':
+            if not HDfilename.endswith('.dat'):
                 raise ValueError (f'The HydroDyn filename should end in `.dat`.')
             self.HDfilepath = os.path.join(self.templatePath,HDfilename)
             checkIfExists(self.HDfilepath)
             self.HDfilename = HDfilename
 
-        if SrvDfilename is not None:
-            if SrvDfilename != 'unused' and not SrvDfilename.endswith('.T'):
+        if SrvDfilename is not None and SrvDfilename != 'unused':
+            if not SrvDfilename.endswith('.T'):
                 raise ValueError (f'Name the template ServoDyn file "*.T.dat" and give "*.T" as `SrvDfilename`')
             self.SrvDfilepath = os.path.join(self.templatePath,f"{SrvDfilename}.dat")
             checkIfExists(self.SrvDfilepath)
             self.SrvDfilename = SrvDfilename
 
-        if ADfilename is not None:
-            if ADfilename != 'unused' and not ADfilename.endswith('.dat'):
+        if ADfilename is not None and ADfilename != 'unused':
+            if not ADfilename.endswith('.dat'):
                 raise ValueError (f'The AeroDyn filename should end in `.dat`.')
             self.ADfilepath = os.path.join(self.templatePath,ADfilename)
             checkIfExists(self.ADfilepath)
             self.ADfilename = ADfilename
 
-        if ADskfilename is not None:
-            if ADskfilename != 'unused' and not ADskfilename.endswith('.dat'):
+        if ADskfilename is not None and ADskfilename != 'unused':
+            if not ADskfilename.endswith('.dat'):
                 raise ValueError (f'The AeroDisk filename should end in `.dat`.')
             self.ADskfilepath = os.path.join(self.templatePath,ADskfilename)
             checkIfExists(self.ADskfilepath)
             self.ADskfilename = ADskfilename
 
-        if SubDfilename is not None:
-            if SubDfilename != 'unused' and not SubDfilename.endswith('.dat'):
+        if SubDfilename is not None and SubDfilename != 'unused':
+            if not SubDfilename.endswith('.dat'):
                 raise ValueError (f'The SubDyn filename should end in `.dat`.')
             self.SubDfilepath = os.path.join(self.templatePath,SubDfilename)
             checkIfExists(self.SubDfilepath)
             self.SubDfilename = SubDfilename
 
-        if IWfilename is not None:
-            if IWfilename != 'unused' and not IWfilename.endswith('.dat'):
+        if IWfilename is not None and IWfilename != 'unused':
+            if not IWfilename.endswith('.dat'):
                 raise ValueError (f'The InflowWind filename should end in `.dat`.')
             self.IWfilepath = os.path.join(self.templatePath,IWfilename)
             checkIfExists(self.IWfilepath)
             self.IWfilename = IWfilename
 
-        if BDfilepath is not None:
-            if BDfilepath != 'unused' and not BDfilepath.endswith('.dat'):
+        if BDfilepath is not None and BDfilepath != 'unused':
+            if not BDfilepath.endswith('.dat'):
                 raise ValueError (f'The BeamDyn filename should end in `.dat`.')
             self.BDfilepath = BDfilepath
             checkIfExists(self.BDfilepath)
@@ -918,7 +918,7 @@ class FFCaseCreation:
             checkIfExists(self.controllerInputfilepath)
             self.controllerInputfilename = controllerInputfilename
 
-        if coeffTablefilename is not None:
+        if coeffTablefilename is not None and coeffTablefilename != 'unused':
             if not coeffTablefilename.endswith('.csv'):
                 raise ValueError (f'The performance table `coeffTablefilename` file should end in "*.csv"')
             self.coeffTablefilepath = os.path.join(templatePath, coeffTablefilename)
