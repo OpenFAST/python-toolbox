@@ -98,11 +98,11 @@ class TurbSimFile(File):
                 self['uTwr'] = uTwr
         self['info'] = info
         self['ID']   = ID
-        self['dt']   = dt
+        self['dt']   = np.round(dt,3) # dt is stored in single precision in the TurbSim output
         self['y']    = np.arange(ny)*dy 
         self['y']   -= np.mean(self['y']) # y always centered on 0
         self['z']    = np.arange(nz)*dz +zBottom
-        self['t']    = np.arange(nt)*dt
+        self['t']    = np.round(np.arange(nt)*dt, 3)
         self['zTwr'] =-np.arange(nTwr)*dz + zBottom
         self['zRef'] = zHub
         self['uRef'] = uHub
@@ -594,6 +594,42 @@ class TurbSimFile(File):
             s+='    uz: min: {}, max: {}, mean: {} \n'.format(np.min(uz), np.max(uz), np.mean(uz))
             
         return s
+
+    def toDataSet(self, datetime=False):
+        import xarray as xr
+
+        if datetime:
+            timearray = pd.to_datetime(self['t'], unit='s', origin=pd.to_datetime('2000-01-01 00:00:00'))
+            timestr   = 'datetime'
+        else:
+            timearray = self['t']
+            timestr   = 'time'
+
+        ds = xr.Dataset(
+            data_vars=dict(
+                u=([timestr,'y','z'], self['u'][0,:,:,:]),
+                v=([timestr,'y','z'], self['u'][1,:,:,:]),
+                w=([timestr,'y','z'], self['u'][2,:,:,:]),
+            ),
+            coords={
+                timestr : timearray,
+                'y' : self['y'],
+                'z' : self['z'],
+            },
+        )
+
+        # Add mean computations
+        ds['up'] = ds['u'] - ds['u'].mean(dim=timestr)
+        ds['vp'] = ds['v'] - ds['v'].mean(dim=timestr)
+        ds['wp'] = ds['w'] - ds['w'].mean(dim=timestr)
+
+        if datetime:
+            # Add time (in s) to the variable list
+            ds['time'] = (('datetime'), self['t'])
+
+        return ds
+
+
 
     def toDataFrame(self):
         dfs={}

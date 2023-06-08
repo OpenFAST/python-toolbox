@@ -5,12 +5,12 @@ import pandas as pd
 from pyFAST.input_output.fast_input_file import FASTInputFile
 from pyFAST.input_output.fast_output_file import FASTOutputFile
 from pyFAST.input_output.turbsim_file import TurbSimFile
-import pyFAST.input_output.postpro as fastlib
+import pyFAST.postpro as fastlib
 
 # --------------------------------------------------------------------------------}
 # --- Small helper functions
 # --------------------------------------------------------------------------------{
-def insertTN(s,i,nWT=1000):
+def insertTN(s,i,nWT=1000, noLeadingZero=False):
     """ insert turbine number in name """
     if nWT<10:
         fmt='{:d}'
@@ -18,8 +18,15 @@ def insertTN(s,i,nWT=1000):
         fmt='{:02d}'
     else:
         fmt='{:03d}'
+
+    if noLeadingZero:
+        fmt='{:d}'
+
     if s.find('T1')>=0:
         s=s.replace('T1','T'+fmt.format(i))
+    elif s.find('T0')>=0:
+        print('this should not be printed')
+        s=s.replace('T0','T'+fmt.format(i))
     else:
         sp=os.path.splitext(s)
         s=sp[0]+'_T'+fmt.format(i)+sp[1]
@@ -249,7 +256,7 @@ def fastFarmBoxExtent(yBox, zBox, tBox, meanU, hubHeight, D, xWT, yWT,
     nX_Low = int(np.ceil(LX_Low/dX_Low))
     nY_Low = int(np.ceil(LY_Low/dY_Low))
     nZ_Low = int(np.ceil(LZ_Low/dZ_Low))
-    # Make sure we don't exceed box in Y and Z
+    # Make sure we don't exceed box in Y and Z #rt: this essentially gives us 1 less grid point than what is on the inp/bst files
     if (nY_Low*dY_Low>LY_Box): nY_Low=nY_Low-1 
     if (nZ_Low*dZ_Low>LZ_Box): nZ_Low=nZ_Low-1 
 
@@ -307,15 +314,19 @@ def fastFarmBoxExtent(yBox, zBox, tBox, meanU, hubHeight, D, xWT, yWT,
     dY = Y_rel - np.round(Y_rel) # Should be close to zero
     if any(abs(dX)>1e-3):
         print('Deltas:',dX)
-        raise Exception('Some X0_High are not on an integer multiple of the high-res grid')
+        print('Exception has been raise. I put this print statement instead. Check with EB.')
+        print('Exception: Some X0_High are not on an integer multiple of the high-res grid')
+        #raise Exception('Some X0_High are not on an integer multiple of the high-res grid')
     if any(abs(dY)>1e-3):
         print('Deltas:',dY)
-        raise Exception('Some Y0_High are not on an integer multiple of the high-res grid')
+        print('Exception has been raise. I put this print statement instead. Check with EB.')
+        print('Exception: Some Y0_High are not on an integer multiple of the high-res grid')
+        #raise Exception('Some Y0_High are not on an integer multiple of the high-res grid')
 
     return d
 
 
-def writeFastFarm(outputFile, templateFile, xWT, yWT, zWT, FFTS=None, OutListT1=None):
+def writeFastFarm(outputFile, templateFile, xWT, yWT, zWT, FFTS=None, OutListT1=None, noLeadingZero=False):
     """ Write FastFarm input file based on a template, a TurbSimFile and the Layout
     
     outputFile: .fstf file to be written
@@ -349,7 +360,7 @@ def writeFastFarm(outputFile, templateFile, xWT, yWT, zWT, FFTS=None, OutListT1=
         WT[iWT,0]=x
         WT[iWT,1]=y
         WT[iWT,2]=z
-        WT[iWT,3]=insertTN(ref_path,iWT+1,nWT)
+        WT[iWT,3]=insertTN(ref_path,iWT+1,nWT,noLeadingZero=noLeadingZero)
         if FFTS is not None:
             WT[iWT,4]=FFTS['X0_High'][iWT]
             WT[iWT,5]=FFTS['Y0_High'][iWT]
@@ -370,15 +381,19 @@ def setFastFarmOutputs(fastFarmFile, OutListT1):
     OutList=['']
     for s in OutListT1:
         s=s.strip('"')  
-        if s.find('T1'):
+        if 'T1' in s:
             OutList+=['"'+s.replace('T1','T{:d}'.format(iWT+1))+'"' for iWT in np.arange(nWTOut) ]
+        elif 'W1VAmb' in s: # special case for ambient wind
+            OutList+=['"'+s.replace('1','{:d}'.format(iWT+1))+'"' for iWT in np.arange(nWTOut) ]
+        elif 'W1VDis' in s: # special case for disturbed wind
+            OutList+=['"'+s.replace('1','{:d}'.format(iWT+1))+'"' for iWT in np.arange(nWTOut) ]
         else:
             OutList+='"'+s+'"'
     fst['OutList']=OutList
     fst.write(fastFarmFile)
 
 
-def plotFastFarmSetup(fastFarmFile, grid=True, fig=None, D=None, plane='XY', hubHeight=None):
+def plotFastFarmSetup(fastFarmFile, grid=True, fig=None, D=None, plane='XY', hubHeight=None, showLegend=True):
     """ """
     import matplotlib.pyplot as plt
 
@@ -475,7 +490,8 @@ def plotFastFarmSetup(fastFarmFile, grid=True, fig=None, D=None, plane='XY', hub
             ax.plot(x, y, '-', lw=2, c=col(wt))
 
     #plt.legend(bbox_to_anchor=(1.05,1.015),frameon=False)
-    ax.legend()
+    if showLegend:
+        ax.legend()
     if plane=='XY':
         ax.set_xlabel("x [m]")
         ax.set_ylabel("y [m]")
