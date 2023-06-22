@@ -1229,13 +1229,11 @@ class FFCaseCreation:
                                     }
                 x0.append(x)
             minx0=min(x0)
-            if minx0<0:
-                for i , turb in self.wts.items():
-                    wts_rot[inflow,i]['x'] -=  minx0 
-                    wts_rot[inflow,i]['x'] += self.extent_low[0]*wts_rot[inflow,i]['D']
-                    # wts_rot[inflow,i]['x'] += 2*wts_rot[inflow,i]['D'] 
-                    # wts_rot[inflow,i]['x'] += 1587
-                    wts_rot[inflow,i]['x']  = round(wts_rot[inflow,i]['x'] ,2)
+            #if minx0<0:
+            for i , turb in self.wts.items():
+                wts_rot[inflow,i]['x'] -=  minx0 
+                wts_rot[inflow,i]['x'] += self.extent_low[0]*wts_rot[inflow,i]['D']
+                wts_rot[inflow,i]['x']  = round(wts_rot[inflow,i]['x'] ,2)
 
         self.wts_rot_ds = pd.DataFrame.from_dict(wts_rot, orient='index').to_xarray().rename({'level_0':'inflow_deg','level_1':'turbine'})
   
