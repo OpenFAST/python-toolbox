@@ -35,7 +35,7 @@ Cmeander = 1.9 # Meandering constant (-)
 # --- Use TurbSim Case Creation class to write a new TurbSim file
 Case = TSCaseCreation(D, HubHt, Vhub, TI, PLExp, x=xlocs, y=ylocs, zbot=zbot, cmax=cmax, fmax=fmax, Cmeander=Cmeander)
 # Rewrite TurbSim Input File
-Case.writeTSFile(OldTSFile, NewTSFile, tmax=5)
+Case.writeTSFile(OldTSFile, NewTSFile, tmax=5, turb=1)
 print('NOTE: run TurbSim to generate this new BTS file.')
 
 # --- Visualize low extent and turbine positions

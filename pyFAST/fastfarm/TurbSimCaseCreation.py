@@ -77,6 +77,8 @@ class TSCaseCreation:
         self.domainSize(zbot=zbot, manual_mode=manual_mode)
         # Determine origin
         # self.originLoc()
+        self.ymin = None
+        self.ymax = None
 
     def Turb(self, D, HubHt, cmax=5.0, fmax=5.0):
         """
@@ -227,8 +229,10 @@ class TSCaseCreation:
         # low-res box
         #         ax.plot([xmin,xmax,xmax,xmin,xmin],
         #                 [ymin,ymin,ymax,ymax,ymin],'--k',lw=2,label='Low')
-        ax.axhline(self.ymin, ls='--', c='k', lw=2, label='Low')
-        ax.axhline(self.ymax, ls='--', c='k', lw=2)
+        if self.ymin is not None:
+            ax.axhline(self.ymin, ls='--', c='k', lw=2, label='Low')
+        if self.ymax is not None:
+            ax.axhline(self.ymax, ls='--', c='k', lw=2)
 
         ax.legend(bbox_to_anchor=(1.05,1.015),frameon=False)
         ax.set_xlabel("x-location [m]")
