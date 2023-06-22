@@ -1946,6 +1946,7 @@ class FFCaseCreation:
                     d = self._getTSBoxesParamsForFF(lowbts, highbts, self.dt_low_les, D_, HubHt_, xWT, yt)
         
                     # Write the file
+                    xWT=xWT+d['dX_Low']
                     writeFastFarm(outputFSTF, templateFSTF, xWT, yt, zWT, d, OutListT1=self.outlistFF, noLeadingZero=True)
         
         
@@ -2110,7 +2111,7 @@ class FFCaseCreation:
         d['dX_High']     = np.around(dX_High,4)
         d['dY_High']     = np.around(dY_High,4)
         d['dZ_High']     = np.around(dZ_High,4)
-        d['X0_High']     = np.around(X0_High,4)
+        d['X0_High']     = np.around(X0_High,4)+d['dX_Low']
         d['Y0_High']     = np.around(Y0_High,4)
         d['Z0_High']     = np.around(Z0_High,4)
         # --- Misc
