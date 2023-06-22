@@ -219,6 +219,70 @@ class FFCaseCreation:
         self._create_dir_structure()
         if self.verbose>0: print('Creating directory structure and copying files... Done.')
 
+    def __repr__(self):
+        s  = f'Requested parameters:\n'
+        s += f' - Case path: {self.path}\n'
+        s += f' - Wake model:              {self.mod_wake} (1:Polar; 2:Curl; 3:Cartesian)\n'
+        if self.LESpath is None: 
+            s += f' - Number of TurbSim seeds: {self.nSeeds}\n'
+        s += f' - End time:                {self.tmax} s\n'
+        s += f'Requested farm:\n'
+        s += f' - Number of turbines:  {self.nTurbines}\n'
+        s += f' - Diameter:            {self.D} m\n'
+        s += f' - Hub height:          {self.zhub} m\n'
+        s += f' - Max chord:           {self.cmax} m\n'
+        s += f' - Max excitation freq: {self.fmax:.3f} Hz\n'
+        s += f' - Meandering constant: {self.Cmeander}\n'
+        s += f'Requested sweeps:\n'
+        s += f' - Wind speeds at hub height (m/s): {self.vhub}\n'
+        s += f' - Shear exponent:                  {self.shear}\n'
+        s += f' - TI (%):                          {self.TIvalue}\n'
+        s += f'\nCase details:\n'
+        s += f' - Number of conditions: {self.nConditions}\n'
+        for c in self.condDirList:
+            s += f"                         {c}\n"
+        s += f' - Number of cases for each condition: {self.nCases}\n'
+        if self.nCases < 11:
+            for c in self.caseDirList:
+                s += f"                         {c}\n"
+        else:
+            for c in self.caseDirList[:5]:
+                s += f"                         {c}\n"
+            s += f"                             ...\n" 
+            for c in self.caseDirList[-5:]:
+                s += f"                         {c}\n"
+        s += f"\n\n" 
+        
+        
+        if self.LESpath is None:
+            s += f'Turbulence boxes: TurbSim\n'
+            s += f'TurbSim turbulence boxes details:\n'
+        else:
+            s += f'Turbulence boxes: LES\n'
+            s += f'LES turbulence boxes details:\n'
+            s += f'  Path: {self.LESpath}\n'
+        
+        
+        if self.TSlowBoxFilesCreatedBool or self.LESpath is not None:
+            s += f'  Low-resolution domain: \n'
+            s += f'   - ds low: {self.ds_low_les} m\n'
+            s += f'   - dt low: {self.dt_low_les} s\n'
+            s += f'   - Extent of low-res box (in D): xmin = {self.extent_low[0]}, xmax = {self.extent_low[1]}, '
+            s += f'ymin = {self.extent_low[2]}, ymax = {self.extent_low[3]}, zmax = {self.extent_low[4]}\n'
+        else:
+            s += f'Low-res boxes not created yet.\n'
+        
+        
+        if self.TShighBoxFilesCreatedBool or self.LESpath is not None:
+            s += f'  High-resolution domain: \n'
+            s += f'   - ds high: {self.ds_high_les} m\n'
+            s += f'   - dt high: {self.dt_high_les} s\n'
+            s += f'   - Extent of high-res boxes: {self.extent_high} D total\n'
+        else:
+            s += f'High-res boxes not created yet.\n'
+        s += f"\n" 
+
+        return s
 
     def _checkInputs(self):
   
