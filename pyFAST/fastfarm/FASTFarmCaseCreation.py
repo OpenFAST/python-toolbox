@@ -2270,7 +2270,7 @@ class FFCaseCreation:
                     time.sleep(delay) # Sometimes the same job gets submitted twice. This gets around it.
 
 
-    def Create_Mannbox(self, Lm, gamma):
+    def Create_Mannbox(self, Lm, gamma, run_bat=True):
     
         #todo: Check if the low-res boxes were created successfully
     
@@ -2316,7 +2316,7 @@ class FFCaseCreation:
                         break
                     currentMB = MBCreation(D_, HubHt_, Vhub_, shear_, y=yloc_, zbot=self.zbot,
                                                cmax=self.cmax, fmax=self.fmax, low_ext=self.extent_low, Lm=Lm,
-                                               gamma=gamma, alphaepsilon=alphaepsilon, seedvalue= self.seedValues[seed], time=self.tmax)
+                                               gamma=gamma, alphaepsilon=alphaepsilon, seedvalue= self.seedValues[seed], time=self.tmax, execute_bat=run_bat)
                     currentMB.writeMannbatch(self.Mannbin, currentMannFile, seedPath)
         
 

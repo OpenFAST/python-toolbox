@@ -149,7 +149,7 @@ def main():
 
     # Organize file structure
     if LESpath =='MannBox':
-        case.Create_Mannbox(33.6, 3.9)
+        case.Create_Mannbox(33.6, 3.9,run_bat=True)
 
     if LESpath =='TurbSim':
         case.TS_low_setup()

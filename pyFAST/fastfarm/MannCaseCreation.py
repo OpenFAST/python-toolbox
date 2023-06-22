@@ -12,27 +12,28 @@ import subprocess
 class MBCreation:
     
     def __init__(self, D, HubHt, Vhub, PLexp,  y, zbot=1.0, cmax=5.0, low_ext=None,fmax=1, 
-                 Lm=None, gamma=None, alphaepsilon=None, seedvalue=None, time=None):
+                 Lm=None, gamma=None, alphaepsilon=None, seedvalue=None, time=None, execute_bat=True):
         """
         Instantiate the object. 
         
         Parameters
         ----------
-        D        :   float,
-                    rotor diameter (m)
-        HubHt    :   float,
-                    turbine hub height (m)
-        Vhub	 :   float,
-                    mean wind speed at hub height (m/s)
-        PLexp    :   float,
-                    power law exponent for shear (-)
-        y        :   float,
-                     y- location of turbine, respectively
-        cmax     :   float,
-                    maximum blade chord (m). If not specified, set to NREL 5MW value.
-        low_ext  :  list of floats [xmin, xmax, ymin, ymax, zabovehub]
-                    extents for the low-res box. All values should be positive  If not specified, resorts to
-                    computations by the manual
+        D            :   float,
+                        rotor diameter (m)
+        HubHt        :   float,
+                        turbine hub height (m)
+        Vhub	     :   float,
+                        mean wind speed at hub height (m/s)
+        PLexp        :   float,
+                        power law exponent for shear (-)
+        y            :   float,
+                         y- location of turbine, respectively
+        cmax         :   float,
+                        maximum blade chord (m). If not specified, set to NREL 5MW value.
+        low_ext      :  list of floats [xmin, xmax, ymin, ymax, zabovehub]
+                        extents for the low-res box. All values should be positive  If not specified, resorts to
+                        computations by the manual
+        execute_bat  :  a flag to execute bat file.
         """
 
         # Perform some checks on the input
@@ -90,4 +91,5 @@ class MBCreation:
         with open(os.path.join(outputpath, filename+'.bat'), "w") as batch_file:
             batch_file.write(batch_file_content)  
             
-        subprocess.run([os.path.join(outputpath, filename+'.bat')],stdout=subprocess.PIPE)
+        if execute_bat:
+            subprocess.run([os.path.join(outputpath, filename+'.bat')],stdout=subprocess.PIPE)
