@@ -1291,12 +1291,42 @@ class FFCaseCreation:
         # and sweep in yaw do not require extra TurbSim runs
         self.nHighBoxCases = len(np.unique(self.inflow_deg))  # some wind dir might be repeated for sweep on yaws
         
-        self.allHighBoxCases = self.allCases.where(~self.allCases['wakeSteering'],drop=True).drop_vars('wakeSteering')\
+        # Old method to get allHighBoxCases. Doesn't work well if I have weird manual sweeps
+        allHighBoxCases_old  = self.allCases.where(~self.allCases['wakeSteering'],drop=True).drop_vars('wakeSteering')\
                                             .where(~self.allCases['misalignment'], drop=True).drop_vars('misalignment')\
                                             .where(self.allCases['nFullAeroDyn']==self.nTurbines, drop=True).drop_vars('ADmodel')\
                                             .where(self.allCases['nFulllElastoDyn']==self.nTurbines, drop=True).drop_vars('EDmodel')\
                                             .where(self.allCases['yawCase']==1, drop=True).drop_vars('yawCase')
-        
+
+        # This is a new method, but I'm not sure if it will work always, so let's leave the one above and check it
+        uniquewdir = np.unique(self.allCases.inflow_deg)
+        allHighBoxCases = []
+        for currwdir in uniquewdir:
+            # Get first case to have the wind direction currwdir
+            firstCaseWithInflow_i = self.allCases.where(self.allCases['inflow_deg'] == currwdir, drop=True).isel(case=0)
+            allHighBoxCases.append(firstCaseWithInflow_i)
+        self.allHighBoxCases = xr.concat(allHighBoxCases, dim='case')
+        # But, before I change the algorithm, I want to time-test it, so let's compare both ways
+        if not allHighBoxCases_old.identical(self.allHighBoxCases):
+            self.allHighBoxCases_old = allHighBoxCases_old
+            print(f'!!!!!! WARNING !!!!!!!!!')
+            print(f'The new method for computing all the high-box cases is not producing the same set of cases as the old algorithm.')
+            print(f'This should only happen if you have complex sweeps that you modified manually after the code creates the initial arrays')
+            print(f'Check the variable <obj>.allHighBoxCases_old to see the cases using the old algorithm')
+            print(f'Check the variable <obj>.allHighBoxCases     to see the cases using the new algorithm')
+            print(f'You should check which xr.dataset has the correct, unique inflow_deg values. The correct array will only have unique values')
+            print(f'')
+            if len(self.allHighBoxCases_old['inflow_deg']) != len(np.unique(self.allHighBoxCases_old['inflow_deg'])):
+                print(f'    Checking the inflow_deg variable, it looks like the old method has non-unique wind directions. The old method is wrong here.')
+            if len(self.allHighBoxCases['inflow_deg'])     != len(np.unique(self.allHighBoxCases['inflow_deg'])):
+                print(f'    Checking the inflow_deg variable, it looks like the new method has non-unique wind directions. The new method is wrong here.')
+            else:
+                print('    The new method appears to be correct here! Trust but verify')
+            print('')
+            print(f'!!!!!!!!!!!!!!!!!!!!!!!!')
+            print(f'')
+
+
         if self.nHighBoxCases != len(self.allHighBoxCases.case):
             raise ValueError(f'The number of cases do not match as expected. {self.nHighBoxCases} unique wind directions, but {len(self.allHighBoxCases.case)} unique cases.')
         
@@ -1431,6 +1461,7 @@ class FFCaseCreation:
                         # Create and write new Low.inp files creating the proper box with proper resolution
                         currentTS = TSCaseCreation(D_, HubHt_, Vhub_, tivalue_, shear_, x=xloc_, y=yloc_, zbot=self.zbot,
                                                    cmax=self.cmax, fmax=self.fmax, Cmeander=self.Cmeander, boxType=boxType, high_ext=self.extent_high)
+                        # !!!!!!!!!!! I have to give the resolution on the call above!!!!
                         currentTS.writeTSFile(self.turbsimHighfilepath, currentTSHighFile, tmax=self.tmax, turb=t, verbose=self.verbose)
         
                         # Modify some values and save file (some have already been set in the call above)
