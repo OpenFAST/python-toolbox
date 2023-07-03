@@ -504,7 +504,7 @@ class FFCaseCreation:
             for case in range(self.nCases):
                 # Recover information about current case for directory naming purposes
                 inflow_deg_   = self.allCases['inflow_deg'     ].sel(case=case).values
-                wakeSteering_ = self.allCases['wakeSteering'   ].sel(case=case).values
+                #wakeSteering_ = self.allCases['wakeSteering'   ].sel(case=case).values
                 misalignment_ = self.allCases['misalignment'   ].sel(case=case).values
                 nADyn_        = self.allCases['nFullAeroDyn'   ].sel(case=case).values
                 nFED_         = self.allCases['nFulllElastoDyn'].sel(case=case).values
@@ -1024,97 +1024,114 @@ class FFCaseCreation:
                                        coords={'cond': np.arange(self.nConditions)} )
   
 
+
+
+
     def _create_all_cases(self):
         # Generate the different "cases" (inflow angle, and misalignment and wakesteer bools).
         # If misalignment true, then the actual yaw is yaw[turb]=np.random.uniform(low=-8.0, high=8.0).
-        
-        # Calculate the total number of cases given sweeps requested. Multipliers for wake steering, yaw misalignment, and reduced-order models
-        nWindDir = len(np.unique(self.inflow_deg))
-        nCasesWSmultiplier = 2 if self.sweepWS else 1
+
+        # Set sweep bools and multipliers
         nCasesYMmultiplier = 2 if self.sweepYM else 1
         nCasesROmultiplier = len(self.EDmodel)
-        
-        # Yaw multiplier, setup in the form of repeated wind directions with changing yaw
-        nCasesYawmultiplier = int(len(self.inflow_deg)/len(np.unique(self.inflow_deg)))
-        
-        # Aux nCases vars
-        nCases        = int(nWindDir * nCasesWSmultiplier * nCasesYMmultiplier * nCasesROmultiplier * nCasesYawmultiplier)
-        nCasesWSfalse = int(nCases/nCasesWSmultiplier)
-        nCasesWStrue  = int(nCases - nCasesWSfalse)
-        nCasesYMfalse = int(nCases/nCasesYMmultiplier)
-        nCasesYMtrue  = int(nCases - nCasesYMfalse)
-        if self.verbose>2: print(f'    Cases: nWindDir = {nWindDir}                                   ')
-        if self.verbose>2: print(f'    Cases: nCases = {nCases}')
-        if self.verbose>2: print(f'    Cases: nCasesWStrue = {nCasesWStrue}')
-        if self.verbose>2: print(f'    Cases: nCasesWSfalse = {nCasesWSfalse}')
-        if self.verbose>2: print(f'    Cases: nCasesYMtrue = {nCasesYMtrue}')
-        if self.verbose>2: print(f'    Cases: nCasesYMfalse = {nCasesYMfalse}')
-        
-        # Build an array of wind directions, with repeated values to account for wake steering and yaw misalign bools, and ROM options
-        windDir = np.repeat(self.inflow_deg, nCasesWSmultiplier*nCasesYMmultiplier*nCasesROmultiplier)
-        yawInit = np.repeat(self.yaw_init, nCasesWSmultiplier*nCasesYMmultiplier*nCasesROmultiplier, axis=0)
-        
-        # Build arrays of wake steering and yaw misalignment bools (done this way for clarity)
-        if self.sweepWS and self.sweepYM:
-            wakeSteering = np.tile([False, True,  False, True], nWindDir*nCasesROmultiplier*nCasesYawmultiplier)
-            misalignment = np.tile([False, False, True,  True], nWindDir*nCasesROmultiplier*nCasesYawmultiplier)
-        elif self.sweepWS and not self.sweepYM:
-            wakeSteering = np.tile([False, True ], nWindDir*nCasesROmultiplier*nCasesYawmultiplier)
-            misalignment = np.tile([False, False], nWindDir*nCasesROmultiplier*nCasesYawmultiplier)
-        elif not self.sweepWS and self.sweepYM:
-            wakeSteering = np.tile([False, False], nWindDir*nCasesROmultiplier*nCasesYawmultiplier)
-            misalignment = np.tile([False, True ], nWindDir*nCasesROmultiplier*nCasesYawmultiplier)
-        elif not self.sweepWS and not self.sweepYM:
-            wakeSteering = np.tile([False], nWindDir*nCasesROmultiplier*nCasesYawmultiplier)
-            misalignment = np.tile([False], nWindDir*nCasesROmultiplier*nCasesYawmultiplier)
-        
-            
-        # Create array of random numbers for yaw misalignment, and set it to zero where no yaw misalign is requested
-        yawMisalignedValue = np.random.uniform(size = [nCases,self.nTurbines], low=-8.0, high=8.0)
-        yawMisalignedValue[~misalignment,:] = 0
-        
-        # Count number of simplified models to add that information to the xarray. If their length is 1, it means they weren't requested
         if len(self.ADmodel) == 1:
-            nADyn = self.nTurbines
+            self.sweepEDmodel = False
             self.sweepADmodel = False
         else:
-            nADyn = [ self.ADmodel[i].count('ADyn') for i in range(len(self.ADmodel)) ]
+            self.sweepEDmodel = True
             self.sweepADmodel = True
-        if len(self.EDmodel) == 1:
-           nFED = self.nTurbines
-           self.sweepEDmodel = False
-        else:
-            nFED = [ self.EDmodel[i].count('FED') for i in range(len(self.EDmodel)) ]
-            self.sweepADmodel = True
-        
-        # Come up with an ordered "yaw case" numbering for dir name
-        yawCase =  np.arange(nCasesYawmultiplier)+1
-        
-        # Assemble main case dataset, containing turbine info
-        self.nCases = nCases
-        self.allCases = xr.Dataset(
-            {
-                'Tx':     (['case','turbine'], np.repeat(self.wts_rot_ds['x'].values   , nCasesWSmultiplier*nCasesYMmultiplier*nCasesROmultiplier*nCasesYawmultiplier, axis=0)),
-                'Ty':     (['case','turbine'], np.repeat(self.wts_rot_ds['y'].values   , nCasesWSmultiplier*nCasesYMmultiplier*nCasesROmultiplier*nCasesYawmultiplier, axis=0)),
-                'Tz':     (['case','turbine'], np.repeat(self.wts_rot_ds['z'].values   , nCasesWSmultiplier*nCasesYMmultiplier*nCasesROmultiplier*nCasesYawmultiplier, axis=0)),
-                'D':      (['case','turbine'], np.repeat(self.wts_rot_ds['D'].values   , nCasesWSmultiplier*nCasesYMmultiplier*nCasesROmultiplier*nCasesYawmultiplier, axis=0)),
-                'zhub':   (['case','turbine'], np.repeat(self.wts_rot_ds['zhub'].values, nCasesWSmultiplier*nCasesYMmultiplier*nCasesROmultiplier*nCasesYawmultiplier, axis=0)),
-                'yawmis': (['case','turbine'], yawMisalignedValue),
-                'yaw':    (['case','turbine'], yawInit),
-                'yawCase': (['case'], np.repeat(yawCase, nWindDir*nCasesWSmultiplier*nCasesYMmultiplier*nCasesROmultiplier)),
-                'ADmodel': (['case','turbine'], np.tile(np.repeat(self.ADmodel, nCasesWSmultiplier*nCasesYMmultiplier*nCasesYawmultiplier, axis=0),(nWindDir,1)) ),
-                'EDmodel': (['case','turbine'], np.tile(np.repeat(self.EDmodel, nCasesWSmultiplier*nCasesYMmultiplier*nCasesYawmultiplier, axis=0),(nWindDir,1)) ),
-                'nFullAeroDyn':    (['case'], np.repeat(np.tile(nADyn, nWindDir), nCasesWSmultiplier*nCasesYMmultiplier*nCasesYawmultiplier)),
-                'nFulllElastoDyn': (['case'], np.repeat(np.tile(nFED,  nWindDir), nCasesWSmultiplier*nCasesYMmultiplier*nCasesYawmultiplier)),
-                'wakeSteering': (['case'], wakeSteering),
-                'misalignment': (['case'], misalignment),
-                'inflow_deg':   (['case'], windDir),
-            },
-            coords={
-                'case':    range(nCases),
-                'turbine': range(self.nTurbines),
-            },
-        )
+
+        # Initialize an empty array to accumulate individual cases
+        allCases = []
+        # Get list of unique yaws, keeping the order
+        _, ind = np.unique(self.yaw_init, axis=0, return_index=True)
+        yaw_unique = self.yaw_init[np.sort(ind)] # duplicates removed, same order as original array
+
+        # The main sweep on wind dir and yaw has been given by the user, such that
+        # only one loop is needed here.
+        for icase in range(len(self.inflow_deg)):
+            wdir     = self.inflow_deg[icase]
+            yaw      = self.yaw_init[icase]
+            yaw_case = np.where(np.all(yaw_unique == yaw, axis=1))[0][0]+1
+            # Get turbine info
+            x = self.wts_rot_ds.sel(inflow_deg=wdir)['x'].values
+            y = self.wts_rot_ds.sel(inflow_deg=wdir)['y'].values
+            z = self.wts_rot_ds.sel(inflow_deg=wdir)['z'].values
+            D = self.wts_rot_ds.sel(inflow_deg=wdir)['D'].values
+            zhub = self.wts_rot_ds.sel(inflow_deg=wdir)['zhub'].values
+
+            oneCase = xr.Dataset({
+                                  'Tx':         (['case','turbine'], [x   ]),
+                                  'Ty':         (['case','turbine'], [y   ]),
+                                  'Tz':         (['case','turbine'], [z   ]),
+                                  'D':          (['case','turbine'], [D   ]),
+                                  'zhub':       (['case','turbine'], [zhub]),
+                                  'yaw':        (['case','turbine'], [yaw] ),
+                                  'inflow_deg': (['case'],           [wdir]),
+                                  'yawCase':    (['case'],           [yaw_case]),
+                                },
+                                coords={
+                                    'case':    [icase],
+                                    'turbine': np.arange(self.nTurbines),
+                                },
+                                )
+            allCases.append(oneCase)
+        allCases = xr.concat(allCases, dim='case')
+
+        # ------------------------------------------------------- SWEEP ROM MODELS
+        # Get the number of cases at before this current sweep
+        nCases_before_sweep = len(allCases.case)
+
+        # Concat instances of allCases and adjust the case numbering
+        ds = xr.concat([allCases for i in range(nCasesROmultiplier)], dim='case')
+        ds['case'] = np.arange(len(ds['case']))
+
+        # Create an empty array to fill. This way have a generic variable of type object
+        data = np.empty_like(ds['Tx'].data, dtype=object);  data[:] = None
+        ds['EDmodel']         = (('case','turbine'), data)
+        ds['ADmodel']         = (('case','turbine'), data)
+        ds['nFulllElastoDyn'] = (('case'), np.zeros_like(ds['inflow_deg']))
+        ds['nFullAeroDyn']    = (('case'), np.zeros_like(ds['inflow_deg']))
+
+        # Now, we fill the array with the new values for the proper sweep
+        for multi in range(nCasesROmultiplier):
+            for c in range(nCases_before_sweep):
+                currCase = nCases_before_sweep*multi + c
+                currEDmodel = np.array(self.EDmodel)[multi]#,:]
+                currADmodel = np.array(self.ADmodel)[multi]#,:]
+
+                ds['EDmodel'].loc[dict(case=currCase, turbine=slice(None))] = currEDmodel
+                nFED = np.count_nonzero(currEDmodel == 'FED')
+                ds['nFulllElastoDyn'].loc[dict(case=currCase)] = nFED
+
+                ds['ADmodel'].loc[dict(case=currCase, turbine=slice(None))] = currADmodel
+                nADyn = np.count_nonzero(currADmodel == 'ADyn')
+                ds['nFullAeroDyn'].loc[dict(case=currCase)] = nADyn
+
+        allCases = ds.copy()
+
+        # ------------------------------------------------- SWEEP YAW MISALIGNMENT
+        # Get the number of cases at before this current sweep
+        nCases_before_sweep = len(allCases.case)
+
+        # Concat instances of allCases and adjust the case numbering
+        ds = xr.concat([allCases for i in range(nCasesYMmultiplier)], dim='case')
+        ds['case'] = np.arange(len(ds['case']))
+
+        # Create an full no-misalignment array to fill when non-aligned
+        ds['yawmis']       = (('case','turbine'), np.zeros_like(ds['yaw']))
+        ds['misalignment'] = (('case'),           np.full_like(ds['inflow_deg'], False, dtype=bool))
+
+        if self.sweepYM:
+            # Now, we fill the array with the new values on the second half (first half has no misalignment)
+            for c in range(nCases_before_sweep):
+                currCase = nCases_before_sweep + c
+                ds['yawmis'].loc[dict(case=currCase, turbine=slice(None))] = np.random.uniform(size=case.nTurbines,low=-8,high=8)
+                ds['misalignment'].loc[dict(case=currCase)] = True
+
+        self.allCases = ds.copy()
+        self.nCases = len(self.allCases['case'])
+
 
 
     def _rotate_wts(self):
@@ -1292,8 +1309,7 @@ class FFCaseCreation:
         self.nHighBoxCases = len(np.unique(self.inflow_deg))  # some wind dir might be repeated for sweep on yaws
         
         # Old method to get allHighBoxCases. Doesn't work well if I have weird manual sweeps
-        allHighBoxCases_old  = self.allCases.where(~self.allCases['wakeSteering'],drop=True).drop_vars('wakeSteering')\
-                                            .where(~self.allCases['misalignment'], drop=True).drop_vars('misalignment')\
+        allHighBoxCases_old  = self.allCases.where(~self.allCases['misalignment'], drop=True).drop_vars('misalignment')\
                                             .where(self.allCases['nFullAeroDyn']==self.nTurbines, drop=True).drop_vars('ADmodel')\
                                             .where(self.allCases['nFulllElastoDyn']==self.nTurbines, drop=True).drop_vars('EDmodel')\
                                             .where(self.allCases['yawCase']==1, drop=True).drop_vars('yawCase')
@@ -1545,7 +1561,7 @@ class FFCaseCreation:
                 for seed in range(self.nSeeds):
                     for case in range(self.nCases):
                         # Let's check if the current case is source (has bts) or destination (needs a symlink to bts)
-                        varsToDrop = ['wakeSteering','misalignment','yawmis','yaw','yawCase','ADmodel','EDmodel','nFullAeroDyn','nFulllElastoDyn']
+                        varsToDrop = ['misalignment','yawmis','yaw','yawCase','ADmodel','EDmodel','nFullAeroDyn','nFulllElastoDyn']
                         if case in self.allHighBoxCases['case']:
                             src = os.path.join('../../../..', self.condDirList[cond], self.caseDirList[case], f'Seed_{seed}', 'TurbSim', f'HighT{t+1}.bts')
                             xr_src = self.allCases.sel(case=case, drop=True).drop_vars(varsToDrop)
