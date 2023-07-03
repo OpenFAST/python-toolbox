@@ -2065,3 +2065,87 @@ class FFCaseCreation:
                     time.sleep(delay) # Sometimes the same job gets submitted twice. This gets around it.
 
 
+
+
+
+    def plot(self, figsize=(15,7), fontsize=14, saveFig=True, returnFig=False):
+        import matplotlib.pyplot as plt
+
+        fig, ax = plt.subplots(figsize=figsize)
+
+        # for plotting different inflow angles
+        alphas = np.append(1, np.linspace(0.5,0.2, len(self.wts_rot_ds['inflow_deg'])-1))
+
+        # low-res box
+        try:
+            ax.plot([self.TSlowbox.xmin, self.TSlowbox.xmax, self.TSlowbox.xmax, self.TSlowbox.xmin, self.TSlowbox.xmin],
+                    [self.TSlowbox.ymin, self.TSlowbox.ymin, self.TSlowbox.ymax, self.TSlowbox.ymax, self.TSlowbox.ymin],'--k',lw=2,label='Low')
+        except AttributeError:
+            print(f'WARNING: The exact limits of the low-res box have not been computed yet. Showing extents given as inputs')
+            xmin = self.allCases['Tx'].min()-self.extent_low[0]*self.D
+            xmax = self.allCases['Tx'].max()+self.extent_low[1]*self.D
+            ymin = self.allCases['Ty'].min()-self.extent_low[2]*self.D
+            ymax = self.allCases['Ty'].max()+self.extent_low[3]*self.D
+            ax.plot([xmin, xmax, xmax, xmin, xmin],
+                    [ymin, ymin, ymax, ymax, ymin],'--k',lw=2,label='Low')
+
+
+        for j, inflow in enumerate(self.wts_rot_ds['inflow_deg']):
+            ax.set_prop_cycle(None)  # Reset the colormap for every inflow
+            for i, currTurbine in enumerate(self.wts_rot_ds.turbine):
+                color = next(ax._get_lines.prop_cycler)['color']
+
+                dst = self.wts_rot_ds.sel(turbine=currTurbine, inflow_deg=inflow)
+
+                # plot high-res boxes
+                xmin, xmax = [dst.x-self.extent_high*dst.D/2, dst.x+self.extent_high*dst.D/2]
+                ymin, ymax = [dst.y-self.extent_high*dst.D/2, dst.y+self.extent_high*dst.D/2]
+                # Only add label entry on first (darker) curves
+                if j==0:
+                    ax.plot([xmin, xmax, xmax, xmin, xmin],
+                            [ymin, ymin, ymax, ymax, ymin], c=color, alpha=alphas[j], label=f'HighT{i+1}')
+                else:
+                    ax.plot([xmin, xmax, xmax, xmin, xmin],
+                            [ymin, ymin, ymax, ymax, ymin], c=color, alpha=alphas[j])
+
+                # plot turbine location
+                ax.scatter(dst.x, dst.y, s=dst.D/6, c=color, marker='o') #, label=f'WT{i+1}')
+
+                # plot turbine disk accoding to all yaws in current wdir
+                allyaw_currwdir = self.allCases.where(self.allCases['inflow_deg']==inflow,drop=True).sel(turbine=currTurbine)['yaw']
+                _, ind = np.unique(allyaw_currwdir, axis=0, return_index=True)
+                yaw_currwdir = allyaw_currwdir[np.sort(ind)].values # duplicates removed, same order as original array
+                for yaw in yaw_currwdir:
+                    ax.plot([dst.x.values-(dst.D.values/2)*sind(yaw-inflow.values), dst.x.values+(dst.D.values/2)*sind(yaw-inflow.values)],
+                            [dst.y.values-(dst.D.values/2)*cosd(yaw-inflow.values), dst.y.values+(dst.D.values/2)*cosd(yaw-inflow.values)], c=color, alpha=alphas[j])
+
+            # plot convex hull of farm (or line) for given inflow
+            turbs = self.wts_rot_ds.sel(inflow_deg=inflow)[['x','y']].to_array().transpose()
+            try:
+                hull = ConvexHull(turbs)
+                for simplex in hull.simplices:
+                    ax.plot(turbs[simplex, 0], turbs[simplex, 1], 'gray', alpha=alphas[j], label=f'Inflow {inflow.values} deg')
+            except:
+                # All turbines are in a line. Plotting a line instead of convex hull
+                ax.plot(turbs[:,0], turbs[:,1], 'gray', alpha=alphas[j], label=f'Inflow {inflow.values} deg')
+
+
+        # Remove duplicate entries from legend
+        handles, labels = plt.gca().get_legend_handles_labels()
+        by_label = dict(zip(labels, handles))
+        plt.legend(by_label.values(), by_label.keys(), loc='upper left', bbox_to_anchor=(1.02,1.015), fontsize=fontsize)
+
+        ax.set_xlabel("x [m]", fontsize=fontsize)
+        ax.set_ylabel("y [m]", fontsize=fontsize)
+        ax.tick_params(axis='both', which='major', labelsize=fontsize)
+        ax.grid()
+        ax.set_aspect('equal')
+
+        if saveFig:
+            fig.savefig(os.path.join(self.path,'farm.png'), bbox_inches='tight', facecolor='white', transparent=False)
+
+        if returnFig:
+            return fig, ax
+
+
+
