@@ -1554,31 +1554,49 @@ class FFCaseCreation:
     def TS_high_create_symlink(self):
 
         # Create symlink of all the high boxes for the cases with wake steering and yaw misalignment. These are the "repeated" boxes
+
+        if self.verbose>0:
+            print(f'Creating symlinks for all the high-resolution boxes')
+            
         notepath = os.getcwd()
         os.chdir(self.path)
         for cond in range(self.nConditions):
-            for t in range(self.nTurbines):
-                for seed in range(self.nSeeds):
-                    for case in range(self.nCases):
-                        # Let's check if the current case is source (has bts) or destination (needs a symlink to bts)
-                        varsToDrop = ['misalignment','yawmis','yaw','yawCase','ADmodel','EDmodel','nFullAeroDyn','nFulllElastoDyn']
-                        if case in self.allHighBoxCases['case']:
-                            src = os.path.join('../../../..', self.condDirList[cond], self.caseDirList[case], f'Seed_{seed}', 'TurbSim', f'HighT{t+1}.bts')
-                            xr_src = self.allCases.sel(case=case, drop=True).drop_vars(varsToDrop)
-                            continue
-                        else:
-                            dst = os.path.join(self.condDirList[cond], self.caseDirList[case], f'Seed_{seed}', 'TurbSim', f'HighT{t+1}.bts')
-                            xr_dst = self.allCases.sel(case=case, drop=True).drop_vars(varsToDrop)
-                            
-                        # Let's make sure the src and destination are the same case, except wake steering and yaw misalign bools
-                        xr.testing.assert_equal(xr_src, xr_dst)
-                        
+            for case in range(self.nCases):
+                # In order to do the symlink let's check if the current case is source (has bts). If so, skip if. If not, find its equivalent source
+                casematch = self.allHighBoxCases['case'] == case
+                if len(np.where(casematch)) != 1:
+                    raise ValueError (f'Something is wrong with your allHighBoxCases array. Found repeated case number. Stopping')
+
+                src_id = np.where(casematch)[0]
+
+                if len(src_id) == 1:
+                    # Current case is source (contains bts). Skipping
+                    continue
+
+                # If we are here, the case is destination. Let's find the first case with the same wdir for source
+                varsToDrop = ['misalignment','yawmis','yaw','yawCase','ADmodel','EDmodel','nFullAeroDyn','nFulllElastoDyn']
+                dst_xr = self.allCases.sel(case=case, drop=True).drop_vars(varsToDrop)
+                currwdir = dst_xr['inflow_deg']
+                
+                src_xr = self.allHighBoxCases.where(self.allHighBoxCases['inflow_deg'] == currwdir, drop=True).drop_vars(varsToDrop)
+                src_case = src_xr['case'].values[0]
+                src_xr = src_xr.sel(case=src_case, drop=True)
+                
+                # Let's make sure the src and destination are the same case, except yaw misalignment and ROM bools, and yaw angles
+                # The xarrays we are comparing here contains all self.nTurbines turbines and no info about seed
+                xr.testing.assert_equal(src_xr, dst_xr)
+
+                # Now that we have the correct arrays, we perform the loop on the turbines and seeds
+                for t in range(self.nTurbines):
+                    for seed in range(self.nSeeds):
+                        src = os.path.join('../../../..', self.condDirList[cond], self.caseDirList[src_case], f'Seed_{seed}', 'TurbSim', f'HighT{t+1}.bts')
+                        dst = os.path.join(self.condDirList[cond], self.caseDirList[case], f'Seed_{seed}', 'TurbSim', f'HighT{t+1}.bts')
+                       
                         try:
                             os.symlink(src, dst)
                         except FileExistsError:
                             if self.verbose>1: print(f'File {dst} already exists. Skipping symlink.')
         os.chdir(notepath)
-
 
 
     def FF_setup(self, outlistFF=None, **kwargs):
@@ -1795,9 +1813,15 @@ class FFCaseCreation:
 
     def _FF_setup_TS(self):
 
+        # Let's first create the symlinks for the high-res boxes. Remember that only the cases with 
+        # unique winddir in self.allHighBoxCases have executed high-res boxes, the rest is all links
+        self.TS_high_create_symlink()
+        
         # Loops on all conditions/cases and cases for FAST.Farm
         for cond in range(self.nConditions):
+            print(f'Processing condition {self.condDirList[cond]}')
             for case in range(self.nCases):
+                print(f'    Processing all {self.nSeeds} seeds of case {self.caseDirList[case]}', end='\r')
                 for seed in range(self.nSeeds):
                     seedPath = os.path.join(self.path, self.condDirList[cond], self.caseDirList[case], f'Seed_{seed}')
         
@@ -1876,6 +1900,7 @@ class FFCaseCreation:
                     ff_file['WindVelZ'] = ', '.join(map(str, zWT[:9]+self.zhub))
         
                     ff_file.write(outputFSTF)
+            print(f'Done processing condition {self.condDirList[cond]}                                              ')
 
         return
 
