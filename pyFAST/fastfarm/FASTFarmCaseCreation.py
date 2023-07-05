@@ -1088,17 +1088,17 @@ class FFCaseCreation:
 
         # Create an empty array to fill. This way have a generic variable of type object
         data = np.empty_like(ds['Tx'].data, dtype=object);  data[:] = None
-        ds['EDmodel']         = (('case','turbine'), data)
-        ds['ADmodel']         = (('case','turbine'), data)
-        ds['nFulllElastoDyn'] = (('case'), np.zeros_like(ds['inflow_deg']))
-        ds['nFullAeroDyn']    = (('case'), np.zeros_like(ds['inflow_deg']))
+        ds['EDmodel']         = (('case','turbine'), data.copy())
+        ds['ADmodel']         = (('case','turbine'), data.copy())
+        ds['nFulllElastoDyn'] = (('case'), np.zeros_like(ds['inflow_deg']).copy())
+        ds['nFullAeroDyn']    = (('case'), np.zeros_like(ds['inflow_deg']).copy())
 
         # Now, we fill the array with the new values for the proper sweep
         for multi in range(nCasesROmultiplier):
             for c in range(nCases_before_sweep):
                 currCase = nCases_before_sweep*multi + c
-                currEDmodel = np.array(self.EDmodel)[multi]#,:]
-                currADmodel = np.array(self.ADmodel)[multi]#,:]
+                currEDmodel = np.array(self.EDmodel)[multi]
+                currADmodel = np.array(self.ADmodel)[multi]
 
                 ds['EDmodel'].loc[dict(case=currCase, turbine=slice(None))] = currEDmodel
                 nFED = np.count_nonzero(currEDmodel == 'FED')
