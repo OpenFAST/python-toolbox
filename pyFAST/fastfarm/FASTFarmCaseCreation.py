@@ -1302,6 +1302,7 @@ class FFCaseCreation:
 
         # If the low box setup hasn't been called (e.g. LES run), do it once to get domain extents
         if not self.TSlowBoxFilesCreatedBool:
+            if self.verbose>1: print('    Running a TurbSim setup once to get domain extents')
             self.TS_low_setup(writeFiles=False, runOnce=True)
 
         # Figure out how many (and which) high boxes actually need to be executed. Remember that wake steering, yaw misalignment, SED/ADsk models,
@@ -2106,6 +2107,31 @@ class FFCaseCreation:
                     time.sleep(delay) # Sometimes the same job gets submitted twice. This gets around it.
 
 
+    def FF_check_output(self):
+        '''
+        Check all the FF output files and look for the termination string.
+        '''
+
+        ff_run_failed = False
+        for cond in range(self.nConditions):
+            for case in range(self.nCases):
+                for seed in range(self.nSeeds):
+                    # Let's check the last line of the logfile
+                    fflog_path = os.path.join(self.path, self.condDirList[cond], self.caseDirList[case], f'Seed_{seed}', f'log.fastfarm.seed{seed}.txt')
+                    if not os.path.isfile(fflog_path):
+                        print(f'{self.condDirList[cond]}, {self.caseDirList[case]}, seed {seed}: FAST.Farm log file does not exist.')
+                        ff_run_failed=True
+
+                    else:
+                        tail_command = ['tail', '-n', '2', fflog_path]
+                        tail = subprocess.check_output(tail_command).decode('utf-8')
+                        if tail.strip() != 'FAST.Farm terminated normally.':
+                            print(f'{self.condDirList[cond]}, {self.caseDirList[case]}, seed {seed}: FAST.Farm did not complete successfully.')
+                            ff_run_failed=True
+
+        if ff_run_failed:
+            print('')
+            raise ValueError(f'Not all FAST.Farm runs were successful')
 
 
 
