@@ -2115,6 +2115,7 @@ class FFCaseCreation:
         ff_run_failed = False
         for cond in range(self.nConditions):
             for case in range(self.nCases):
+                if self.verbose>1:  print(f'Checking {self.condDirList[cond]}, {self.caseDirList[case]}')
                 for seed in range(self.nSeeds):
                     # Let's check the last line of the logfile
                     fflog_path = os.path.join(self.path, self.condDirList[cond], self.caseDirList[case], f'Seed_{seed}', f'log.fastfarm.seed{seed}.txt')
@@ -2132,6 +2133,8 @@ class FFCaseCreation:
         if ff_run_failed:
             print('')
             raise ValueError(f'Not all FAST.Farm runs were successful')
+        else:
+            print(f'All cases finished successfully.')
 
 
 
