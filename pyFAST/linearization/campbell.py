@@ -167,7 +167,7 @@ def postproMBC(xlsFile=None, csvModesIDFile=None, xlssheet=None, verbose=True, W
         for i,v in enumerate(WS):
             OPFile = csvBase+'Campbell_Point{:02d}{:}.csv'.format(i+1,suffix)
             #print(OPFile, WS[i], RPM[i])
-            Points[i] = pd.read_csv(OPFile, sep = ',', header=None)
+            Points[i] = pd.read_csv(OPFile, sep = ',', header=None, dtype='object')
     else:
         raise Exception('Provide either an Excel file or a csv (ModesID) file')
     # --- Mode Identification
@@ -258,7 +258,7 @@ def postproMBC(xlsFile=None, csvModesIDFile=None, xlssheet=None, verbose=True, W
             UnMapped_RPM  = np.concatenate((UnMapped_RPM, rpm))
         else:
             if all(ModeIndices==-1):
-                print('Skipping mode number ',iMode)
+                print('Mode not IDd: {}, name: {}.'.format(iMode, ModeName))
             else:
                 f=[]
                 d=[]
