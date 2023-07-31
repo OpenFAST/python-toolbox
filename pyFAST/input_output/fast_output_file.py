@@ -9,11 +9,21 @@ Main content:
 - data, info = def load_binary_output(filename, use_buffer=True)
 - def writeDataFrame(df, filename, binary=True)
 - def writeBinary(fileName, channels, chanNames, chanUnits, fileID=2, descStr='')
+
+NOTE: 
+  - load_binary and writeBinary are not "fully reversible" for now.
+      Some small numerical errors are introduced in the conversion.
+      Some of the error is likely due to the fact that Python converts to "int" and "float" (double).
+      Maybe all the operations should be done in single. I tried but failed. 
+      I simply wonder if the operation is perfectly reversible. 
+             
+
 """
 from itertools import takewhile
 import numpy as np
 import pandas as pd
 import struct
+import ctypes
 import os
 import re
 try:
@@ -28,6 +38,13 @@ try:
     from .csv_file import CSVFile
 except:
     print('CSVFile not available')
+
+
+
+FileFmtID_WithTime              = 1 # File identifiers used in FAST
+FileFmtID_WithoutTime           = 2
+FileFmtID_NoCompressWithoutTime = 3
+FileFmtID_ChanLen_In            = 4 # Channel length included in file
 
 
 # --------------------------------------------------------------------------------}
@@ -108,7 +125,12 @@ class FASTOutputFile(File):
                 self.info['attribute_units']=readline(3).replace('sec','s').split()
                 self.info['attribute_names']=self.data.columns.values
             else:
-                self.data, self.info = load_output(self.filename)
+                if isBinary(self.filename):
+                    self.data, self.info = load_binary_output(self.filename)
+                    self['binary']=True
+                else:
+                    self.data, self.info = load_ascii_output(self.filename)
+                    self['binary']=False
         except MemoryError as e:    
             raise BrokenReaderError('FAST Out File {}: Memory error encountered\n{}'.format(self.filename,e))
         except Exception as e:    
@@ -120,13 +142,13 @@ class FASTOutputFile(File):
             self.info['attribute_units'] = [re.sub(r'[()\[\]]','',u) for u in self.info['attribute_units']]
 
 
-    def _write(self): 
-        if self['binary']:
-            channels = self.data
-            chanNames = self.info['attribute_names']
-            chanUnits = self.info['attribute_units']
-            descStr   = self.info['description']
-            writeBinary(self.filename, channels, chanNames, chanUnits, fileID=2, descStr=descStr)
+    def _write(self, binary=None, fileID=4): 
+        if binary is None:
+            binary = self['binary']
+
+        if binary:
+            # NOTE: user provide a filename, we allow overwrite
+            self.toOUTB(filename=self.filename, fileID=fileID, noOverWrite=False)
         else:
             # ascii output
             with open(self.filename,'w') as f:
@@ -155,9 +177,6 @@ class FASTOutputFile(File):
                 raise BrokenFormatError('Inconstistent number of columns between headers ({}) and data ({}) for file {}'.format(len(cols), self.data.shape[1], self.filename))
             df = pd.DataFrame(data=self.data,columns=cols)
 
-        # Remove duplicate columns if they are present
-        df = df.loc[:,~df.columns.duplicated()].copy()
-
         return df
 
     def writeDataFrame(self, df, filename, binary=True):
@@ -170,38 +189,59 @@ class FASTOutputFile(File):
         s+='and keys: {}\n'.format(self.keys())
         return s
 
+    # --------------------------------------------------------------------------------
+    # --- Converters 
+    # --------------------------------------------------------------------------------
+    def toOUTB(self, filename=None, extension='.outb', fileID=4, noOverWrite=True, **kwargs):
+        #NOTE: we override the File class here
+        if filename is None:
+            base, _ = os.path.splitext(self.filename)
+            filename = base + extension
+        else:
+            base, ext = os.path.splitext(filename)
+            if len(ext)!=0:
+                extension = ext
+        if (filename==self.filename) and noOverWrite:
+            raise Exception('Not overwritting {}. Specify a filename or an extension.'.format(filename))
+        
+        # NOTE: fileID=2 will chop the channels name of long channels use fileID4 instead
+        channels = self.data
+        chanNames = self.info['attribute_names']
+        chanUnits = self.info['attribute_units']
+        descStr   = self.info['description']
+        if isinstance(descStr, list):
+            descStr=(''.join(descStr[:2])).replace('\n','')
+        writeBinary(filename, channels, chanNames, chanUnits, fileID=fileID, descStr=descStr)
+
+
 # --------------------------------------------------------------------------------
 # --- Helper low level functions 
 # --------------------------------------------------------------------------------
-def load_output(filename):
-    """Load a FAST binary or ascii output file
-
-    Parameters
-    ----------
-    filename : str
-        filename
-
-    Returns
-    -------
-    data : ndarray
-        data values
-    info : dict
-        info containing:
-            - name: filename
-            - description: description of dataset
-            - attribute_names: list of attribute names
-            - attribute_units: list of attribute units
-    """
-
-    assert os.path.isfile(filename), "File, %s, does not exists" % filename
+def isBinary(filename):
     with open(filename, 'r') as f:
         try:
-            f.readline()
+            # first try to read as string
+            l = f.readline()
+            # then look for weird characters
+            for c in l:
+                code = ord(c)
+                if code<10 or (code>14 and code<31):
+                    return True
+            return False
         except UnicodeDecodeError:
-            return load_binary_output(filename)
-    return load_ascii_output(filename)
+            return True
 
-def load_ascii_output(filename):
+        
+
+
+
+def load_ascii_output(filename, method='numpy'):
+
+
+    if method in ['forLoop','pandas']:
+        from .file import numberOfLines
+        nLines = numberOfLines(filename, method=2)
+
     with open(filename) as f:
         info = {}
         info['name'] = os.path.splitext(os.path.basename(filename))[0]
@@ -220,12 +260,42 @@ def load_ascii_output(filename):
                 info['description'] = header
                 info['attribute_names'] = l.split()
                 info['attribute_units'] = [unit[1:-1] for unit in f.readline().split()]
-        # ---
-        # Data, up to end of file or empty line (potential comment line at the end)
-#         data = np.array([l.strip().split() for l in takewhile(lambda x: len(x.strip())>0, f.readlines())]).astype(np.float)
-        # ---
-        data = np.loadtxt(f, comments=('This')) # Adding "This" for the Hydro Out files..
-        return data, info
+
+        nHeader = len(header)+1
+        nCols = len(info['attribute_names'])
+
+        if method=='numpy':
+            # The most efficient, and will remove empty lines and the lines that starts with "This"
+            #  ("This" is found at the end of some Hydro Out files..)
+            data = np.loadtxt(f, comments=('This'))
+
+        elif method =='pandas':
+            # Could probably be made more efficient, but 
+            f.close()
+            nRows = nLines-nHeader
+            sep=r'\s+'
+            cols= ['C{}'.format(i) for i in range(nCols)]
+            df = pd.read_csv(filename, sep=sep, header=0, skiprows=nHeader, names=cols, dtype=float, na_filter=False, nrows=nRows, engine='pyarrow'); print(df)
+            data=df.values
+
+        elif method == 'forLoop':
+            # The most inefficient
+            nRows = nLines-nHeader
+            sep=r'\s+'
+            data = np.zeros((nRows, nCols))
+            for i in range(nRows):
+                l = f.readline().strip()
+                sp = np.array(l.split()).astype(np.float)
+                data[i,:] = sp[:nCols]
+
+        elif method == 'listCompr':
+            # --- Method 4 - List comprehension
+            # Data, up to end of file or empty line (potential comment line at the end)
+            data = np.array([l.strip().split() for l in takewhile(lambda x: len(x.strip())>0, f.readlines())]).astype(np.float)
+        else:
+            raise NotImplementedError()
+
+    return data, info
 
 
 def load_binary_output(filename, use_buffer=True):
@@ -240,8 +310,15 @@ def load_binary_output(filename, use_buffer=True):
     %
     %  Edited for FAST v7.02.00b-bjj  22-Oct-2012
     """
-    def fread(fid, n, type):
-        fmt, nbytes = {'uint8': ('B', 1), 'int16':('h', 2), 'int32':('i', 4), 'float32':('f', 4), 'float64':('d', 8)}[type]
+    StructDict = {
+            'uint8': ('B', 1, np.uint8), 
+            'int16':('h', 2, np.int16), 
+            'int32':('i', 4, np.int32), 
+            'float32':('f', 4, np.float32),
+            'float64':('d', 8, np.float64)}
+    def fread(fid, n, dtype):
+        fmt, nbytes, npdtype = StructDict[dtype]
+        #return np.array(struct.unpack(fmt * n, fid.read(nbytes * n)), dtype=npdtype)
         return struct.unpack(fmt * n, fid.read(nbytes * n))
 
     def freadRowOrderTableBuffered(fid, n, type_in, nCols, nOff=0, type_out='float64'):
@@ -282,12 +359,6 @@ def load_binary_output(filename, use_buffer=True):
             raise Exception('Read only %d of %d values in file:' % (nIntRead, n, filename))
         return data
 
-
-    FileFmtID_WithTime              = 1 # File identifiers used in FAST
-    FileFmtID_WithoutTime           = 2
-    FileFmtID_NoCompressWithoutTime = 3
-    FileFmtID_ChanLen_In            = 4
-
     with open(filename, 'rb') as fid:
         #----------------------------        
         # get the header information
@@ -307,11 +378,11 @@ def load_binary_output(filename, use_buffer=True):
         NT = fread(fid, 1, 'int32')[0]  #;             % The number of time steps, INT(4)
 
         if FileID == FileFmtID_WithTime:
-            TimeScl = fread(fid, 1, 'float64')  #;           % The time slopes for scaling, REAL(8)
-            TimeOff = fread(fid, 1, 'float64')  #;           % The time offsets for scaling, REAL(8)
+            TimeScl = fread(fid, 1, 'float64')[0]  # The time slopes for scaling, REAL(8)
+            TimeOff = fread(fid, 1, 'float64')[0]  # The time offsets for scaling, REAL(8)
         else:
-            TimeOut1 = fread(fid, 1, 'float64')  #;           % The first time in the time series, REAL(8)
-            TimeIncr = fread(fid, 1, 'float64')  #;           % The time increment, REAL(8)
+            TimeOut1 = fread(fid, 1, 'float64')[0]  # The first time in the time series, REAL(8)
+            TimeIncr = fread(fid, 1, 'float64')[0]  # The time increment, REAL(8)
 
         if FileID == FileFmtID_NoCompressWithoutTime:
             ColScl = np.ones ((NumOutChans, 1)) # The channel slopes for scaling, REAL(4)
@@ -395,40 +466,7 @@ def load_binary_output(filename, use_buffer=True):
     return data, info
 
 
-def writeDataFrame(df, filename, binary=True):
-    channels  = df.values
-    # attempt to extract units from channel names
-    chanNames=[]
-    chanUnits=[]
-    for c in df.columns:
-        c     = c.strip()
-        name  = c
-        units = ''
-        if c[-1]==']':
-            chars=['[',']']
-        elif c[-1]==')':
-            chars=['(',')']
-        else:
-            chars=[]
-        if len(chars)>0:
-            op,cl = chars
-            iu=c.rfind(op)
-            if iu>1:
-                name = c[:iu]
-                unit = c[iu+1:].replace(cl,'')
-                if name[-1]=='_':
-                    name=name[:-1]
-                
-        chanNames.append(name)
-        chanUnits.append(unit)
-
-    if binary:
-        writeBinary(filename, channels, chanNames, chanUnits)
-    else:
-        NotImplementedError()
-
-
-def writeBinary(fileName, channels, chanNames, chanUnits, fileID=2, descStr=''):
+def writeBinary(fileName, channels, chanNames, chanUnits, fileID=4, descStr=''):
     """
     Write an OpenFAST binary file.
 
@@ -463,7 +501,7 @@ def writeBinary(fileName, channels, chanNames, chanUnits, fileID=2, descStr=''):
 
     time = channels[:,iTime]
     timeStart = time[0]
-    timeIncr  = time[1]-time[0]
+    timeIncr = (time[-1]-time[0])/(nT-1)
     dataWithoutTime = channels[:,1:]
         
     # Compute data range, scaling and offsets to convert to int16
@@ -482,8 +520,8 @@ def writeBinary(fileName, channels, chanNames, chanUnits, fileID=2, descStr=''):
     ColOff  = np.single(int16Min - np.single(mins)*ColScl)
     
     #Just available for fileID 
-    if fileID != 2:
-        print("current version just works with FileID = 2")
+    if fileID not in [2,4]:
+        print("current version just works with fileID = 2 or 4")
 
     else:
         with open(fileName,'wb') as fid:
@@ -497,6 +535,14 @@ def writeBinary(fileName, channels, chanNames, chanUnits, fileID=2, descStr=''):
 
             # Write header informations
             fid.write(struct.pack('@h',fileID))
+            if fileID == FileFmtID_ChanLen_In: 
+                maxChanLen = np.max([len(s) for s in chanNames])
+                maxUnitLen = np.max([len(s) for s in chanUnits])
+                nChar = max(maxChanLen, maxUnitLen)
+                fid.write(struct.pack('@h',nChar))
+            else:
+                nChar = 10
+
             fid.write(struct.pack('@i',nChannels))
             fid.write(struct.pack('@i',nT))
             fid.write(struct.pack('@d',timeStart))
@@ -509,27 +555,86 @@ def writeBinary(fileName, channels, chanNames, chanUnits, fileID=2, descStr=''):
 
             # Write channel names
             for chan in chanNames:
-                ordchan = [ord(char) for char in chan]+ [32]*(10-len(chan))
-                fid.write(struct.pack('@10B', *ordchan))
+                chan = chan[:nChar]
+                ordchan = [ord(char) for char in chan] + [32]*(nChar-len(chan))
+                fid.write(struct.pack('@'+str(nChar)+'B', *ordchan))
 
             # Write channel units
             for unit in chanUnits:
-                ordunit = [ord(char) for char in unit]+ [32]*(10-len(unit))
-                fid.write(struct.pack('@10B', *ordunit))
+                unit = unit[:nChar]
+                ordunit = [ord(char) for char in unit] + [32]*(nChar-len(unit))
+                fid.write(struct.pack('@'+str(nChar)+'B', *ordunit))
 
-            # Pack data
-            packedData=np.zeros((nT, nChannels), dtype=np.int16)
+            # --- Pack and write data
+            # Method 1
+            #packedData=np.zeros((nT, nChannels), dtype=np.int16)
+            #for iChan in range(nChannels):
+            #    packedData[:,iChan] = np.clip( ColScl[iChan]*dataWithoutTime[:,iChan]+ColOff[iChan], int16Min, int16Max)
+            #packedData = packedData.ravel()
+            ## NOTE: the *packedData converts to a tuple before passing to struct.pack
+            ##       which is inefficient
+            #fid.write(struct.pack('@{}h'.format(packedData.size), *packedData))
+
+            # --- Method 2
+            #packedData=np.zeros((nT, nChannels), dtype=np.int16)
+            #for iChan in range(nChannels):
+            #    packedData[:,iChan] = np.clip( ColScl[iChan]*dataWithoutTime[:,iChan]+ColOff[iChan], int16Min, int16Max)
+            #packedData = packedData.ravel()
+            ## Here we use slice assignment
+            #buf = (ctypes.c_int16 * len(packedData))()
+            #buf[:] = packedData
+            #fid.write(buf)
+
+            # --- Method 3 use packedData as slice directly
+            packedData = (ctypes.c_int16 * (nT*nChannels))()
             for iChan in range(nChannels):
-                packedData[:,iChan] = np.clip( ColScl[iChan]*dataWithoutTime[:,iChan]+ColOff[iChan], int16Min, int16Max)
+                packedData[iChan::nChannels] = np.clip( ColScl[iChan]*dataWithoutTime[:,iChan]+ColOff[iChan], int16Min, int16Max).astype(np.int16)
+            fid.write(packedData)
 
-            # Write data
-            fid.write(struct.pack('@{}h'.format(packedData.size), *packedData.flatten()))
+
             fid.close()
+
+def writeDataFrame(df, filename, binary=True):
+    """ write a DataFrame to OpenFAST output format"""
+    channels  = df.values
+    # attempt to extract units from channel names
+    chanNames=[]
+    chanUnits=[]
+    for c in df.columns:
+        c     = c.strip()
+        name  = c
+        unit = ''
+        if c[-1]==']':
+            chars=['[',']']
+        elif c[-1]==')':
+            chars=['(',')']
+        else:
+            chars=[]
+        if len(chars)>0:
+            op,cl = chars
+            iu=c.rfind(op)
+            if iu>1:
+                name = c[:iu]
+                unit = c[iu+1:].replace(cl,'')
+                if name[-1]=='_':
+                    name=name[:-1]
+                
+        chanNames.append(name)
+        chanUnits.append(unit)
+
+    if binary:
+        writeBinary(filename, channels, chanNames, chanUnits, fileID=FileFmtID_ChanLen_In)
+    else:
+        NotImplementedError()
+
 
 
 if __name__ == "__main__":
     B=FASTOutputFile('tests/example_files/FASTOutBin.outb')
     df=B.toDataFrame()
     B.writeDataFrame(df, 'tests/example_files/FASTOutBin_OUT.outb')
+    B.toOUTB(extension='.dat.outb')
+    B.toParquet()
+    B.toCSV()
 
 

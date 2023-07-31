@@ -195,8 +195,40 @@ def run_fast(input_file, fastExe=None, wait=True, showOutputs=False, showCommand
     return run_cmd(input_file, fastExe, wait=wait, showOutputs=showOutputs, showCommand=showCommand)
 
 
-def writeBatch(batchfile, fastfiles, fastExe=None, nBatches=1, pause=False, flags='', flags_after=''):
-    """ Write batch file, everything is written relative to the batch file"""
+def writeBatch(batchfile, fastfiles, fastExe=None, nBatches=1, pause=False, flags='', flags_after='',
+        run_if_ext_missing=None,
+        discard_if_ext_present=None,
+        dispatch=False,
+        stdOutToFile=False,
+        echo=True):
+    """ Write one or several batch file, all paths are written relative to the batch file directory.
+    The batch file will consist of lines of the form:
+         [CONDITION] EXE [FLAGS] FILENAME [FLAGS_AFTER]
+
+    INPUTS:
+    - batchfile: path of the batch file to be written. 
+                 If several files are requested (using nBatches) _i is inserted before the extension
+    - nBatches: split into nBatches files.
+    - pause: insert a pause statement at the end so that batch file is not closed after execution
+    - flags: flags (string) to be placed between the executable and the filename
+    - flags_after: flags (string) to be placed after the filename
+    - run_if_ext_missing: add a line in the batch file so that the command is only run if
+                          the file `f.EXT` is missing, where .EXT is specified in run_if_ext_missing
+                          If None, the command is always run
+    - discard_if_ext_present: similar to run_if_ext_missing, but this time, the lines are not written to the batch file
+                          The test for existing outputs is done before writing the batch file
+    - dispatch: if True, the input files are dispatched (the first nBatches files are dispathced on the nBatches)
+    - stdOutToFile: if True, the output of the command is redirected to filename.stdout
+
+    example:
+       writeBatch('dir/MyBatch.bat', ['dir/c1.fst','dir/c2.fst'], 'op.exe', flags='-v', run_if_ext_missing='.outb')
+
+       will generate a file with the following content:
+         if not exist c1.outb (../of.exe c1.fst) else (echo "Skipping c1.fst")
+         if not exist c2.outb (../of.exe c2.fst) else (echo "Skipping c2.fst")
+
+
+    """
     if fastExe is None:
         fastExe=FAST_EXE
     fastExe_abs   = os.path.abspath(fastExe)
@@ -207,20 +239,54 @@ def writeBatch(batchfile, fastfiles, fastExe=None, nBatches=1, pause=False, flag
         flags=' '+flags
     if len(flags_after)>0:
         flags_after=' '+flags_after
+
+    # Remove commandlines if outputs are already present
+    if discard_if_ext_present:
+        outfiles = [os.path.splitext(f)[0] + discard_if_ext_present for f in fastfiles]
+        nIn=len(fastfiles)
+        fastfiles =[f for f,o in zip(fastfiles,outfiles) if not os.path.exists(o)]
+        nMiss=len(fastfiles)
+        if nIn>nMiss:
+            print('[INFO] WriteBatch: discarding simulations, only {}/{} needed'.format(nMiss, nIn))
+
+
     def writeb(batchfile, fastfiles):
         with open(batchfile,'w') as f:
+            if not echo:
+                if os.name == 'nt':
+                    f.write('@echo off\n')
             for ff in fastfiles:
                 ff_abs = os.path.abspath(ff)
                 ff_rel = os.path.relpath(ff_abs, batchdir)
-                l = fastExe_rel + flags + ' '+ ff_rel + flags_after
-                f.write("{:s}\n".format(l))
+                cmd = fastExe_rel + flags + ' '+ ff_rel + flags_after
+                if stdOutToFile:
+                    stdout = os.path.splitext(ff_rel)[0]+'.stdout'
+                    cmd += ' > ' +stdout
+                if run_if_ext_missing is not None:
+                    # TODO might be windows only
+                    ff_out = os.path.splitext(ff_rel)[0] + run_if_ext_missing
+                    if os.name == 'nt':
+                        cmd = 'if not exist {} ({}) else (echo Skipping {})'.format(ff_out, cmd, ff_rel)
+                    else:
+                        cmd = 'if [[ ! -f {} ]] ; then {}; else echo Skipping {} ; fi'.format(ff_out, cmd, ff_rel)
+                f.write("{:s}\n".format(cmd))
             if pause:
-                f.write("pause\n") # windows only..
+                f.write("pause\n") # might be windows only..
+
+
 
     if nBatches==1:
         writeb(batchfile, fastfiles)
         return batchfile
     else:
+
+        if dispatch:
+            # TODO this can probably be done with a one liner
+            fastfiles2=[]
+            for i in range(nBatches):
+                fastfiles2+=fastfiles[i::nBatches]
+            fastfiles = fastfiles2
+
         splits = np.array_split(fastfiles,nBatches)
         base, ext = os.path.splitext(batchfile)
         batchfiles=[]

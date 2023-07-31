@@ -1,7 +1,6 @@
 import unittest
 import os
 import numpy as np
-import pyFAST
 from pyFAST.input_output.tests.helpers_for_test import MyDir, reading_test 
 from pyFAST.input_output import FASTOutputFile
 

@@ -1,8 +1,9 @@
 import unittest
 import os
 import numpy as np
-from pyFAST.input_output.mannbox_file import MannBoxFile
 from pyFAST.input_output.tests.helpers_for_test import MyDir, reading_test 
+from pyFAST.input_output.mannbox_file import MannBoxFile
+
 
 class Test(unittest.TestCase):
 

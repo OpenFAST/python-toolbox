@@ -31,15 +31,15 @@ setup(
     packages=["pyFAST"],
     python_requires=">=3.6",
     install_requires=[
+        "matplotlib",
+        "openpyxl",
         "numpy>=1.15.2",
         "pandas",
-        "matplotlib",
-        "chardet",
+        "pyarrow", # for parquet files
         "scipy",
-        "sympy",
-        "openpyxl",
+        "chardet",
+        "xarray",  # for netcdf files
         "pytest",
-        "xarray"
     ],
     test_suite="pytest",
     tests_require=["pytest"],

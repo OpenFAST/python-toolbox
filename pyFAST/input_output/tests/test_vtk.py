@@ -1,11 +1,7 @@
 import unittest
 import os
 import numpy as np
-try:
-    from .helpers_for_test import MyDir, reading_test 
-except ImportError:
-    from helpers_for_test import MyDir, reading_test 
-
+from pyFAST.input_output.tests.helpers_for_test import MyDir, reading_test
 from pyFAST.input_output.vtk_file import VTKFile
 
 
