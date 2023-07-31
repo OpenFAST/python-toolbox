@@ -1,12 +1,8 @@
 import unittest
 import os
 import numpy as np
-try:
-    from .helpers_for_test import MyDir, reading_test 
-except ImportError:
-    from helpers_for_test import MyDir, reading_test 
-
-import pyFAST
+import pyFAST.input_output as weio
+from pyFAST.input_output.tests.helpers_for_test import MyDir, reading_test 
 from pyFAST.input_output.hawc2_dat_file import HAWC2DatFile
 from pyFAST.input_output.hawc2_ae_file import HAWC2AEFile
 from pyFAST.input_output.hawc2_pc_file import HAWC2PCFile
@@ -14,10 +10,11 @@ from pyFAST.input_output.hawc2_st_file import HAWC2StFile
 from pyFAST.input_output.hawcstab2_ind_file import HAWCStab2IndFile
 from pyFAST.input_output.hawcstab2_pwr_file import HAWCStab2PwrFile
 
+
 class Test(unittest.TestCase):
  
-    #def test_001_read_all(self):
-    #    reading_test('HAWC*.*', weio.read)
+    def test_001_read_all(self):
+        reading_test('HAWC*.*', weio.read)
 
     def DF(self,FN):
         """ Reads a file with weio and return a dataframe """ 

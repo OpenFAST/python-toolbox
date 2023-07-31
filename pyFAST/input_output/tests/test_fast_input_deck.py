@@ -1,8 +1,7 @@
 import unittest
 import os
 import numpy as np
-from .helpers_for_test import MyDir, reading_test 
-
+from pyFAST.input_output.tests.helpers_for_test import MyDir, reading_test 
 from pyFAST.input_output.fast_input_deck import FASTInputDeck
 
 class Test(unittest.TestCase):
