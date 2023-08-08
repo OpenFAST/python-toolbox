@@ -11,7 +11,9 @@ from pyFAST.linearization.mbc import fx_mbc3, formatModesForViz
 from pyFAST.linearization.campbell_data import campbell_diagram_data_oneOP # 
 
 
-def getCampbellDataOP(fstFile_or_linFiles, writeModes=None, BladeLen=None, TowerLen=None, removeTwrAzimuth=False, verbose=False, writeViz=False, **kwargs):
+def getCampbellDataOP(fstFile_or_linFiles, writeModes=None, BladeLen=None, TowerLen=None, 
+        removeTwrAzimuth=False, starSub=None, removeStatesPattern=None, verbose=False, 
+        writeViz=False, **kwargs):
     """ 
     Return Campbell Data at one operating point from a .fst file or a list of lin files
     INPUTS:
@@ -30,6 +32,14 @@ def getCampbellDataOP(fstFile_or_linFiles, writeModes=None, BladeLen=None, Tower
      - TowerLen: tower length needed to scale the Campbell diagram data. 
                  if None: the length is inferred by reading the .fst file (and ED file)
 
+     - starSub: if None, raise an error if `****` are present
+                otherwise replace *** with `starSub` (e.g. 0)
+                see FASTLinearizationFile. 
+     - removeStatesPattern: remove states matching a giving description pattern.
+               e.g:  'tower|Drivetrain'  or '^AD'
+               see FASTLinearizationFile. 
+     - removeTwrAzimuth: if False do nothing
+                otherwise discard lin files where azimuth in [60, 180, 300]+/-4deg (close to tower). 
      - verbose: if True, more info is written to stdout
 
      - **kwargs: list of key/values to be passed to writeVizFile (see function below)
@@ -43,7 +53,7 @@ def getCampbellDataOP(fstFile_or_linFiles, writeModes=None, BladeLen=None, Tower
     fstFile, linFiles =  getFST_and_LinFiles(fstFile_or_linFiles, verbose=verbose)
 
     # --- Open lin files for given OP/fst file, perform MBC
-    MBCOP, matData = getMBCOP(fstFile=fstFile, linFiles=linFiles, verbose=verbose, removeTwrAzimuth=removeTwrAzimuth)
+    MBCOP, matData = getMBCOP(fstFile=fstFile, linFiles=linFiles, verbose=verbose, removeTwrAzimuth=removeTwrAzimuth, starSub=starSub, removeStatesPattern=removeStatesPattern)
     if MBCOP is None:
         return None, None
 
@@ -78,10 +88,10 @@ def getCampbellDataOP(fstFile_or_linFiles, writeModes=None, BladeLen=None, Tower
     return CDDOP, MBCOP
 
 
-def getCampbellDataOPs(fstFiles, writeModes=None, BladeLen=None, TowerLen=None, removeTwrAzimuth=False, verbose=False, **kwargs):
+def getCampbellDataOPs(fstFiles, BladeLen=None, TowerLen=None, verbose=False, **kwargs):
     """ 
     Return Campbell Data at several operating points from a list of .fst files
-        see getCDDOP for inputs
+        see getCampbellDataOP for input arguments
     """
     # --- Estimate blade length and tower length for scaling
     if BladeLen is None and TowerLen is None:
@@ -91,7 +101,7 @@ def getCampbellDataOPs(fstFiles, writeModes=None, BladeLen=None, TowerLen=None, 
     MBC = []
     CDD = []
     for i_lin, fstFile in enumerate(fstFiles):
-        CDDOP, MBCOP = getCampbellDataOP(fstFile, writeModes=writeModes, BladeLen=BladeLen, TowerLen=TowerLen, removeTwrAzimuth=removeTwrAzimuth, verbose=verbose, **kwargs)
+        CDDOP, MBCOP = getCampbellDataOP(fstFile, BladeLen=BladeLen, TowerLen=TowerLen, verbose=verbose, **kwargs)
         if MBCOP is not None:
             CDD.append(CDDOP)
             MBC.append(MBCOP)
@@ -100,9 +110,22 @@ def getCampbellDataOPs(fstFiles, writeModes=None, BladeLen=None, TowerLen=None, 
         raise Exception('No linearization file found')
     return CDD, MBC
 
-def getMBCOP(fstFile, linFiles=None, verbose=False, removeTwrAzimuth=False):
+def getMBCOP(fstFile, linFiles=None, verbose=False, removeTwrAzimuth=False, starSub=None, removeStatesPattern=None):
     """ 
     Run necessary MBC for an OpenFAST file (one operating point)
+
+    INPUTS:
+     - fstFile: main openfast `.fst` filename 
+     - linFiles: list of linfiles, inferred from fstfile if None provided
+     - starSub: if None, raise an error if `****` are present
+                otherwise replace *** with `starSub` (e.g. 0)
+                see FASTLinearizationFile. 
+     - removeStatesPattern: remove states matching a giving description pattern.
+               e.g. r'^AD' : remove the AeroDyn states
+               see FASTLinearizationFile. 
+     - removeTwrAzimuth: if False do nothing
+                otherwise discard lin files where azimuth in [60, 180, 300]+/-4deg (close to tower). 
+
     """
 
     # --- Find available lin files
@@ -111,7 +134,7 @@ def getMBCOP(fstFile, linFiles=None, verbose=False, removeTwrAzimuth=False):
 
     # --- run MBC3 and campbell post_pro on lin files, generate postMBC file if needed 
     if len(linFiles)>0:
-        MBC, matData = fx_mbc3(linFiles, verbose=False, removeTwrAzimuth=removeTwrAzimuth)
+        MBC, matData = fx_mbc3(linFiles, verbose=False, removeTwrAzimuth=removeTwrAzimuth, starSub=starSub, removeStatesPattern=removeStatesPattern)
     else:
         return None, None
 

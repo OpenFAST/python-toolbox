@@ -12,6 +12,7 @@ import collections
 from itertools import islice
 import numpy as np
 import re
+from pyFAST.input_output.fast_linearization_file import FASTLinearizationFile
 
 def _isbool(str):
     flag=0
@@ -245,7 +246,65 @@ def readFASTMatrix(f):
 
     return name,tmp
     
-def ReadFASTLinear(filename):
+def ReadFASTLinear(filename, starSub=None, removeStatesPattern=None):
+    """ 
+    Read one lin file.
+
+    INPUTS:
+     - filename: linfile name, string.
+     - starSub: if None, raise an error if `****` are present
+                otherwise replace *** with `starSub` (e.g. 0)
+                see FASTLinearizationFile. 
+     - removeStatesPattern: remove states matching a giving description pattern.
+               e.g:  'tower|Drivetrain'  or '^AD'
+               see FASTLinearizationFile. 
+    OUTPUTS:
+     - data: a dictionary with fields matching the MATLAB implementation. 
+    """
+
+    # --- Read lin file
+    f = FASTLinearizationFile(filename, starSub=starSub, removeStatesPattern=removeStatesPattern)
+
+    # --- Legacy structure. TODO, just use "f"
+    data={}
+    data['n_x'] = f.nx
+    data['n_u'] = f.nu
+    data['n_y'] = f.ny
+    data['n_z'] = f.nz
+    KeyMap={'t':'t'}
+    KeyMap.update({'Azimuth':'Azimuth', 'WindSpeed':'WindSpeed', 'RotSpeed':'RotSpeed'})
+    KeyMap.update({'x_op':'x', 'xdot_op':'xdot', 'z_op':'z', 'y_op':'y'})
+    for knew,kold in KeyMap.items():
+        if kold in f.keys():
+            data[knew] = f[kold]
+    data['WindSpeed'] = data['WindSpeed'] if data['WindSpeed'] is not None else np.nan
+    data['RotSpeed']  = data['RotSpeed'] if data['RotSpeed'] is not None else np.nan
+    data['Azimuth']   = np.mod(data['Azimuth'],2.0*np.pi)
+    if data['n_x']>0:
+        data['x_rotFrame']   = f['x_info']['RotatingFrame']
+        data['x_DerivOrder'] = f['x_info']['DerivativeOrder']
+        data['x_desc']       = f['x_info']['Description']
+        data['xdot_desc']    = f['xdot_info']['Description']
+        data['n_x2'] = np.sum(data['x_DerivOrder']== 2)
+    else:
+        data['n_x2'] = 0;
+    if data['n_z']>0:
+        data['z_desc']     = f['z_info']['Description']
+    if data['n_u']>0:
+        data['u_rotFrame'] = f['u_info']['RotatingFrame']
+        data['u_desc']     = f['u_info']['Description']
+    if data['n_y']>0:
+        data['y_rotFrame'] = f['y_info']['RotatingFrame']
+        data['y_desc']     = f['y_info']['Description']
+    for k in ['A','B','C','D']:
+        if k in f.keys():
+            data[k] = f[k]
+    return data, None
+
+def ReadFASTLinearLegacy(filename):
+    """ 
+    Legacy reader, TODO remove in future release
+    """
 
     def extractVal(lines, key):
         for l in lines:
@@ -294,25 +353,6 @@ def ReadFASTLinear(filename):
         except:
             data['WindSpeed'] = np.nan
 
-        # --- Old method for reading
-        #  header = [f.readline() for _ in range(17)]
-        #  info['fast_version'] = header[1].strip()
-        #  info['modules'] = header[2].strip()
-        #  info['description'] = header[4].strip()
-        #  ln=7;
-        #  data = np.array([line.split() for line in f.readlines()]).astype(np.float)
-        #  data['t']=np.float(header[ln].split(':')[1].strip().split(' ')[0])
-        #  data['RotSpeed']=np.float(header[ln+1].split(':')[1].strip().split(' ')[0])
-        #  data['Azimuth']=np.float(header[ln+2].split(':')[1].strip().split(' ')[0])
-        #  data['WindSpeed']=np.float(header[ln+3].split(':')[1].strip().split(' ')[0])
-        #  data['n_x']=np.float(header[ln+4].split(':')[1].strip().split(' ')[0])
-        #  data['n_xd']=np.float(header[ln+5].split(':')[1].strip().split(' ')[0])
-        #  data['n_z']=np.float(header[ln+6].split(':')[1].strip().split(' ')[0])
-        #  data['n_u']=np.float(header[ln+7].split(':')[1].strip().split(' ')[0])
-        #  data['n_y']=np.float(header[ln+8].split(':')[1].strip().split(' ')[0])
-        #  if header[ln+9].split('?')[1].strip()=='Yes':
-        #      SetOfMatrices=2
-            
         data['Azimuth']=np.mod(data['Azimuth'],2.0*np.pi)
         try:
             # skip next three lines
@@ -388,18 +428,34 @@ def ReadFASTLinear(filename):
             raise
 
 
-def get_Mats(FileNames, verbose=True, removeTwrAzimuth=False):
+def get_Mats(FileNames, verbose=True, removeTwrAzimuth=False, starSub=None, removeStatesPattern=None):
+    """ 
+    Extra main data from a list of lin files.
+    INPUTS:
+     - FileNames : list of lin files
+     - starSub: if None, raise an error if `****` are present
+                otherwise replace *** with `starSub` (e.g. 0)
+                see FASTLinearizationFile. 
+     - removeStatesPattern: remove states matching a giving description pattern.
+                e.g:  'tower|Drivetrain'  or '^AD'
+                see FASTLinearizationFile. 
+     - removeTwrAzimuth: if False do nothing
+                otherwise discard lin files where azimuth in [60, 180, 300]+/-4deg (close to tower). 
+
+    """
     NAzimStep = len(FileNames)
     data     = [None]*NAzimStep
     # --- Read all files
     for iFile, filename in enumerate(FileNames):
-        data[iFile],_= ReadFASTLinear(FileNames[iFile]);
+        #data[iFile], _ = ReadFASTLinearLegacy(FileNames[iFile]);
+        data[iFile],_= ReadFASTLinear(FileNames[iFile], starSub=starSub, removeStatesPattern=removeStatesPattern);
     Azimuth  = np.array([d['Azimuth'] for d in data])*180/np.pi
     # --- Sort by azimuth, not required, but filenames are not sorted, nor are the lin times azimuth
     ISort = np.argsort(Azimuth)
     Azimuth   = Azimuth[ISort]
     data      = [data[i]      for i in ISort]
     FileNames = [FileNames[i] for i in ISort]
+    # --- Remove some azimuth
     if removeTwrAzimuth:
         IDiscard = [i  for i,a in enumerate(Azimuth) if np.any(np.abs(np.array([60,180,300])-a)<4)  ]
         n=len(FileNames[0]); sfmt='{:'+str(n+2)+'s}'
@@ -572,34 +628,8 @@ def get_Mats(FileNames, verbose=True, removeTwrAzimuth=False):
     else:
         matData['RotTripletIndicesOutput'] = [];
         matData['n_RotTripletOutputs'] = 0;
-
-
         
     return matData, data
 
-#matData,FAST_linData=get_Mats(FileNames)
-
-#print("\n".join(matData['DescStates']))
-                                      
-# print(info)
-# print(data['t'])
-# print(data['RotSpeed'])
-# print(data['Azimuth'])
-# print(data['WindSpeed'])
-# print(data['n_x'])
-# print(data['n_xd'])
-# print(data['n_z'])
-# print(data['n_u'])
-# print(data['n_y'])
-# print(data['n_x2'])
-# print(data['x_op'])
-# print(data['x_desc'])
-# print(data['x_rotFrame'])
-# print(data['xdot_op'])
-# print(data['xdot_desc'])
-# print(data['u_op'])
-# print(data['u_desc'])
-# print(data['u_rotFrame'])
-# print(data['y_op'])
-# print(data['y_desc'])
-# print(data['y_rotFrame'])
+if __name__ == '__main__':
+    madData,dat = get_Mats(['file.lin'])

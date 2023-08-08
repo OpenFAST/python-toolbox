@@ -201,49 +201,68 @@ def printCampbellDataOP(CDDOP, nModesMax=15, nCharMaxDesc=50) :
 # --- Manipulation of multiple operating points
 # --------------------------------------------------------------------------------{
 
-def campbellData2TXT(CD, nFreqOut=15, txtFileName=None, skipHighDamp=True, skipNonEDBD=True):
+def campbellData2TXT(CD, txtFileName=None, nFreqOut=500, freqRange=None, posDampRange=None, skipNonEDBD=True):
     """ Write frequencies, damping, and mode contents for each operating points to a string
     Write to file if filename provided
+    INPUTS:
+     - nFreqOut: maximum number of frequencies to write to Campbell_Summary.txt file
+     - freqRange:    range in which frequencies are "accepted",  if None: [-np.inf, np.inf]
+     - posDampRange: range in which damping are "accepted'    ,  if None: [1e-5, 0.96]
     """
     if not isinstance(CD, list):
         CD=[CD]
+    if freqRange is None:
+        freqRange =[-np.inf, np.inf] 
+    if posDampRange is None:
+        posDampRange =[1e-5, 0.96] 
+
+    def mode2txtline(cd, im):
+        m    = cd['Modes'][im]
+        Desc = cd['ShortModeDescr'][im]
+        zeta = m['DampingRatio']
+        return '{:03d} ; {:8.3f} ; {:7.4f} ; {:s}\n'.format(im+1,m['NaturalFreq_Hz'],m['DampingRatio'],Desc)
+
     txt=''
     for iOP,cd in enumerate(CD):
         WS  = cd['WindSpeed']
         RPM = cd['RotSpeed_rpm']
         nFreqOut_loc = np.min([len(cd['Modes']),nFreqOut])
-        txt+='------------------------------------------------------------------------\n'
-        txt+='--- OP {:d} - WS {:.1f} - RPM {:.2f} \n'.format(iOP+1, WS, RPM)
-        txt+='------------------------------------------------------------------------\n'
+        txt+='# -----------------------------------------------------------------------\n'
+        txt+='# --- OP {:d} - WS {:.1f} - RPM {:.2f} \n'.format(iOP+1, WS, RPM)
+        txt+='# -----------------------------------------------------------------------\n'
+        txt+='# --- "Selected" modes\n'
+        txt+='# ID; Freq [Hz]; Zeta [-]; Mode content\n'
         skippedDamp=[]
+        skippedFreq=[]
         skippedEDBD=[]
         for im in np.arange(nFreqOut_loc):
             m    = cd['Modes'][im]
             Desc = cd['ShortModeDescr'][im]
             zeta = m['DampingRatio']
+            freq = m['NaturalFreq_Hz']
             hasED = Desc.find('ED')>=0
             hasBD = Desc.find('BD')>=0
             hasAD = Desc.find('AD')>=0
-            if skipHighDamp and (zeta>0.96 or abs(zeta)<1e-5):
+            if (freq>freqRange[1] or freq<freqRange[0]):
+                skippedFreq.append(im)
+            elif (zeta>posDampRange[1] or abs(zeta)<posDampRange[0]):
                 skippedDamp.append(im)
             elif skipNonEDBD and (not (hasBD or hasED)):
                 skippedEDBD.append(im)
             else:
-                txt+='{:02d} ; {:8.3f} ; {:7.4f} ; {:s}\n'.format(im+1,m['NaturalFreq_Hz'],m['DampingRatio'],Desc)
+                txt+=mode2txtline(cd, im)
         if len(skippedEDBD)>0:
-            txt+='---- Skipped (No ED/BD)\n'
+            txt+='# --- Skipped (No ED/BD)\n'
             for im in skippedEDBD:
-                m    = cd['Modes'][im]
-                Desc = cd['ShortModeDescr'][im]
-                zeta = m['DampingRatio']
-                txt+='{:02d} ; {:8.3f} ; {:7.4f} ; {:s}\n'.format(im+1,m['NaturalFreq_Hz'],m['DampingRatio'],Desc)
+                txt+=mode2txtline(cd, im)
+        if len(skippedFreq)>0:
+            txt+='# --- Skipped (Frequency outside of `freqRange`={})\n'.format(freqRange)
+            for im in skippedFreq:
+                txt+=mode2txtline(cd, im)
         if len(skippedDamp)>0:
-            txt+='---- Skipped (High Damping)\n'
+            txt+='# --- Skipped (Damping outside of `posDampRange`={})\n'.format(posDampRange)
             for im in skippedDamp:
-                m    = cd['Modes'][im]
-                Desc = cd['ShortModeDescr'][im]
-                zeta = m['DampingRatio']
-                txt+='{:02d} ; {:8.3f} ; {:7.4f} ; {:s}\n'.format(im+1,m['NaturalFreq_Hz'],m['DampingRatio'],Desc)
+                txt+=mode2txtline(cd, im)
     if txtFileName is not None:
         with open(txtFileName, 'w') as f:
             f.write(txt)

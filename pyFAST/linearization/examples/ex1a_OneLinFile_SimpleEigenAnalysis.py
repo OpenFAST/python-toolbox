@@ -17,7 +17,8 @@ lin = FASTLinearizationFile(linFile)
 print('Keys available:',lin.keys())
 
 # --- Perform eigenvalue analysis
-fd, zeta, Q, f0 = eigA(lin['A'])
+#fd, zeta, Q, f0 = eigA(lin['A'])
+fd, zeta, Q, f0 = lin.eva()
 print('Nat. freq. [Hz], Damping ratio [%]')
 print(np.column_stack((np.around(f0,4),np.around(zeta*100,4))))
 
