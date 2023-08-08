@@ -131,7 +131,7 @@ def find_range_count(signal, bins, method='rainflow_windap', meanBin=True, binSt
             ranges = fatpack.find_rainflow_ranges(signal)
         except IndexError:
             # Currently fails for constant signal
-            return np.nan
+            return np.nan, np.nan, np.nan
         # --- Legacy fatpack
         # if (not binStartAt0) and (not meanBin):
         #    N, S = fatpack.find_range_count(ranges, bins)
@@ -148,6 +148,7 @@ def find_range_count(signal, bins, method='rainflow_windap', meanBin=True, binSt
     b = np.isnan(S)
     S[b] = 0
     N[b] = 0
+
     return N, S, S_bin_edges
 
 def create_bins(x, bins, binStartAt0=False):
