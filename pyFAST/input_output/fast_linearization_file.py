@@ -7,6 +7,8 @@ except:
     File = dict
     class BrokenFormatError(Exception): pass
 
+class SlowReaderNeededError(Exception):
+    pass
 
 
 _lin_vec = ['x','xd','xdot','u','y','z','header']
@@ -80,144 +82,61 @@ class FASTLinearizationFile(File):
         # --- StarValues replacement `*****` -> inf
         starPattern = re.compile(r"[\*]+")
         starSubStr = ' inf '
+        starSubFn  = lambda si: starPattern.sub(starSubStr, si)
 
-        def extractVal(lines, key, NA=None, missing=None, dtype=float):
-            for l in lines:
-                if l.find(key)>=0:
-                    #l = starPattern.sub(starSubStr, l)
-                    try:
-                        return dtype(l.split(key)[1].split()[0])
-                    except:
-                        return NA
-            return missing
-
-        def readToMarker(fid, marker, nMax):
-            lines=[]
-            for i, line in enumerate(fid):
-                if i>nMax:
-                    raise BrokenFormatError('`{}` not found in file'.format(marker))
-                if line.find(marker)>=0:
-                    break
-                lines.append(line.strip())
-            return lines, line
-
-        def readOP(fid, n, name='', defaultDerivOrder=1):
-            OP=[]
-            Var = {'RotatingFrame': [], 'DerivativeOrder': [], 'Description': []}
-            colNames=fid.readline().strip()
-            dummy=   fid.readline().strip()
-            bHasDeriv= colNames.find('Derivative Order')>=0
-            for i, line in enumerate(fid):
-                line = line.strip()
-                line = starPattern.sub(starSubStr, line)
-                sp   = line.split()
-                if sp[1].find(',')>=0:
-                    #  Most likely this OP has three values (e.g. orientation angles)
-                    # For now we discard the two other values
-                    OP.append(float(sp[1][:-1]))
-                    iRot=4
-                else:
-                    OP.append(float(sp[1]))
-                    iRot=2
-                Var['RotatingFrame'].append(sp[iRot])
-                if bHasDeriv:
-                    Var['DerivativeOrder'].append(int(sp[iRot+1]))
-                    Var['Description'].append(' '.join(sp[iRot+2:]).strip())
-                else:
-                    Var['DerivativeOrder'].append(defaultDerivOrder)
-                    Var['Description'].append(' '.join(sp[iRot+1:]).strip())
-                if i>=n-1:
-                    break
-            OP = np.asarray(OP)
-            nInf = sum(np.isinf(OP))
-            if nInf>0:
-                sErr = 'Some ill-formated/infinite values (e.g. `*******`) were found in the vector `{}`\n\tin linflile: {}'.format(name, self.filename)
-                if starSub is None:
-                    raise Exception(sErr)
-                else:
-                    print('[WARN] '+sErr)
-                    OP[np.isinf(OP)] = starSub
-                    
-            Var['RotatingFrame']   = np.asarray(Var['RotatingFrame'])
-            Var['DerivativeOrder'] = np.asarray(Var['DerivativeOrder'])
-            Var['Description']     = np.asarray(Var['Description'])
-            return OP, Var
-
-        def readMat(fid, n, m, name=''):
-            vals=[starPattern.sub(starSubStr, fid.readline().strip() ).split() for i in np.arange(n)]
-            vals = np.array(vals)
-            try:
-                vals = np.array(vals).astype(float) # This could potentially fail
-            except:
-                raise Exception('Failed to convert into an array of float the matrix `{}`\n\tin linfile: {}'.format(name, self.filename))
-            if vals.shape[0]!=n or vals.shape[1]!=m:
-                shape1 = vals.shape
-                shape2 = (n,m)
-                raise Exception('Shape of matrix `{}` has wrong dimension ({} instead of {})\n\tin linfile: {}'.format(name, shape1, shape2, name, self.filename))
-
-            nNaN = sum(np.isnan(vals.ravel()))
-            nInf = sum(np.isinf(vals.ravel()))
-            if nInf>0:
-                sErr = 'Some ill-formated/infinite values (e.g. `*******`) were found in the matrix `{}`\n\tin linflile: {}'.format(name, self.filename)
-                if starSub is None:
-                    raise Exception(sErr)
-                else:
-                    print('[WARN] '+sErr)
-                    vals[np.isinf(vals)] = starSub
-            if nNaN>0:
-                raise Exception('Some NaN values were found in the matrix `{}`\n\tin linfile: `{}`.'.format(name, self.filename))
-            return vals
-
-
-        # Reading 
-        with open(self.filename, 'r', errors="surrogateescape") as f:
-            # --- Reader header
-            self['header'], lastLine=readToMarker(f, 'Jacobians included', 30)
-            self['header'].append(lastLine)
-            nx   = extractVal(self['header'],'Number of continuous states:'    , dtype=int, NA=np.nan, missing=None)
-            nxd  = extractVal(self['header'],'Number of discrete states:'      , dtype=int, NA=np.nan, missing=None)
-            nz   = extractVal(self['header'],'Number of constraint states:'    , dtype=int, NA=np.nan, missing=None)
-            nu   = extractVal(self['header'],'Number of inputs:'               , dtype=int, NA=np.nan, missing=None)
-            ny   = extractVal(self['header'],'Number of outputs:'              , dtype=int, NA=np.nan, missing=None)
-            bJac = extractVal(self['header'],'Jacobians included in this file?', dtype=bool, NA=False, missing=None)
-            self['Azimuth']   = extractVal(self['header'], 'Azimuth:'    , dtype=float, NA=np.nan, missing=None)
-            self['RotSpeed']  = extractVal(self['header'], 'Rotor Speed:', dtype=float, NA=np.nan, missing=None) # rad/s
-            self['WindSpeed'] = extractVal(self['header'], 'Wind Speed:' , dtype=float, NA=np.nan, missing=None)
-            self['t']  = extractVal(self['header'],'Simulation time:'    , dtype=float, NA=np.nan, missing=None)
-
-            for i, line in enumerate(f):
-                line = line.strip()
-                if line.find('Order of continuous states:')>=0:
-                    self['x'], self['x_info'] = readOP(f, nx, 'x', defaultDerivOrder=1)
-                elif line.find('Order of continuous state derivatives:')>=0:
-                    self['xdot'], self['xdot_info'] = readOP(f, nx, 'xdot', defaultDerivOrder=2)
-                elif line.find('Order of discrete states:')>=0:
-                    self['xd'], self['xd_info'] = readOP(f, nxd, 'xd', defaultDerivOrder=2)
-                elif line.find('Order of inputs')>=0:
-                    self['u'], self['u_info'] = readOP(f, nu, 'u', defaultDerivOrder=0)
-                elif line.find('Order of outputs')>=0:
-                    self['y'], self['y_info'] = readOP(f, ny, 'y', defaultDerivOrder=0)
-                elif line.find('Order of constraint states:')>=0:
-                    self['z'], self['z_info'] = readOP(f, nz, 'z', defaultDerivOrder=0)
-                elif line.find('A:')>=0:
-                    self['A'] = readMat(f, nx, nx, 'A')
-                elif line.find('B:')>=0:
-                    self['B'] = readMat(f, nx, nu, 'B')
-                elif line.find('C:')>=0:
-                    self['C'] = readMat(f, ny, nx, 'C')
-                elif line.find('D:')>=0:
-                    self['D'] = readMat(f, ny, nu, 'D')
-                elif line.find('dUdu:')>=0:
-                    self['dUdu'] = readMat(f, nu, nu,'dUdu')
-                elif line.find('dUdy:')>=0:
-                    self['dUdy'] = readMat(f, nu, ny,'dUdy')
-                elif line.find('StateRotation:')>=0:
-                    pass
-                    # TODO
-                    #StateRotation:
-                elif line.find('ED M:')>=0:
-                    self['EDDOF'] = line[5:].split()
-                    self['M']     = readMat(f, 24, 24,'M')
+        # Reading function, with slow or fast reader. See sub functions at end of this file
+        def doRead(slowReader=False):
+            with open(self.filename, 'r', errors="surrogateescape") as f:
+                # --- Reader header
+                self['header'], lastLine=readToMarker(f, 'Jacobians included', 30)
+                self['header'].append(lastLine)
+                nx   = extractVal(self['header'],'Number of continuous states:'    , dtype=int, NA=np.nan, missing=None)
+                nxd  = extractVal(self['header'],'Number of discrete states:'      , dtype=int, NA=np.nan, missing=None)
+                nz   = extractVal(self['header'],'Number of constraint states:'    , dtype=int, NA=np.nan, missing=None)
+                nu   = extractVal(self['header'],'Number of inputs:'               , dtype=int, NA=np.nan, missing=None)
+                ny   = extractVal(self['header'],'Number of outputs:'              , dtype=int, NA=np.nan, missing=None)
+                bJac = extractVal(self['header'],'Jacobians included in this file?', dtype=bool, NA=False, missing=None)
+                self['Azimuth']   = extractVal(self['header'], 'Azimuth:'    , dtype=float, NA=np.nan, missing=None)
+                self['RotSpeed']  = extractVal(self['header'], 'Rotor Speed:', dtype=float, NA=np.nan, missing=None) # rad/s
+                self['WindSpeed'] = extractVal(self['header'], 'Wind Speed:' , dtype=float, NA=np.nan, missing=None)
+                self['t']  = extractVal(self['header'],'Simulation time:'    , dtype=float, NA=np.nan, missing=None)
+                for i, line in enumerate(f):
+                    line = line.strip()
+                    if line.find('Order of continuous states:')>=0:
+                        self['x'], self['x_info'] = readOP(f, nx, 'x', defaultDerivOrder=1, starSubFn=starSubFn, starSub=starSub)
+                    elif line.find('Order of continuous state derivatives:')>=0:
+                        self['xdot'], self['xdot_info'] = readOP(f, nx, 'xdot', defaultDerivOrder=2, starSubFn=starSubFn, starSub=starSub)
+                    elif line.find('Order of discrete states:')>=0:
+                        self['xd'], self['xd_info'] = readOP(f, nxd, 'xd', defaultDerivOrder=2, starSubFn=starSubFn, starSub=starSub)
+                    elif line.find('Order of inputs')>=0:
+                        self['u'], self['u_info'] = readOP(f, nu, 'u', defaultDerivOrder=0, starSubFn=starSubFn, starSub=starSub)
+                    elif line.find('Order of outputs')>=0:
+                        self['y'], self['y_info'] = readOP(f, ny, 'y', defaultDerivOrder=0, starSubFn=starSubFn, starSub=starSub)
+                    elif line.find('Order of constraint states:')>=0:
+                        self['z'], self['z_info'] = readOP(f, nz, 'z', defaultDerivOrder=0, starSubFn=starSubFn, starSub=starSub)
+                    elif line.find('A:')>=0:
+                        self['A'] = readMat(f, nx, nx, 'A', slowReader=slowReader, filename=self.filename, starSubFn=starSubFn, starSub=starSub)
+                    elif line.find('B:')>=0:
+                        self['B'] = readMat(f, nx, nu, 'B', slowReader=slowReader, filename=self.filename, starSubFn=starSubFn, starSub=starSub)
+                    elif line.find('C:')>=0:
+                        self['C'] = readMat(f, ny, nx, 'C', slowReader=slowReader, filename=self.filename, starSubFn=starSubFn, starSub=starSub)
+                    elif line.find('D:')>=0:
+                        self['D'] = readMat(f, ny, nu, 'D', slowReader=slowReader, filename=self.filename, starSubFn=starSubFn, starSub=starSub)
+                    elif line.find('dUdu:')>=0:
+                        self['dUdu'] = readMat(f, nu, nu,'dUdu', slowReader=slowReader, filename=self.filename, starSubFn=starSubFn, starSub=starSub)
+                    elif line.find('dUdy:')>=0:
+                        self['dUdy'] = readMat(f, nu, ny,'dUdy', slowReader=slowReader, filename=self.filename, starSubFn=starSubFn, starSub=starSub)
+                    elif line.find('StateRotation:')>=0:
+                        pass
+                        # TODO
+                        #StateRotation:
+                    elif line.find('ED M:')>=0:
+                        self['EDDOF'] = line[5:].split()
+                        self['M']     = readMat(f, 24, 24,'M', slowReader=slowReader, filename=self.filename, starSubFn=starSubFn, starSub=starSub)
+        try:
+            doRead(slowReader=False)
+        except SlowReaderNeededError:
+            doRead(slowReader=True)
 
         if removeStatesPattern is not None:
             self.removeStates(pattern=removeStatesPattern)
@@ -442,9 +361,6 @@ class FASTLinearizationFile(File):
         return freq_d, zeta, Q, freq_0 
 
 
-
-
-
 def short_descr(slist):
     """ Shorten and "unify" the description from lin file """
     def shortname(s):
@@ -586,6 +502,103 @@ def short_descr(slist):
     return [shortname(s) for s in slist]
 
 
+
+def extractVal(lines, key, NA=None, missing=None, dtype=float):
+    for l in lines:
+        if l.find(key)>=0:
+            #l = starPattern.sub(starSubStr, l)
+            try:
+                return dtype(l.split(key)[1].split()[0])
+            except:
+                return NA
+    return missing
+
+def readToMarker(fid, marker, nMax):
+    lines=[]
+    for i, line in enumerate(fid):
+        if i>nMax:
+            raise BrokenFormatError('`{}` not found in file'.format(marker))
+        if line.find(marker)>=0:
+            break
+        lines.append(line.strip())
+    return lines, line
+
+def readOP(fid, n, name='', defaultDerivOrder=1, filename='', starSubFn=None, starSub=None):
+    OP=[]
+    Var = {'RotatingFrame': [], 'DerivativeOrder': [], 'Description': []}
+    colNames=fid.readline().strip()
+    dummy=   fid.readline().strip()
+    bHasDeriv= colNames.find('Derivative Order')>=0
+    for i, line in enumerate(fid):
+        line = line.strip()
+        line = starSubFn(line)
+        sp   = line.split()
+        if sp[1].find(',')>=0:
+            #  Most likely this OP has three values (e.g. orientation angles)
+            # For now we discard the two other values
+            OP.append(float(sp[1][:-1]))
+            iRot=4
+        else:
+            OP.append(float(sp[1]))
+            iRot=2
+        Var['RotatingFrame'].append(sp[iRot])
+        if bHasDeriv:
+            Var['DerivativeOrder'].append(int(sp[iRot+1]))
+            Var['Description'].append(' '.join(sp[iRot+2:]).strip())
+        else:
+            Var['DerivativeOrder'].append(defaultDerivOrder)
+            Var['Description'].append(' '.join(sp[iRot+1:]).strip())
+        if i>=n-1:
+            break
+    OP = np.asarray(OP)
+    nInf = np.sum(np.isinf(OP))
+    if nInf>0:
+        sErr = 'Some ill-formated/infinite values (e.g. `*******`) were found in the vector `{}`\n\tin linflile: {}'.format(name, filename)
+        if starSub is None:
+            raise Exception(sErr)
+        else:
+            print('[WARN] '+sErr)
+            OP[np.isinf(OP)] = starSub
+            
+    Var['RotatingFrame']   = np.asarray(Var['RotatingFrame'])
+    Var['DerivativeOrder'] = np.asarray(Var['DerivativeOrder'])
+    Var['Description']     = np.asarray(Var['Description'])
+    return OP, Var
+
+
+
+def readMat(fid, n, m, name='', slowReader=False, filename='', starSubFn=None, starSub=None):
+    if not slowReader:
+        try:
+            return np.array([fid.readline().strip().split() for i in np.arange(n)],dtype=float)
+        except:
+            print('[INFO] Failed to read some value in matrix {}, trying slower reader'.format(name))
+            raise SlowReaderNeededError()
+    else:
+        #vals = vals.ravel()
+        #vals = np.array(list(map(starSubFn, vals))).reshape(n,m)
+        vals=np.array([starSubFn( fid.readline().strip() ).split() for i in np.arange(n)], dtype=str)
+        try:
+            vals = vals.astype(float) # This could potentially fail
+        except:
+            raise Exception('Failed to convert into an array of float the matrix `{}`\n\tin linfile: {}'.format(name, filename))
+        if vals.shape[0]!=n or vals.shape[1]!=m:
+            shape1 = vals.shape
+            shape2 = (n,m)
+            raise Exception('Shape of matrix `{}` has wrong dimension ({} instead of {})\n\tin linfile: {}'.format(name, shape1, shape2, name, filename))
+
+        nNaN = np.sum(np.isnan(vals.ravel()))
+        nInf = np.sum(np.isinf(vals.ravel()))
+        if nInf>0:
+            sErr = 'Some ill-formated/infinite values (e.g. `*******`) were found in the matrix `{}`\n\tin linflile: {}'.format(name, filename)
+            if starSub is None:
+                raise Exception(sErr)
+            else:
+                print('[WARN] '+sErr)
+                vals[np.isinf(vals)] = starSub
+        if nNaN>0:
+            raise Exception('Some NaN values were found in the matrix `{}`\n\tin linfile: `{}`.'.format(name, filename))
+        return vals
 
 if __name__ == '__main__':
     f = FASTLinearizationFile('../../data/example_files/StandstillSemi_ForID_EDHD.1.lin')
