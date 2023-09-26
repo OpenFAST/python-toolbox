@@ -390,11 +390,17 @@ class FFCaseCreation:
         # Check on seed parameters
         if not isinstance(self.nSeeds,int):
             raise ValueError(f'An integer number of seeds should be requested. Got {self.nSeeds}.')
+        if self.nSeeds > 30:
+            raise ValueError(f'Number of seeds requested is larger than 30. For the case of {self.nSeeds} seeds, '\
+                             f'pass seedValues as a {self.nSeeds}-sized array of scalars.')
         if self.seedValues is None:
-            self.seedValues = [2318573, 122299, 123456, 389432, -432443, 9849898]
+            self.seedValues = [2318573, 122299, 123456, 389432, -432443, 9849898, 432425, 894832, 849324, 678095,
+                               1235456, 435342, 897023, 423800, -898881, 2988900, 798911, 482391, 892111, 899190,
+                               7693202, 587924, 890090, 435646, -454899, -785138, -78564, -17944, -99021, 389432]
+            self.seedValues = self.seedValues[:self.nSeeds]
         if len(self.seedValues) != self.nSeeds:
-            raise ValueError(f'Number of seeds is {self.nSeeds} but {len(self.seedValues)} seed values were given. '\
-                             f'Adjust the seedValues array accordingly')
+            raise ValueError(f'The array seedValues has been passed, but its length does not correspond '\
+                             f'to the number of seeds requested.')
   
         # Check LES parameters
         if self.LESpath is None:
@@ -1596,7 +1602,7 @@ class FFCaseCreation:
                         try:
                             os.symlink(src, dst)
                         except FileExistsError:
-                            if self.verbose>1: print(f'File {dst} already exists. Skipping symlink.')
+                            if self.verbose>1: print(f'  File {dst} already exists. Skipping symlink.')
         os.chdir(notepath)
 
 
