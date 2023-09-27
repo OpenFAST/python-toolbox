@@ -122,9 +122,11 @@ def main():
 
 
     # Initial setup
-    case = FFCaseCreation(path, wts, tmax, zbot, vhub, shear,
-                          TIvalue, inflow_deg, dt_high_les, ds_high_les, extent_high,
-                          dt_low_les, ds_low_les, extent_low, ffbin, mod_wake, LESpath=LESpath,
+    case = FFCaseCreation(path, wts, tmax, zbot, vhub, shear, TIvalue, inflow_deg,
+                          dt_high_les, ds_high_les, extent_high,
+                          dt_low_les, ds_low_les, extent_low,
+                          ffbin, mod_wake, yaw_init,
+                          nSeeds=nSeeds, LESpath=LESpath,
                           verbose=1)
 
     case.setTemplateFilename(templatePath, EDfilename, SEDfilename, HDfilename, SrvDfilename, ADfilename,

@@ -1252,6 +1252,9 @@ class FFCaseCreation:
 
         shutil.copy2(slurmfilepath, os.path.join(self.path, self.slurmfilename_low))
         
+        # Determine memory-per-cpu
+        memory_per_cpu = int(150000/self.nSeeds)
+
         # Change job name (for convenience only)
         _ = subprocess.call(f"sed -i 's|#SBATCH --job-name=lowBox|#SBATCH --job-name=lowBox_{os.path.basename(self.path)}|g' {self.slurmfilename_low}", cwd=self.path, shell=True)
         # Change the path inside the script to the desired one
@@ -1259,6 +1262,8 @@ class FFCaseCreation:
         _ = subprocess.call(sed_command, cwd=self.path, shell=True)
         # Change number of nodes values 
         _ = subprocess.call(f"sed -i 's|#SBATCH --nodes=2|#SBATCH --nodes={int(np.ceil(self.nConditions*self.nSeeds/6))}|g' {self.slurmfilename_low}", cwd=self.path, shell=True)
+        # Change memory per cpu
+        _ = subprocess.call(f"sed -i 's|--mem-per-cpu=25000M|--mem-per-cpu={memory_per_cpu}M|g' {self.slurmfilename_low}", cwd=self.path, shell=True)
         # Assemble list of conditions and write it
         listtoprint = "' '".join(self.condDirList)
         sed_command = f"""sed -i "s|^condList.*|condList=('{listtoprint}')|g" {self.slurmfilename_low}"""
@@ -1267,8 +1272,8 @@ class FFCaseCreation:
         _ = subprocess.call(f"sed -i 's|nSeeds=6|nSeeds={self.nSeeds}|g' {self.slurmfilename_low}", cwd=self.path, shell=True)
 
 
-        if self.nSeeds != 6:
-            print(f'--- WARNING: The memory-per-cpu on the low-res boxes SLURM script is configured for 6 seeds, not {self.nSeeds}.')
+        if self.nSeeds > 6:
+            print(f'--- WARNING: The memory-per-cpu on the low-res boxes SLURM script might be too low given {self.nSeeds} seeds.')
 
 
     def TS_low_slurm_submit(self, qos='normal', A=None, t=None):
@@ -2144,7 +2149,7 @@ class FFCaseCreation:
 
 
 
-    def plot(self, figsize=(15,7), fontsize=14, saveFig=True, returnFig=False):
+    def plot(self, figsize=(15,7), fontsize=14, saveFig=True, returnFig=False, figFormat='png'):
         import matplotlib.pyplot as plt
 
         fig, ax = plt.subplots(figsize=figsize)
@@ -2192,8 +2197,8 @@ class FFCaseCreation:
                 _, ind = np.unique(allyaw_currwdir, axis=0, return_index=True)
                 yaw_currwdir = allyaw_currwdir[np.sort(ind)].values # duplicates removed, same order as original array
                 for yaw in yaw_currwdir:
-                    ax.plot([dst.x.values-(dst.D.values/2)*sind(yaw-inflow.values), dst.x.values+(dst.D.values/2)*sind(yaw-inflow.values)],
-                            [dst.y.values-(dst.D.values/2)*cosd(yaw-inflow.values), dst.y.values+(dst.D.values/2)*cosd(yaw-inflow.values)], c=color, alpha=alphas[j])
+                    ax.plot([dst.x.values-(dst.D.values/2)*sind(yaw), dst.x.values+(dst.D.values/2)*sind(yaw)],
+                            [dst.y.values-(dst.D.values/2)*cosd(yaw), dst.y.values+(dst.D.values/2)*cosd(yaw)], c=color, alpha=alphas[j])
 
             # plot convex hull of farm (or line) for given inflow
             turbs = self.wts_rot_ds.sel(inflow_deg=inflow)[['x','y']].to_array().transpose()
@@ -2218,7 +2223,12 @@ class FFCaseCreation:
         ax.set_aspect('equal')
 
         if saveFig:
-            fig.savefig(os.path.join(self.path,'farm.png'), bbox_inches='tight', facecolor='white', transparent=False)
+            if figFormat == 'png':
+                fig.savefig(os.path.join(self.path,'farm.png'), bbox_inches='tight', facecolor='white', transparent=False)
+            elif figFormat == 'pdf':
+                fig.savefig(os.path.join(self.path,'farm.pdf'), bbox_inches='tight', facecolor='white', transparent=False)
+            else:
+                raise ValueError (f'Figure format not recognized. Options are png and pdf.')
 
         if returnFig:
             return fig, ax
