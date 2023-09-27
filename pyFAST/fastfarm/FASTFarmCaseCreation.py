@@ -610,9 +610,9 @@ class FFCaseCreation:
                 self.InflowWindFile['PropagationDir'] = 0
                 self.InflowWindFile['Filename_BTS']   = '"./TurbSim"'
                 if writeFiles:
-                    self.InflowWindFile.write( os.path.join(currPath,f'InflowWind.dat'))
+                    self.InflowWindFile.write( os.path.join(currPath,self.IWfilename))
                     for seed in range(self.nSeeds):
-                        self.InflowWindFile.write( os.path.join(currPath,f'Seed_{seed}','InflowWind.dat'))
+                        self.InflowWindFile.write( os.path.join(currPath,f'Seed_{seed}',self.IWfilename))
 
         
                 for t in range(self.nTurbines):
@@ -731,11 +731,11 @@ class FFCaseCreation:
                 if not _: return False
                 _ = checkIfExists(os.path.join(currPath,self.controllerInputfilename))
                 if not _: return False
-                _ = checkIfExists( os.path.join(currPath,f'InflowWind.dat'))
+                _ = checkIfExists( os.path.join(currPath,self.IWfilename))
                 if not _: return False
 
                 for seed in range(self.nSeeds):
-                    _ = checkIfExists(os.path.join(currPath,f'Seed_{seed}','InflowWind.dat'))
+                    _ = checkIfExists(os.path.join(currPath,f'Seed_{seed}',self.IWfilename))
                     if not _: return False
 
                 for t in range(self.nTurbines):
