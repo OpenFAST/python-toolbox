@@ -1489,7 +1489,6 @@ class FFCaseCreation:
                         # Create and write new Low.inp files creating the proper box with proper resolution
                         currentTS = TSCaseCreation(D_, HubHt_, Vhub_, tivalue_, shear_, x=xloc_, y=yloc_, zbot=self.zbot,
                                                    cmax=self.cmax, fmax=self.fmax, Cmeander=self.Cmeander, boxType=boxType, high_ext=self.extent_high)
-                        # !!!!!!!!!!! I have to give the resolution on the call above!!!!
                         currentTS.writeTSFile(self.turbsimHighfilepath, currentTSHighFile, tmax=self.tmax, turb=t, verbose=self.verbose)
         
                         # Modify some values and save file (some have already been set in the call above)
