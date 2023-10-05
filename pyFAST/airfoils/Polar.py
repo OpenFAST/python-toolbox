@@ -1274,7 +1274,7 @@ def _find_alpha0(alpha, coeff, window, direction='up', value_if_constant = np.na
     The angle alpha0 is found by looking at a zero up crossing in this window, and interpolation is used to find the exact location.
     """
     # Constant case or only one value
-    if np.max(abs((coeff - coeff[0])<1e-8)) or len(coeff) == 1:
+    if np.all(abs((coeff - coeff[0])<1e-8)) or len(coeff) == 1:
         if coeff[0] == 0:
             return 0
         else:
