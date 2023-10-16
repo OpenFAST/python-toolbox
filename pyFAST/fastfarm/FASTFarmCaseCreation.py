@@ -1191,6 +1191,7 @@ class FFCaseCreation:
     
     def TS_low_setup(self, writeFiles=True, runOnce=False):
         # Loops on all conditions/seeds creating Low-res TurbSim box  (following python-toolbox/pyFAST/fastfarm/examples/Ex1_TurbSimInputSetup.py)
+
         boxType='lowres'
         for cond in range(self.nConditions):
             for seed in range(self.nSeeds):
@@ -1276,7 +1277,7 @@ class FFCaseCreation:
             print(f'--- WARNING: The memory-per-cpu on the low-res boxes SLURM script might be too low given {self.nSeeds} seeds.')
 
 
-    def TS_low_slurm_submit(self, qos='normal', A=None, t=None):
+    def TS_low_slurm_submit(self, qos='normal', A=None, t=None, p=None):
         # ---------------------------------
         # ----- Run turbSim Low boxes -----
         # ---------------------------------
@@ -1286,6 +1287,8 @@ class FFCaseCreation:
             options += f'-A {A} '
         if t is not None:
             options += f'-t {t} '
+        if p is not None:
+            options += f'-p {p} '
 
         sub_command = f"sbatch {options}{self.slurmfilename_low}"
         print(f'Calling: {sub_command}')
@@ -1451,6 +1454,10 @@ class FFCaseCreation:
 
         #todo: Check if the low-res boxes were created successfully
 
+        if self.ds_high_les != self.cmax:
+            print(f'WARNING: The requested ds_high = {self.ds_high_les} m is not actually used. The TurbSim ')
+            print(f'         boxes use the default max chord value ({self.cmax} m here) for the spatial resolution.')
+
         # Create symbolic links for the low-res boxes
         self.TS_low_createSymlinks()
 
@@ -1546,7 +1553,7 @@ class FFCaseCreation:
 
 
 
-    def TS_high_slurm_submit(self, qos='normal', A=None, t=None):
+    def TS_high_slurm_submit(self, qos='normal', A=None, t=None, p=None):
         # ----------------------------------
         # ----- Run turbSim High boxes -----
         # ----------------------------------
@@ -1556,6 +1563,8 @@ class FFCaseCreation:
             options += f'-A {A} '
         if t is not None:
             options += f'-t {t} '
+        if p is not None:
+            otions += f'-p {p} '
 
         sub_command = f"sbatch {options}{self.slurmfilename_high}"
         print(f'Calling: {sub_command}')
@@ -1861,8 +1870,6 @@ class FFCaseCreation:
                     highbts  = TurbSimFile(os.path.join(seedPath,'TurbSim', f'HighT1.bts'))
         
                     # Get dictionary with all the D{X,Y,Z,t}, L{X,Y,Z,t}, N{X,Y,Z,t}, {X,Y,Z}0
-                    dt_low_desired = self.Cmeander*D_/(10*Vhub_) # will be made multiple of dT_High inside _getBoxesParamsForFF
-                    #d = self._getBoxesParamsForFF(lowbts, highbts, dt_low_desired, D_, HubHt_, xWT, yt)
                     d = self._getBoxesParamsForFF(lowbts, highbts, self.dt_low_les, D_, HubHt_, xWT, yt)
         
                     # Write the file
@@ -1888,7 +1895,6 @@ class FFCaseCreation:
                         self.dr = round(self.D/10)
                     ff_file['dr'] = self.dr
                     ff_file['NumRadii']  = int(np.ceil(3*D_/(2*self.dr) + 1))
-                    #ff_file['NumPlanes'] = int(np.ceil( 20*D_/(dt_low_desired*Vhub_*(1-1/6)) ) )
                     ff_file['NumPlanes'] = int(np.ceil( 20*D_/(self.dt_low_les*Vhub_*(1-1/6)) ) )
         
                     # Vizualization outputs
@@ -2090,7 +2096,7 @@ class FFCaseCreation:
 
 
 
-    def FF_slurm_submit(self, qos='normal', A=None, t=None, delay=4):
+    def FF_slurm_submit(self, qos='normal', A=None, t=None, p=None, delay=4):
 
         # ----------------------------------
         # ---------- Run FAST.Farm ---------
@@ -2110,6 +2116,8 @@ class FFCaseCreation:
                         options += f'-A {A} '
                     if t is not None:
                         options += f'-t {t} '
+                    if p is not None:
+                        otions += f'-p {p} '
 
                     sub_command = f"sbatch {options}{fname}"
                     print(f'Calling: {sub_command}')
