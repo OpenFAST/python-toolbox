@@ -77,8 +77,6 @@ class TSCaseCreation:
         self.domainSize(zbot=zbot, manual_mode=manual_mode)
         # Determine origin
         # self.originLoc()
-        self.ymin = None
-        self.ymax = None
 
     def Turb(self, D, HubHt, cmax=5.0, fmax=5.0):
         """
@@ -153,6 +151,10 @@ class TSCaseCreation:
 
     def domainSize(self, zbot, manual_mode=False):
     
+        # Set default
+        self.ymin = None
+        self.ymax = None
+
         if self.boxType == 'lowres':
             if manual_mode:
                 self.ymin = min(self.y) - self.low_ext[2]*self.D

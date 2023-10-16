@@ -390,11 +390,17 @@ class FFCaseCreation:
         # Check on seed parameters
         if not isinstance(self.nSeeds,int):
             raise ValueError(f'An integer number of seeds should be requested. Got {self.nSeeds}.')
+        if self.nSeeds > 30:
+            raise ValueError(f'Number of seeds requested is larger than 30. For the case of {self.nSeeds} seeds, '\
+                             f'pass seedValues as a {self.nSeeds}-sized array of scalars.')
         if self.seedValues is None:
-            self.seedValues = [2318573, 122299, 123456, 389432, -432443, 9849898]
+            self.seedValues = [2318573, 122299, 123456, 389432, -432443, 9849898, 432425, 894832, 849324, 678095,
+                               1235456, 435342, 897023, 423800, -898881, 2988900, 798911, 482391, 892111, 899190,
+                               7693202, 587924, 890090, 435646, -454899, -785138, -78564, -17944, -99021, 389432]
+            self.seedValues = self.seedValues[:self.nSeeds]
         if len(self.seedValues) != self.nSeeds:
-            raise ValueError(f'Number of seeds is {self.nSeeds} but {len(self.seedValues)} seed values were given. '\
-                             f'Adjust the seedValues array accordingly')
+            raise ValueError(f'The array seedValues has been passed, but its length does not correspond '\
+                             f'to the number of seeds requested.')
   
         # Check LES parameters
         if self.LESpath is None:
@@ -504,7 +510,7 @@ class FFCaseCreation:
             for case in range(self.nCases):
                 # Recover information about current case for directory naming purposes
                 inflow_deg_   = self.allCases['inflow_deg'     ].sel(case=case).values
-                wakeSteering_ = self.allCases['wakeSteering'   ].sel(case=case).values
+                #wakeSteering_ = self.allCases['wakeSteering'   ].sel(case=case).values
                 misalignment_ = self.allCases['misalignment'   ].sel(case=case).values
                 nADyn_        = self.allCases['nFullAeroDyn'   ].sel(case=case).values
                 nFED_         = self.allCases['nFulllElastoDyn'].sel(case=case).values
@@ -604,9 +610,9 @@ class FFCaseCreation:
                 self.InflowWindFile['PropagationDir'] = 0
                 self.InflowWindFile['Filename_BTS']   = '"./TurbSim"'
                 if writeFiles:
-                    self.InflowWindFile.write( os.path.join(currPath,f'InflowWind.dat'))
+                    self.InflowWindFile.write( os.path.join(currPath,self.IWfilename))
                     for seed in range(self.nSeeds):
-                        self.InflowWindFile.write( os.path.join(currPath,f'Seed_{seed}','InflowWind.dat'))
+                        self.InflowWindFile.write( os.path.join(currPath,f'Seed_{seed}',self.IWfilename))
 
         
                 for t in range(self.nTurbines):
@@ -725,11 +731,11 @@ class FFCaseCreation:
                 if not _: return False
                 _ = checkIfExists(os.path.join(currPath,self.controllerInputfilename))
                 if not _: return False
-                _ = checkIfExists( os.path.join(currPath,f'InflowWind.dat'))
+                _ = checkIfExists( os.path.join(currPath,self.IWfilename))
                 if not _: return False
 
                 for seed in range(self.nSeeds):
-                    _ = checkIfExists(os.path.join(currPath,f'Seed_{seed}','InflowWind.dat'))
+                    _ = checkIfExists(os.path.join(currPath,f'Seed_{seed}',self.IWfilename))
                     if not _: return False
 
                 for t in range(self.nTurbines):
@@ -1024,97 +1030,114 @@ class FFCaseCreation:
                                        coords={'cond': np.arange(self.nConditions)} )
   
 
+
+
+
     def _create_all_cases(self):
         # Generate the different "cases" (inflow angle, and misalignment and wakesteer bools).
         # If misalignment true, then the actual yaw is yaw[turb]=np.random.uniform(low=-8.0, high=8.0).
-        
-        # Calculate the total number of cases given sweeps requested. Multipliers for wake steering, yaw misalignment, and reduced-order models
-        nWindDir = len(np.unique(self.inflow_deg))
-        nCasesWSmultiplier = 2 if self.sweepWS else 1
+
+        # Set sweep bools and multipliers
         nCasesYMmultiplier = 2 if self.sweepYM else 1
         nCasesROmultiplier = len(self.EDmodel)
-        
-        # Yaw multiplier, setup in the form of repeated wind directions with changing yaw
-        nCasesYawmultiplier = int(len(self.inflow_deg)/len(np.unique(self.inflow_deg)))
-        
-        # Aux nCases vars
-        nCases        = int(nWindDir * nCasesWSmultiplier * nCasesYMmultiplier * nCasesROmultiplier * nCasesYawmultiplier)
-        nCasesWSfalse = int(nCases/nCasesWSmultiplier)
-        nCasesWStrue  = int(nCases - nCasesWSfalse)
-        nCasesYMfalse = int(nCases/nCasesYMmultiplier)
-        nCasesYMtrue  = int(nCases - nCasesYMfalse)
-        if self.verbose>2: print(f'    Cases: nWindDir = {nWindDir}                                   ')
-        if self.verbose>2: print(f'    Cases: nCases = {nCases}')
-        if self.verbose>2: print(f'    Cases: nCasesWStrue = {nCasesWStrue}')
-        if self.verbose>2: print(f'    Cases: nCasesWSfalse = {nCasesWSfalse}')
-        if self.verbose>2: print(f'    Cases: nCasesYMtrue = {nCasesYMtrue}')
-        if self.verbose>2: print(f'    Cases: nCasesYMfalse = {nCasesYMfalse}')
-        
-        # Build an array of wind directions, with repeated values to account for wake steering and yaw misalign bools, and ROM options
-        windDir = np.repeat(self.inflow_deg, nCasesWSmultiplier*nCasesYMmultiplier*nCasesROmultiplier)
-        yawInit = np.repeat(self.yaw_init, nCasesWSmultiplier*nCasesYMmultiplier*nCasesROmultiplier, axis=0)
-        
-        # Build arrays of wake steering and yaw misalignment bools (done this way for clarity)
-        if self.sweepWS and self.sweepYM:
-            wakeSteering = np.tile([False, True,  False, True], nWindDir*nCasesROmultiplier*nCasesYawmultiplier)
-            misalignment = np.tile([False, False, True,  True], nWindDir*nCasesROmultiplier*nCasesYawmultiplier)
-        elif self.sweepWS and not self.sweepYM:
-            wakeSteering = np.tile([False, True ], nWindDir*nCasesROmultiplier*nCasesYawmultiplier)
-            misalignment = np.tile([False, False], nWindDir*nCasesROmultiplier*nCasesYawmultiplier)
-        elif not self.sweepWS and self.sweepYM:
-            wakeSteering = np.tile([False, False], nWindDir*nCasesROmultiplier*nCasesYawmultiplier)
-            misalignment = np.tile([False, True ], nWindDir*nCasesROmultiplier*nCasesYawmultiplier)
-        elif not self.sweepWS and not self.sweepYM:
-            wakeSteering = np.tile([False], nWindDir*nCasesROmultiplier*nCasesYawmultiplier)
-            misalignment = np.tile([False], nWindDir*nCasesROmultiplier*nCasesYawmultiplier)
-        
-            
-        # Create array of random numbers for yaw misalignment, and set it to zero where no yaw misalign is requested
-        yawMisalignedValue = np.random.uniform(size = [nCases,self.nTurbines], low=-8.0, high=8.0)
-        yawMisalignedValue[~misalignment,:] = 0
-        
-        # Count number of simplified models to add that information to the xarray. If their length is 1, it means they weren't requested
         if len(self.ADmodel) == 1:
-            nADyn = self.nTurbines
+            self.sweepEDmodel = False
             self.sweepADmodel = False
         else:
-            nADyn = [ self.ADmodel[i].count('ADyn') for i in range(len(self.ADmodel)) ]
+            self.sweepEDmodel = True
             self.sweepADmodel = True
-        if len(self.EDmodel) == 1:
-           nFED = self.nTurbines
-           self.sweepEDmodel = False
-        else:
-            nFED = [ self.EDmodel[i].count('FED') for i in range(len(self.EDmodel)) ]
-            self.sweepADmodel = True
-        
-        # Come up with an ordered "yaw case" numbering for dir name
-        yawCase =  np.arange(nCasesYawmultiplier)+1
-        
-        # Assemble main case dataset, containing turbine info
-        self.nCases = nCases
-        self.allCases = xr.Dataset(
-            {
-                'Tx':     (['case','turbine'], np.repeat(self.wts_rot_ds['x'].values   , nCasesWSmultiplier*nCasesYMmultiplier*nCasesROmultiplier*nCasesYawmultiplier, axis=0)),
-                'Ty':     (['case','turbine'], np.repeat(self.wts_rot_ds['y'].values   , nCasesWSmultiplier*nCasesYMmultiplier*nCasesROmultiplier*nCasesYawmultiplier, axis=0)),
-                'Tz':     (['case','turbine'], np.repeat(self.wts_rot_ds['z'].values   , nCasesWSmultiplier*nCasesYMmultiplier*nCasesROmultiplier*nCasesYawmultiplier, axis=0)),
-                'D':      (['case','turbine'], np.repeat(self.wts_rot_ds['D'].values   , nCasesWSmultiplier*nCasesYMmultiplier*nCasesROmultiplier*nCasesYawmultiplier, axis=0)),
-                'zhub':   (['case','turbine'], np.repeat(self.wts_rot_ds['zhub'].values, nCasesWSmultiplier*nCasesYMmultiplier*nCasesROmultiplier*nCasesYawmultiplier, axis=0)),
-                'yawmis': (['case','turbine'], yawMisalignedValue),
-                'yaw':    (['case','turbine'], yawInit),
-                'yawCase': (['case'], np.repeat(yawCase, nWindDir*nCasesWSmultiplier*nCasesYMmultiplier*nCasesROmultiplier)),
-                'ADmodel': (['case','turbine'], np.tile(np.repeat(self.ADmodel, nCasesWSmultiplier*nCasesYMmultiplier*nCasesYawmultiplier, axis=0),(nWindDir,1)) ),
-                'EDmodel': (['case','turbine'], np.tile(np.repeat(self.EDmodel, nCasesWSmultiplier*nCasesYMmultiplier*nCasesYawmultiplier, axis=0),(nWindDir,1)) ),
-                'nFullAeroDyn':    (['case'], np.repeat(np.tile(nADyn, nWindDir), nCasesWSmultiplier*nCasesYMmultiplier*nCasesYawmultiplier)),
-                'nFulllElastoDyn': (['case'], np.repeat(np.tile(nFED,  nWindDir), nCasesWSmultiplier*nCasesYMmultiplier*nCasesYawmultiplier)),
-                'wakeSteering': (['case'], wakeSteering),
-                'misalignment': (['case'], misalignment),
-                'inflow_deg':   (['case'], windDir),
-            },
-            coords={
-                'case':    range(nCases),
-                'turbine': range(self.nTurbines),
-            },
-        )
+
+        # Initialize an empty array to accumulate individual cases
+        allCases = []
+        # Get list of unique yaws, keeping the order
+        _, ind = np.unique(self.yaw_init, axis=0, return_index=True)
+        yaw_unique = self.yaw_init[np.sort(ind)] # duplicates removed, same order as original array
+
+        # The main sweep on wind dir and yaw has been given by the user, such that
+        # only one loop is needed here.
+        for icase in range(len(self.inflow_deg)):
+            wdir     = self.inflow_deg[icase]
+            yaw      = self.yaw_init[icase]
+            yaw_case = np.where(np.all(yaw_unique == yaw, axis=1))[0][0]+1
+            # Get turbine info
+            x = self.wts_rot_ds.sel(inflow_deg=wdir)['x'].values
+            y = self.wts_rot_ds.sel(inflow_deg=wdir)['y'].values
+            z = self.wts_rot_ds.sel(inflow_deg=wdir)['z'].values
+            D = self.wts_rot_ds.sel(inflow_deg=wdir)['D'].values
+            zhub = self.wts_rot_ds.sel(inflow_deg=wdir)['zhub'].values
+
+            oneCase = xr.Dataset({
+                                  'Tx':         (['case','turbine'], [x   ]),
+                                  'Ty':         (['case','turbine'], [y   ]),
+                                  'Tz':         (['case','turbine'], [z   ]),
+                                  'D':          (['case','turbine'], [D   ]),
+                                  'zhub':       (['case','turbine'], [zhub]),
+                                  'yaw':        (['case','turbine'], [yaw] ),
+                                  'inflow_deg': (['case'],           [wdir]),
+                                  'yawCase':    (['case'],           [yaw_case]),
+                                },
+                                coords={
+                                    'case':    [icase],
+                                    'turbine': np.arange(self.nTurbines),
+                                },
+                                )
+            allCases.append(oneCase)
+        allCases = xr.concat(allCases, dim='case')
+
+        # ------------------------------------------------------- SWEEP ROM MODELS
+        # Get the number of cases at before this current sweep
+        nCases_before_sweep = len(allCases.case)
+
+        # Concat instances of allCases and adjust the case numbering
+        ds = xr.concat([allCases for i in range(nCasesROmultiplier)], dim='case')
+        ds['case'] = np.arange(len(ds['case']))
+
+        # Create an empty array to fill. This way have a generic variable of type object
+        data = np.empty_like(ds['Tx'].data, dtype=object);  data[:] = None
+        ds['EDmodel']         = (('case','turbine'), data.copy())
+        ds['ADmodel']         = (('case','turbine'), data.copy())
+        ds['nFulllElastoDyn'] = (('case'), np.zeros_like(ds['inflow_deg']).copy())
+        ds['nFullAeroDyn']    = (('case'), np.zeros_like(ds['inflow_deg']).copy())
+
+        # Now, we fill the array with the new values for the proper sweep
+        for multi in range(nCasesROmultiplier):
+            for c in range(nCases_before_sweep):
+                currCase = nCases_before_sweep*multi + c
+                currEDmodel = np.array(self.EDmodel)[multi]
+                currADmodel = np.array(self.ADmodel)[multi]
+
+                ds['EDmodel'].loc[dict(case=currCase, turbine=slice(None))] = currEDmodel
+                nFED = np.count_nonzero(currEDmodel == 'FED')
+                ds['nFulllElastoDyn'].loc[dict(case=currCase)] = nFED
+
+                ds['ADmodel'].loc[dict(case=currCase, turbine=slice(None))] = currADmodel
+                nADyn = np.count_nonzero(currADmodel == 'ADyn')
+                ds['nFullAeroDyn'].loc[dict(case=currCase)] = nADyn
+
+        allCases = ds.copy()
+
+        # ------------------------------------------------- SWEEP YAW MISALIGNMENT
+        # Get the number of cases at before this current sweep
+        nCases_before_sweep = len(allCases.case)
+
+        # Concat instances of allCases and adjust the case numbering
+        ds = xr.concat([allCases for i in range(nCasesYMmultiplier)], dim='case')
+        ds['case'] = np.arange(len(ds['case']))
+
+        # Create an full no-misalignment array to fill when non-aligned
+        ds['yawmis']       = (('case','turbine'), np.zeros_like(ds['yaw']))
+        ds['misalignment'] = (('case'),           np.full_like(ds['inflow_deg'], False, dtype=bool))
+
+        if self.sweepYM:
+            # Now, we fill the array with the new values on the second half (first half has no misalignment)
+            for c in range(nCases_before_sweep):
+                currCase = nCases_before_sweep + c
+                ds['yawmis'].loc[dict(case=currCase, turbine=slice(None))] = np.random.uniform(size=case.nTurbines,low=-8,high=8)
+                ds['misalignment'].loc[dict(case=currCase)] = True
+
+        self.allCases = ds.copy()
+        self.nCases = len(self.allCases['case'])
+
 
 
     def _rotate_wts(self):
@@ -1168,6 +1191,7 @@ class FFCaseCreation:
     
     def TS_low_setup(self, writeFiles=True, runOnce=False):
         # Loops on all conditions/seeds creating Low-res TurbSim box  (following python-toolbox/pyFAST/fastfarm/examples/Ex1_TurbSimInputSetup.py)
+
         boxType='lowres'
         for cond in range(self.nConditions):
             for seed in range(self.nSeeds):
@@ -1229,6 +1253,9 @@ class FFCaseCreation:
 
         shutil.copy2(slurmfilepath, os.path.join(self.path, self.slurmfilename_low))
         
+        # Determine memory-per-cpu
+        memory_per_cpu = int(150000/self.nSeeds)
+
         # Change job name (for convenience only)
         _ = subprocess.call(f"sed -i 's|#SBATCH --job-name=lowBox|#SBATCH --job-name=lowBox_{os.path.basename(self.path)}|g' {self.slurmfilename_low}", cwd=self.path, shell=True)
         # Change the path inside the script to the desired one
@@ -1236,6 +1263,8 @@ class FFCaseCreation:
         _ = subprocess.call(sed_command, cwd=self.path, shell=True)
         # Change number of nodes values 
         _ = subprocess.call(f"sed -i 's|#SBATCH --nodes=2|#SBATCH --nodes={int(np.ceil(self.nConditions*self.nSeeds/6))}|g' {self.slurmfilename_low}", cwd=self.path, shell=True)
+        # Change memory per cpu
+        _ = subprocess.call(f"sed -i 's|--mem-per-cpu=25000M|--mem-per-cpu={memory_per_cpu}M|g' {self.slurmfilename_low}", cwd=self.path, shell=True)
         # Assemble list of conditions and write it
         listtoprint = "' '".join(self.condDirList)
         sed_command = f"""sed -i "s|^condList.*|condList=('{listtoprint}')|g" {self.slurmfilename_low}"""
@@ -1244,11 +1273,11 @@ class FFCaseCreation:
         _ = subprocess.call(f"sed -i 's|nSeeds=6|nSeeds={self.nSeeds}|g' {self.slurmfilename_low}", cwd=self.path, shell=True)
 
 
-        if self.nSeeds != 6:
-            print(f'--- WARNING: The memory-per-cpu on the low-res boxes SLURM script is configured for 6 seeds, not {self.nSeeds}.')
+        if self.nSeeds > 6:
+            print(f'--- WARNING: The memory-per-cpu on the low-res boxes SLURM script might be too low given {self.nSeeds} seeds.')
 
 
-    def TS_low_slurm_submit(self, qos='normal', A=None, t=None):
+    def TS_low_slurm_submit(self, qos='normal', A=None, t=None, p=None):
         # ---------------------------------
         # ----- Run turbSim Low boxes -----
         # ---------------------------------
@@ -1258,6 +1287,8 @@ class FFCaseCreation:
             options += f'-A {A} '
         if t is not None:
             options += f'-t {t} '
+        if p is not None:
+            options += f'-p {p} '
 
         sub_command = f"sbatch {options}{self.slurmfilename_low}"
         print(f'Calling: {sub_command}')
@@ -1285,18 +1316,48 @@ class FFCaseCreation:
 
         # If the low box setup hasn't been called (e.g. LES run), do it once to get domain extents
         if not self.TSlowBoxFilesCreatedBool:
+            if self.verbose>1: print('    Running a TurbSim setup once to get domain extents')
             self.TS_low_setup(writeFiles=False, runOnce=True)
 
         # Figure out how many (and which) high boxes actually need to be executed. Remember that wake steering, yaw misalignment, SED/ADsk models,
         # and sweep in yaw do not require extra TurbSim runs
         self.nHighBoxCases = len(np.unique(self.inflow_deg))  # some wind dir might be repeated for sweep on yaws
         
-        self.allHighBoxCases = self.allCases.where(~self.allCases['wakeSteering'],drop=True).drop_vars('wakeSteering')\
-                                            .where(~self.allCases['misalignment'], drop=True).drop_vars('misalignment')\
+        # Old method to get allHighBoxCases. Doesn't work well if I have weird manual sweeps
+        allHighBoxCases_old  = self.allCases.where(~self.allCases['misalignment'], drop=True).drop_vars('misalignment')\
                                             .where(self.allCases['nFullAeroDyn']==self.nTurbines, drop=True).drop_vars('ADmodel')\
                                             .where(self.allCases['nFulllElastoDyn']==self.nTurbines, drop=True).drop_vars('EDmodel')\
                                             .where(self.allCases['yawCase']==1, drop=True).drop_vars('yawCase')
-        
+
+        # This is a new method, but I'm not sure if it will work always, so let's leave the one above and check it
+        uniquewdir = np.unique(self.allCases.inflow_deg)
+        allHighBoxCases = []
+        for currwdir in uniquewdir:
+            # Get first case to have the wind direction currwdir
+            firstCaseWithInflow_i = self.allCases.where(self.allCases['inflow_deg'] == currwdir, drop=True).isel(case=0)
+            allHighBoxCases.append(firstCaseWithInflow_i)
+        self.allHighBoxCases = xr.concat(allHighBoxCases, dim='case')
+        # But, before I change the algorithm, I want to time-test it, so let's compare both ways
+        if not allHighBoxCases_old.identical(self.allHighBoxCases):
+            self.allHighBoxCases_old = allHighBoxCases_old
+            print(f'!!!!!! WARNING !!!!!!!!!')
+            print(f'The new method for computing all the high-box cases is not producing the same set of cases as the old algorithm.')
+            print(f'This should only happen if you have complex sweeps that you modified manually after the code creates the initial arrays')
+            print(f'Check the variable <obj>.allHighBoxCases_old to see the cases using the old algorithm')
+            print(f'Check the variable <obj>.allHighBoxCases     to see the cases using the new algorithm')
+            print(f'You should check which xr.dataset has the correct, unique inflow_deg values. The correct array will only have unique values')
+            print(f'')
+            if len(self.allHighBoxCases_old['inflow_deg']) != len(np.unique(self.allHighBoxCases_old['inflow_deg'])):
+                print(f'    Checking the inflow_deg variable, it looks like the old method has non-unique wind directions. The old method is wrong here.')
+            if len(self.allHighBoxCases['inflow_deg'])     != len(np.unique(self.allHighBoxCases['inflow_deg'])):
+                print(f'    Checking the inflow_deg variable, it looks like the new method has non-unique wind directions. The new method is wrong here.')
+            else:
+                print('    The new method appears to be correct here! Trust but verify')
+            print('')
+            print(f'!!!!!!!!!!!!!!!!!!!!!!!!')
+            print(f'')
+
+
         if self.nHighBoxCases != len(self.allHighBoxCases.case):
             raise ValueError(f'The number of cases do not match as expected. {self.nHighBoxCases} unique wind directions, but {len(self.allHighBoxCases.case)} unique cases.')
         
@@ -1393,6 +1454,10 @@ class FFCaseCreation:
 
         #todo: Check if the low-res boxes were created successfully
 
+        if self.ds_high_les != self.cmax:
+            print(f'WARNING: The requested ds_high = {self.ds_high_les} m is not actually used. The TurbSim ')
+            print(f'         boxes use the default max chord value ({self.cmax} m here) for the spatial resolution.')
+
         # Create symbolic links for the low-res boxes
         self.TS_low_createSymlinks()
 
@@ -1488,7 +1553,7 @@ class FFCaseCreation:
 
 
 
-    def TS_high_slurm_submit(self, qos='normal', A=None, t=None):
+    def TS_high_slurm_submit(self, qos='normal', A=None, t=None, p=None):
         # ----------------------------------
         # ----- Run turbSim High boxes -----
         # ----------------------------------
@@ -1498,6 +1563,8 @@ class FFCaseCreation:
             options += f'-A {A} '
         if t is not None:
             options += f'-t {t} '
+        if p is not None:
+            otions += f'-p {p} '
 
         sub_command = f"sbatch {options}{self.slurmfilename_high}"
         print(f'Calling: {sub_command}')
@@ -1507,31 +1574,49 @@ class FFCaseCreation:
     def TS_high_create_symlink(self):
 
         # Create symlink of all the high boxes for the cases with wake steering and yaw misalignment. These are the "repeated" boxes
+
+        if self.verbose>0:
+            print(f'Creating symlinks for all the high-resolution boxes')
+            
         notepath = os.getcwd()
         os.chdir(self.path)
         for cond in range(self.nConditions):
-            for t in range(self.nTurbines):
-                for seed in range(self.nSeeds):
-                    for case in range(self.nCases):
-                        # Let's check if the current case is source (has bts) or destination (needs a symlink to bts)
-                        varsToDrop = ['wakeSteering','misalignment','yawmis','yaw','yawCase','ADmodel','EDmodel','nFullAeroDyn','nFulllElastoDyn']
-                        if case in self.allHighBoxCases['case']:
-                            src = os.path.join('../../../..', self.condDirList[cond], self.caseDirList[case], f'Seed_{seed}', 'TurbSim', f'HighT{t+1}.bts')
-                            xr_src = self.allCases.sel(case=case, drop=True).drop_vars(varsToDrop)
-                            continue
-                        else:
-                            dst = os.path.join(self.condDirList[cond], self.caseDirList[case], f'Seed_{seed}', 'TurbSim', f'HighT{t+1}.bts')
-                            xr_dst = self.allCases.sel(case=case, drop=True).drop_vars(varsToDrop)
-                            
-                        # Let's make sure the src and destination are the same case, except wake steering and yaw misalign bools
-                        xr.testing.assert_equal(xr_src, xr_dst)
-                        
+            for case in range(self.nCases):
+                # In order to do the symlink let's check if the current case is source (has bts). If so, skip if. If not, find its equivalent source
+                casematch = self.allHighBoxCases['case'] == case
+                if len(np.where(casematch)) != 1:
+                    raise ValueError (f'Something is wrong with your allHighBoxCases array. Found repeated case number. Stopping')
+
+                src_id = np.where(casematch)[0]
+
+                if len(src_id) == 1:
+                    # Current case is source (contains bts). Skipping
+                    continue
+
+                # If we are here, the case is destination. Let's find the first case with the same wdir for source
+                varsToDrop = ['misalignment','yawmis','yaw','yawCase','ADmodel','EDmodel','nFullAeroDyn','nFulllElastoDyn']
+                dst_xr = self.allCases.sel(case=case, drop=True).drop_vars(varsToDrop)
+                currwdir = dst_xr['inflow_deg']
+                
+                src_xr = self.allHighBoxCases.where(self.allHighBoxCases['inflow_deg'] == currwdir, drop=True).drop_vars(varsToDrop)
+                src_case = src_xr['case'].values[0]
+                src_xr = src_xr.sel(case=src_case, drop=True)
+                
+                # Let's make sure the src and destination are the same case, except yaw misalignment and ROM bools, and yaw angles
+                # The xarrays we are comparing here contains all self.nTurbines turbines and no info about seed
+                xr.testing.assert_equal(src_xr, dst_xr)
+
+                # Now that we have the correct arrays, we perform the loop on the turbines and seeds
+                for t in range(self.nTurbines):
+                    for seed in range(self.nSeeds):
+                        src = os.path.join('../../../..', self.condDirList[cond], self.caseDirList[src_case], f'Seed_{seed}', 'TurbSim', f'HighT{t+1}.bts')
+                        dst = os.path.join(self.condDirList[cond], self.caseDirList[case], f'Seed_{seed}', 'TurbSim', f'HighT{t+1}.bts')
+                       
                         try:
                             os.symlink(src, dst)
                         except FileExistsError:
-                            if self.verbose>1: print(f'File {dst} already exists. Skipping symlink.')
+                            if self.verbose>1: print(f'  File {dst} already exists. Skipping symlink.')
         os.chdir(notepath)
-
 
 
     def FF_setup(self, outlistFF=None, **kwargs):
@@ -1748,9 +1833,15 @@ class FFCaseCreation:
 
     def _FF_setup_TS(self):
 
+        # Let's first create the symlinks for the high-res boxes. Remember that only the cases with 
+        # unique winddir in self.allHighBoxCases have executed high-res boxes, the rest is all links
+        self.TS_high_create_symlink()
+        
         # Loops on all conditions/cases and cases for FAST.Farm
         for cond in range(self.nConditions):
+            print(f'Processing condition {self.condDirList[cond]}')
             for case in range(self.nCases):
+                print(f'    Processing all {self.nSeeds} seeds of case {self.caseDirList[case]}', end='\r')
                 for seed in range(self.nSeeds):
                     seedPath = os.path.join(self.path, self.condDirList[cond], self.caseDirList[case], f'Seed_{seed}')
         
@@ -1779,8 +1870,6 @@ class FFCaseCreation:
                     highbts  = TurbSimFile(os.path.join(seedPath,'TurbSim', f'HighT1.bts'))
         
                     # Get dictionary with all the D{X,Y,Z,t}, L{X,Y,Z,t}, N{X,Y,Z,t}, {X,Y,Z}0
-                    dt_low_desired = self.Cmeander*D_/(10*Vhub_) # will be made multiple of dT_High inside _getBoxesParamsForFF
-                    #d = self._getBoxesParamsForFF(lowbts, highbts, dt_low_desired, D_, HubHt_, xWT, yt)
                     d = self._getBoxesParamsForFF(lowbts, highbts, self.dt_low_les, D_, HubHt_, xWT, yt)
         
                     # Write the file
@@ -1806,7 +1895,6 @@ class FFCaseCreation:
                         self.dr = round(self.D/10)
                     ff_file['dr'] = self.dr
                     ff_file['NumRadii']  = int(np.ceil(3*D_/(2*self.dr) + 1))
-                    #ff_file['NumPlanes'] = int(np.ceil( 20*D_/(dt_low_desired*Vhub_*(1-1/6)) ) )
                     ff_file['NumPlanes'] = int(np.ceil( 20*D_/(self.dt_low_les*Vhub_*(1-1/6)) ) )
         
                     # Vizualization outputs
@@ -1829,6 +1917,7 @@ class FFCaseCreation:
                     ff_file['WindVelZ'] = ', '.join(map(str, zWT[:9]+self.zhub))
         
                     ff_file.write(outputFSTF)
+            print(f'Done processing condition {self.condDirList[cond]}                                              ')
 
         return
 
@@ -2007,7 +2096,7 @@ class FFCaseCreation:
 
 
 
-    def FF_slurm_submit(self, qos='normal', A=None, t=None, delay=4):
+    def FF_slurm_submit(self, qos='normal', A=None, t=None, p=None, delay=4):
 
         # ----------------------------------
         # ---------- Run FAST.Farm ---------
@@ -2027,10 +2116,129 @@ class FFCaseCreation:
                         options += f'-A {A} '
                     if t is not None:
                         options += f'-t {t} '
+                    if p is not None:
+                        otions += f'-p {p} '
 
                     sub_command = f"sbatch {options}{fname}"
                     print(f'Calling: {sub_command}')
                     _ = subprocess.call(sub_command, cwd=self.path, shell=True)
                     time.sleep(delay) # Sometimes the same job gets submitted twice. This gets around it.
+
+
+    def FF_check_output(self):
+        '''
+        Check all the FF output files and look for the termination string.
+        '''
+
+        ff_run_failed = False
+        for cond in range(self.nConditions):
+            for case in range(self.nCases):
+                if self.verbose>1:  print(f'Checking {self.condDirList[cond]}, {self.caseDirList[case]}')
+                for seed in range(self.nSeeds):
+                    # Let's check the last line of the logfile
+                    fflog_path = os.path.join(self.path, self.condDirList[cond], self.caseDirList[case], f'Seed_{seed}', f'log.fastfarm.seed{seed}.txt')
+                    if not os.path.isfile(fflog_path):
+                        print(f'{self.condDirList[cond]}, {self.caseDirList[case]}, seed {seed}: FAST.Farm log file does not exist.')
+                        ff_run_failed=True
+
+                    else:
+                        tail_command = ['tail', '-n', '2', fflog_path]
+                        tail = subprocess.check_output(tail_command).decode('utf-8')
+                        if tail.strip() != 'FAST.Farm terminated normally.':
+                            print(f'{self.condDirList[cond]}, {self.caseDirList[case]}, seed {seed}: FAST.Farm did not complete successfully.')
+                            ff_run_failed=True
+
+        if ff_run_failed:
+            print('')
+            raise ValueError(f'Not all FAST.Farm runs were successful')
+        else:
+            print(f'All cases finished successfully.')
+
+
+
+    def plot(self, figsize=(15,7), fontsize=14, saveFig=True, returnFig=False, figFormat='png'):
+        import matplotlib.pyplot as plt
+
+        fig, ax = plt.subplots(figsize=figsize)
+
+        # for plotting different inflow angles
+        alphas = np.append(1, np.linspace(0.5,0.2, len(self.wts_rot_ds['inflow_deg'])-1))
+
+        # low-res box
+        try:
+            ax.plot([self.TSlowbox.xmin, self.TSlowbox.xmax, self.TSlowbox.xmax, self.TSlowbox.xmin, self.TSlowbox.xmin],
+                    [self.TSlowbox.ymin, self.TSlowbox.ymin, self.TSlowbox.ymax, self.TSlowbox.ymax, self.TSlowbox.ymin],'--k',lw=2,label='Low')
+        except AttributeError:
+            print(f'WARNING: The exact limits of the low-res box have not been computed yet. Showing extents given as inputs')
+            xmin = self.allCases['Tx'].min()-self.extent_low[0]*self.D
+            xmax = self.allCases['Tx'].max()+self.extent_low[1]*self.D
+            ymin = self.allCases['Ty'].min()-self.extent_low[2]*self.D
+            ymax = self.allCases['Ty'].max()+self.extent_low[3]*self.D
+            ax.plot([xmin, xmax, xmax, xmin, xmin],
+                    [ymin, ymin, ymax, ymax, ymin],'--k',lw=2,label='Low')
+
+
+        for j, inflow in enumerate(self.wts_rot_ds['inflow_deg']):
+            ax.set_prop_cycle(None)  # Reset the colormap for every inflow
+            for i, currTurbine in enumerate(self.wts_rot_ds.turbine):
+                color = next(ax._get_lines.prop_cycler)['color']
+
+                dst = self.wts_rot_ds.sel(turbine=currTurbine, inflow_deg=inflow)
+
+                # plot high-res boxes
+                xmin, xmax = [dst.x-self.extent_high*dst.D/2, dst.x+self.extent_high*dst.D/2]
+                ymin, ymax = [dst.y-self.extent_high*dst.D/2, dst.y+self.extent_high*dst.D/2]
+                # Only add label entry on first (darker) curves
+                if j==0:
+                    ax.plot([xmin, xmax, xmax, xmin, xmin],
+                            [ymin, ymin, ymax, ymax, ymin], c=color, alpha=alphas[j], label=f'HighT{i+1}')
+                else:
+                    ax.plot([xmin, xmax, xmax, xmin, xmin],
+                            [ymin, ymin, ymax, ymax, ymin], c=color, alpha=alphas[j])
+
+                # plot turbine location
+                ax.scatter(dst.x, dst.y, s=dst.D/6, c=color, marker='o') #, label=f'WT{i+1}')
+
+                # plot turbine disk accoding to all yaws in current wdir
+                allyaw_currwdir = self.allCases.where(self.allCases['inflow_deg']==inflow,drop=True).sel(turbine=currTurbine)['yaw']
+                _, ind = np.unique(allyaw_currwdir, axis=0, return_index=True)
+                yaw_currwdir = allyaw_currwdir[np.sort(ind)].values # duplicates removed, same order as original array
+                for yaw in yaw_currwdir:
+                    ax.plot([dst.x.values-(dst.D.values/2)*sind(yaw), dst.x.values+(dst.D.values/2)*sind(yaw)],
+                            [dst.y.values-(dst.D.values/2)*cosd(yaw), dst.y.values+(dst.D.values/2)*cosd(yaw)], c=color, alpha=alphas[j])
+
+            # plot convex hull of farm (or line) for given inflow
+            turbs = self.wts_rot_ds.sel(inflow_deg=inflow)[['x','y']].to_array().transpose()
+            try:
+                hull = ConvexHull(turbs)
+                for simplex in hull.simplices:
+                    ax.plot(turbs[simplex, 0], turbs[simplex, 1], 'gray', alpha=alphas[j], label=f'Inflow {inflow.values} deg')
+            except:
+                # All turbines are in a line. Plotting a line instead of convex hull
+                ax.plot(turbs[:,0], turbs[:,1], 'gray', alpha=alphas[j], label=f'Inflow {inflow.values} deg')
+
+
+        # Remove duplicate entries from legend
+        handles, labels = plt.gca().get_legend_handles_labels()
+        by_label = dict(zip(labels, handles))
+        plt.legend(by_label.values(), by_label.keys(), loc='upper left', bbox_to_anchor=(1.02,1.015), fontsize=fontsize)
+
+        ax.set_xlabel("x [m]", fontsize=fontsize)
+        ax.set_ylabel("y [m]", fontsize=fontsize)
+        ax.tick_params(axis='both', which='major', labelsize=fontsize)
+        ax.grid()
+        ax.set_aspect('equal')
+
+        if saveFig:
+            if figFormat == 'png':
+                fig.savefig(os.path.join(self.path,'farm.png'), bbox_inches='tight', facecolor='white', transparent=False)
+            elif figFormat == 'pdf':
+                fig.savefig(os.path.join(self.path,'farm.pdf'), bbox_inches='tight', facecolor='white', transparent=False)
+            else:
+                raise ValueError (f'Figure format not recognized. Options are png and pdf.')
+
+        if returnFig:
+            return fig, ax
+
 
 
