@@ -112,7 +112,7 @@ def beamDynToHawc2(BD_mainfile, BD_bladefile, H2_htcfile=None, H2_stfile=None, b
         s_aero = BlSpn/BlSpn[-1]
         ac_x = np.interp(r_bar, s_aero, BlCrvAC)
         ac_y = np.interp(r_bar, s_aero, BlSwpAC)
-        le2ac = np.interp(r_bar, s_aero, le2ac_raw)
+        le2ac = np.interp(r_bar, s_aero, le2ac_raw) # Leading edge to aerodynamic center (in chord)
 
         # Get x and y coordinates of c2 axis
         ac2c2 = (0.5 - le2ac) * chord
