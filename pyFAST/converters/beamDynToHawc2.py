@@ -118,7 +118,7 @@ def beamDynToHawc2(BD_mainfile, BD_bladefile, H2_htcfile=None, H2_stfile=None, b
         ac2c2 = (0.5 - ac) * chord
         c2_x = ac_x + ac2c2 * np.sin(twist)
         c2_y = ac_y + ac2c2 * np.cos(twist)
-        # # Get offsets from BD axis to c2 axis along the twisted frame of reference
+        # Get offsets from BD axis to c2 axis along the twisted frame of reference
         c2BD_y = (c2_y - kp_y) / np.cos(twist)
         c2BD_x = np.zeros_like(c2BD_y) # no x translation, we should be translating along the twisted chord
 
