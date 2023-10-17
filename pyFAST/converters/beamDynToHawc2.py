@@ -122,7 +122,7 @@ def beamDynToHawc2(BD_mainfile, BD_bladefile, H2_htcfile=None, H2_stfile=None, b
         c2BD_y = np.sqrt( (c2_y - kp_y)**2 + (c2_x - kp_x)**2 )
         c2BD_x = np.zeros_like(c2BD_y) # no x translation, we should be translating along the twisted chord
 
-        # Translate matrices to from BD to c2 axis (translate along chord, x and twist are 0)
+        # Translate matrices from BD to c2 axis (translate along chord, x and twist are 0)
         transform = TransformCrossSectionMatrix()
         for iSpan in np.arange(len(K[0,0])):
             K_bd_temp = np.zeros((6,6))
