@@ -9,6 +9,7 @@ from pyFAST.input_output.hawc2_htc_file import HAWC2HTCFile
 from pyFAST.input_output.csv_file import CSVFile
 from pyFAST.input_output.fast_input_file import FASTInputFile
 from pyFAST.converters.beam import ComputeStiffnessProps, TransformCrossSectionMatrix
+from pyFAST.input_output.fast_input_deck import FASTInputDeck
 
 from .beam import *
 from .hawc2 import dfstructure2stfile
@@ -58,7 +59,7 @@ def arc_length(points):
 # --------------------------------------------------------------------------------}
 # ---beamDynToHawc2
 # --------------------------------------------------------------------------------{
-def beamDynToHawc2(BD_mainfile, BD_bladefile, H2_htcfile=None, H2_stfile=None, bodyname=None, A=None, E=None, G=None, theta_p_in=None, FPM=False, verbose=False):
+def beamDynToHawc2(BD_mainfile, BD_bladefile, H2_htcfile=None, H2_stfile=None, bodyname=None, A=None, E=None, G=None, fstIn=None, theta_p_in=None, FPM=False, verbose=False):
     """ 
     
      FPM: fully populated matrix, if True, use the FPM format of hawc2
@@ -71,7 +72,7 @@ def beamDynToHawc2(BD_mainfile, BD_bladefile, H2_htcfile=None, H2_stfile=None, b
     bdLine = BD_mainfile.toDataFrame()
     prop   = BD_bladefile.toDataFrame()
 
-    # --- Extract relevant info
+    # Define BeamDyn reference axis
     r_bar = prop['Span'].values
     
     kp_x_raw  = bdLine['kp_xr_[m]'].values
@@ -87,13 +88,59 @@ def beamDynToHawc2(BD_mainfile, BD_bladefile, H2_htcfile=None, H2_stfile=None, b
     kp_z = np.interp(r_bar, s_coord, kp_z_raw)
     twist = np.interp(r_bar, s_coord, twist_raw)
 
-
+    # Create K and M matrices
     K = np.zeros((6,6),dtype='object')
     M = np.zeros((6,6),dtype='object')
     for i in np.arange(6):
         for j in np.arange(6):
             K[i,j]=prop['K{}{}'.format(i+1,j+1)].values
             M[i,j]=prop['M{}{}'.format(i+1,j+1)].values
+
+    if fstIn != None:
+        fst = FASTInputDeck(fstIn, verbose=True)
+        Bld = fst.fst_vt['AeroDynBlade']
+        AF = fst.fst_vt['af_data']
+        BlSpn = Bld['BldAeroNodes'][:,0]
+        n_span = len(BlSpn)
+        ac_pos = np.zeros(n_span)
+        for iSpan in range(n_span):
+            ac_pos[iSpan] = fst.fst_vt['ac_data'][iSpan]['AirfoilRefPoint'][0]
+        # Define axis of aero centers
+        BlCrvAC = Bld['BldAeroNodes'][:,1]
+        BlSwpAC = Bld['BldAeroNodes'][:,2]
+        chord = Bld['BldAeroNodes'][:,5]
+        s_aero = BlSpn/BlSpn[-1]
+        ac_x = np.interp(r_bar, s_aero, BlCrvAC)
+        ac_y = np.interp(r_bar, s_aero, BlSwpAC)
+        ac = np.interp(r_bar, s_aero, ac_pos)
+
+        # Get x and y coordinates of c2 axis
+        ac2c2 = (0.5 - ac) * chord
+        c2_x = ac_x + ac2c2 * np.sin(twist)
+        c2_y = ac_y + ac2c2 * np.cos(twist)
+        # # Get offsets from BD axis to c2 axis along the twisted frame of reference
+        c2BD_y = (c2_y - kp_y) / np.cos(twist)
+        c2BD_x = np.zeros_like(c2BD_y) # no x translation, we should be translating along the twisted chord
+
+        # Translate matrices to from BD to c2 axis (translate along chord, x and twist are 0)
+        transform = TransformCrossSectionMatrix()
+        for iSpan in np.arange(len(K[0,0])):
+            K_bd_temp = np.zeros((6,6))
+            M_bd_temp = np.zeros((6,6))
+            for i in np.arange(6):
+                for j in np.arange(6):
+                    K_bd_temp[i,j] = K[i,j][iSpan]
+                    M_bd_temp[i,j] = M[i,j][iSpan]
+            K_c2_temp = transform.CrossSectionRotoTranslationMatrix(K_bd_temp, 0., c2BD_y[iSpan], 0.)
+            M_c2_temp = transform.CrossSectionRotoTranslationMatrix(M_bd_temp, 0., c2BD_y[iSpan], 0.)
+            for i in np.arange(6):
+                for j in np.arange(6):
+                    K[i,j][iSpan]=K_c2_temp[i,j]
+                    M[i,j][iSpan]=M_c2_temp[i,j]
+
+        # Update BeamDyn axis to c2 axis
+        kp_x = c2_x
+        kp_y = c2_y
 
     # Map 6x6 data to "beam" data
     # NOTE: theta_* are in [rad]
