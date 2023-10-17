@@ -102,9 +102,9 @@ def beamDynToHawc2(BD_mainfile, BD_bladefile, H2_htcfile=None, H2_stfile=None, b
         AF = fst.fst_vt['af_data']
         BlSpn = Bld['BldAeroNodes'][:,0]
         n_span = len(BlSpn)
-        ac_pos = np.zeros(n_span)
+        le2ac_raw = np.zeros(n_span)
         for iSpan in range(n_span):
-            ac_pos[iSpan] = fst.fst_vt['ac_data'][iSpan]['AirfoilRefPoint'][0]
+            le2ac_raw[iSpan] = fst.fst_vt['ac_data'][iSpan]['AirfoilRefPoint'][0]
         # Define axis of aero centers
         BlCrvAC = Bld['BldAeroNodes'][:,1]
         BlSwpAC = Bld['BldAeroNodes'][:,2]
@@ -112,14 +112,14 @@ def beamDynToHawc2(BD_mainfile, BD_bladefile, H2_htcfile=None, H2_stfile=None, b
         s_aero = BlSpn/BlSpn[-1]
         ac_x = np.interp(r_bar, s_aero, BlCrvAC)
         ac_y = np.interp(r_bar, s_aero, BlSwpAC)
-        ac = np.interp(r_bar, s_aero, ac_pos)
+        le2ac = np.interp(r_bar, s_aero, le2ac_raw)
 
         # Get x and y coordinates of c2 axis
-        ac2c2 = (0.5 - ac) * chord
+        ac2c2 = (0.5 - le2ac) * chord
         c2_x = ac_x + ac2c2 * np.sin(twist)
         c2_y = ac_y + ac2c2 * np.cos(twist)
         # Get offsets from BD axis to c2 axis along the twisted frame of reference
-        c2BD_y = (c2_y - kp_y) / np.cos(twist)
+        c2BD_y = np.sqrt( (c2_y - kp_y)**2 + (c2_x - kp_x)**2 )
         c2BD_x = np.zeros_like(c2BD_y) # no x translation, we should be translating along the twisted chord
 
         # Translate matrices to from BD to c2 axis (translate along chord, x and twist are 0)
