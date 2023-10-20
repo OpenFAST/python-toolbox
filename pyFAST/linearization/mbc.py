@@ -4,7 +4,7 @@
 import numpy as np
 import scipy.linalg as scp
 import os
-from pyFAST.linearization.linfile import get_Mats # TODO use pyFAST
+from pyFAST.linearization.linfile import get_Mats
 
 
 # --------------------------------------------------------------------------------}
@@ -120,20 +120,31 @@ def eiganalysis(A, ndof2=None, ndof1=None):
 # --------------------------------------------------------------------------------}
 # --- Main function 
 # --------------------------------------------------------------------------------{
-def fx_mbc3(FileNames, verbose=True, removeTwrAzimuth=False):
+def fx_mbc3(FileNames, verbose=True, starSub=None, removeStatesPattern=None, removeTwrAzimuth=False):
     """ 
-    FileNames: list of lin files for a given operating point
+    Perform MBC2 funciton based on a list of lin files.
+    NOTE: variable names and data structure match MATLAB implementation.
+
+    INPUTS:
+     - FileNames: list of lin files for a given operating point
+
+     - starSub: if None, raise an error if `****` are present
+                otherwise replace *** with `starSub` (e.g. 0)
+                see FASTLinearizationFile. 
+     - removeStatesPattern: remove states matching a giving description pattern.
+               e.g:  'tower|Drivetrain'  or '^AD'
+               see FASTLinearizationFile. 
+     - removeTwrAzimuth: if False do nothing
+                otherwise discard lin files where azimuth in [60, 180, 300]+/-4deg (close to tower). 
 
     NOTE: unlike the matlab function, fx_mbc3 does not write the modes for VTK visualization
           Instead use the wrapper function def getCDDOP from pyFAST.linearization.tools
-
-
 
     Original contribution by: Srinivasa B. Ramisett, ramisettisrinivas@yahoo.com, http://ramisetti.github.io
     """
 
     MBC={}
-    matData, _ = get_Mats(FileNames, verbose=verbose, removeTwrAzimuth=removeTwrAzimuth)
+    matData, _ = get_Mats(FileNames, verbose=verbose, starSub=starSub, removeStatesPattern=removeStatesPattern, removeTwrAzimuth=removeTwrAzimuth)
 
     # print('matData[Omega] ', matData['Omega'])
     # print('matData[OmegaDot] ', matData['OmegaDot'])

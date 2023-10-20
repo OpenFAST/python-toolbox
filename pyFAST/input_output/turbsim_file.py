@@ -58,7 +58,7 @@ class TurbSimFile(File):
         if filename:
             self.read(filename, **kwargs)
 
-    def read(self, filename=None, header_only=False):
+    def read(self, filename=None, header_only=False, tdecimals=8):
         """ read BTS file, with field: 
                      u    (3 x nt x ny x nz)
                      uTwr (3 x nt x nTwr)
@@ -98,11 +98,11 @@ class TurbSimFile(File):
                 self['uTwr'] = uTwr
         self['info'] = info
         self['ID']   = ID
-        self['dt']   = dt
+        self['dt']   = np.round(dt, tdecimals) # dt is stored in single precision in the TurbSim output
         self['y']    = np.arange(ny)*dy 
         self['y']   -= np.mean(self['y']) # y always centered on 0
         self['z']    = np.arange(nz)*dz +zBottom
-        self['t']    = np.arange(nt)*dt
+        self['t']    = np.round(np.arange(nt)*dt, tdecimals)
         self['zTwr'] =-np.arange(nTwr)*dz + zBottom
         self['zRef'] = zHub
         self['uRef'] = uHub
@@ -592,7 +592,11 @@ class TurbSimFile(File):
             s+='    ux: min: {}, max: {}, mean: {} \n'.format(np.min(ux), np.max(ux), np.mean(ux))
             s+='    uy: min: {}, max: {}, mean: {} \n'.format(np.min(uy), np.max(uy), np.mean(uy))
             s+='    uz: min: {}, max: {}, mean: {} \n'.format(np.min(uz), np.max(uz), np.mean(uz))
-            
+        s += ' Useful methods:\n'
+        s += ' - read, write, toDataFrame, keys\n'
+        s += ' - valuesAt, vertProfile, horizontalPlane, verticalPlane, closestPoint\n'
+        s += ' - fitPowerLaw\n'
+        s += ' - makePeriodic, checkPeriodic\n'
         return s
 
     def toDataFrame(self):
@@ -677,31 +681,167 @@ class TurbSimFile(File):
         #    pass
         return dfs
 
+    def toDataset(self):
+        """
+        Convert the data that was read in into a xarray Dataset
+        
+        # TODO SORT OUT THE DIFFERENCE WITH toDataSet
+        """
+        from xarray import IndexVariable, DataArray, Dataset
+        
+        print('[TODO] pyFAST.input_output.turbsim_file.toDataset: merge with function toDataSet')
+
+        y      = IndexVariable("y", self.y, attrs={"description":"lateral coordinate","units":"m"})
+        zround = np.asarray([np.round(zz,6) for zz in self.z]) #the open function here returns something like *.0000000001 which is annoying
+        z      = IndexVariable("z", zround, attrs={"description":"vertical coordinate","units":"m"})
+        time   = IndexVariable("time", self.t, attrs={"description":"time since start of simulation","units":"s"})
+
+        da = {}
+        for component,direction,velname in zip([0,1,2],["x","y","z"],["u","v","w"]):
+            # the dataset produced here has y/z axes swapped relative to data stored in original object
+            velocity = np.swapaxes(self["u"][component,...],1,2)     
+            da[velname] = DataArray(velocity, 
+                         coords={"time":time,"y":y,"z":z}, 
+                         dims=["time","y","z"], 
+                         name="velocity", 
+                         attrs={"description":"velocity along {0}".format(direction),"units":"m/s"})
+
+        return Dataset(data_vars=da, coords={"time":time,"y":y,"z":z})      
+
+    def toDataSet(self, datetime=False):
+        """
+        Convert the data that was read in into a xarray Dataset
+        
+        # TODO SORT OUT THE DIFFERENCE WITH toDataset
+        """
+        import xarray as xr
+        
+        print('[TODO] pyFAST.input_output.turbsim_file.toDataSet: should be discontinued')        
+        print('[TODO] pyFAST.input_output.turbsim_file.toDataSet: merge with function toDataset')        
+
+        if datetime:
+            timearray = pd.to_datetime(self['t'], unit='s', origin=pd.to_datetime('2000-01-01 00:00:00'))
+            timestr   = 'datetime'
+        else:
+            timearray = self['t']
+            timestr   = 'time'
+
+        ds = xr.Dataset(
+            data_vars=dict(
+                u=([timestr,'y','z'], self['u'][0,:,:,:]),
+                v=([timestr,'y','z'], self['u'][1,:,:,:]),
+                w=([timestr,'y','z'], self['u'][2,:,:,:]),
+            ),
+            coords={
+                timestr : timearray,
+                'y' : self['y'],
+                'z' : self['z'],
+            },
+        )
+
+        # Add mean computations
+        ds['up'] = ds['u'] - ds['u'].mean(dim=timestr)
+        ds['vp'] = ds['v'] - ds['v'].mean(dim=timestr)
+        ds['wp'] = ds['w'] - ds['w'].mean(dim=timestr)
+
+        if datetime:
+            # Add time (in s) to the variable list
+            ds['time'] = (('datetime'), self['t'])
+
+        return ds
 
     # Useful converters
-    def fromAMRWind(self, filename, dt, nt):
+    def fromAMRWind(self, filename, timestep, output_frequency, sampling_identifier, verbose=1, fileout=None, zref=None, xloc=None):
+        """
+        Reads a AMRWind netcdf file, grabs a group of sampling planes (e.g. p_slice),
+          return an instance of TurbSimFile, optionally write turbsim file to disk
+
+
+        Parameters
+        ----------
+        filename : str,
+            full path to netcdf file generated by amrwind
+        timestep : float,
+            amr-wind code timestep (time.fixed_dt)
+        output_frequency : int,
+            frequency chosen for sampling output in amrwind input file (sampling.output_frequency)
+        sampling_identifier : str,
+            identifier of the sampling being requested (an entry of sampling.labels in amrwind input file)
+        zref : float,
+            height to be written to turbsim as the reference height. if none is given, it is taken as the vertical centerpoint of the slice
+        """
+        try:
+            from pyFAST.input_output.amrwind_file import AMRWindFile
+        except:
+            try:
+                from .amrwind_file import AMRWindFile
+            except:
+                from amrwind_file import AMRWindFile
+                
+        obj = AMRWindFile(filename,timestep,output_frequency, group_name=sampling_identifier)
+
+        self["u"]          = np.ndarray((3,obj.nt,obj.ny,obj.nz)) 
+        
+        xloc = float(obj.data.x[0]) if xloc is None else xloc
+        if verbose:
+            print("Grabbing the slice at x={0} m".format(xloc))
+        self['u'][0,:,:,:] = np.swapaxes(obj.data.u.sel(x=xloc).values,1,2)
+        self['u'][1,:,:,:] = np.swapaxes(obj.data.v.sel(x=xloc).values,1,2)
+        self['u'][2,:,:,:] = np.swapaxes(obj.data.w.sel(x=xloc).values,1,2)        
+        self['t']          = obj.data.t.values
+
+        self['y']  = obj.data.y.values
+        self['z']  = obj.data.z.values
+        self['dt'] = obj.output_dt
+        
+        self['ID'] = 7 
+        ltime = time.strftime('%d-%b-%Y at %H:%M:%S', time.localtime())
+        self['info'] = 'Converted from AMRWind output file {0} {1:s}.'.format(filename,ltime)
+        
+        iz           = int(obj.nz/2)
+        self['zRef'] = float(obj.data.z[iz]) if zref is None else zref
+        if verbose:
+            print("Setting the TurbSim file reference height to z={0} m".format(self["zRef"]))                
+
+        self['uRef'] = float(obj.data.u.sel(x=xloc).sel(y=0).sel(z=self["zRef"]).mean().values)
+        self['zRef'], self['uRef'], bHub = self.hubValues()
+        
+        if fileout is not None:
+            filebase = os.path.splitext(filename)[1]
+            fileout = filebase+".bts"
+            if verbose:
+                print("===> {0}".format(fileout))
+            self.write(fileout) 
+        
+    
+    def fromAMRWind_legacy(self, filename, dt, nt, y, z, sampling_identifier='p_sw2'):
         """
         Convert current TurbSim file into one generated from AMR-Wind LES sampling data in .nc format
         Assumes:
           --  u, v, w (nt, nx * ny * nz)
           --  u is aligned with x-axis (flow is not rotated) - this consideration needs to be added
 
+
         INPUTS:
           - filename: (string) full path to .nc sampling data file
-          - plane_label: (string) name of sampling plane group from .inp file (e.g. "p_sw2")
+          - sampling_identifier: (string) name of sampling plane group from .inp file (e.g. "p_sw2")
           - dt: timestep size [s]
           - nt: number of timesteps (sequential) you want to read in, starting at the first timestep available
+        INPUTS: TODO
           - y: user-defined vector of coordinate positions in y
           - z: user-defined vector of coordinate positions in z
           - uref: (float) reference mean velocity (e.g. 8.0 hub height mean velocity from input file)
           - zref: (float) hub height (e.t. 150.0)
         """
         import xarray as xr
+
+        print('[TODO] fromAMRWind_legacy: function might be unfinished. Merge with fromAMRWind')
+        print('[TODO] fromAMRWind_legacy: figure out y, and z from data (see fromAMRWind)')
         
         # read in sampling data plane
         ds = xr.open_dataset(filename,
                               engine='netcdf4',
-                              group=plane_label)
+                              group=sampling_identifier)
         ny, nz, _ = ds.attrs['ijk_dims']
         noffsets  = len(ds.attrs['offsets'])
         t         = np.arange(0, dt*(nt-0.5), dt)

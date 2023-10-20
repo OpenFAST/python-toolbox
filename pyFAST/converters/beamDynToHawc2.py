@@ -9,8 +9,10 @@ from pyFAST.input_output.hawc2_htc_file import HAWC2HTCFile
 from pyFAST.input_output.csv_file import CSVFile
 from pyFAST.input_output.fast_input_file import FASTInputFile
 from pyFAST.converters.beam import ComputeStiffnessProps, TransformCrossSectionMatrix
+from pyFAST.input_output.fast_input_deck import FASTInputDeck
 
 from .beam import *
+from .hawc2 import dfstructure2stfile
 
 
 def arc_length(points):
@@ -57,7 +59,7 @@ def arc_length(points):
 # --------------------------------------------------------------------------------}
 # ---beamDynToHawc2
 # --------------------------------------------------------------------------------{
-def beamDynToHawc2(BD_mainfile, BD_bladefile, H2_htcfile=None, H2_stfile=None, bodyname=None, A=None, E=None, G=None, theta_p_in=None, FPM=False, verbose=False):
+def beamDynToHawc2(BD_mainfile, BD_bladefile, H2_htcfile=None, H2_stfile=None, bodyname=None, A=None, E=None, G=None, fstIn=None, theta_p_in=None, FPM=False, verbose=False):
     """ 
     
      FPM: fully populated matrix, if True, use the FPM format of hawc2
@@ -70,7 +72,7 @@ def beamDynToHawc2(BD_mainfile, BD_bladefile, H2_htcfile=None, H2_stfile=None, b
     bdLine = BD_mainfile.toDataFrame()
     prop   = BD_bladefile.toDataFrame()
 
-    # --- Extract relevant info
+    # Define BeamDyn reference axis
     r_bar = prop['Span'].values
     
     kp_x_raw  = bdLine['kp_xr_[m]'].values
@@ -86,13 +88,59 @@ def beamDynToHawc2(BD_mainfile, BD_bladefile, H2_htcfile=None, H2_stfile=None, b
     kp_z = np.interp(r_bar, s_coord, kp_z_raw)
     twist = np.interp(r_bar, s_coord, twist_raw)
 
-
+    # Create K and M matrices
     K = np.zeros((6,6),dtype='object')
     M = np.zeros((6,6),dtype='object')
     for i in np.arange(6):
         for j in np.arange(6):
             K[i,j]=prop['K{}{}'.format(i+1,j+1)].values
             M[i,j]=prop['M{}{}'.format(i+1,j+1)].values
+
+    if fstIn != None:
+        fst = FASTInputDeck(fstIn, verbose=True)
+        Bld = fst.fst_vt['AeroDynBlade']
+        AF = fst.fst_vt['af_data']
+        BlSpn = Bld['BldAeroNodes'][:,0]
+        n_span = len(BlSpn)
+        le2ac_raw = np.zeros(n_span)
+        for iSpan in range(n_span):
+            le2ac_raw[iSpan] = fst.fst_vt['ac_data'][iSpan]['AirfoilRefPoint'][0]
+        # Define axis of aero centers
+        BlCrvAC = Bld['BldAeroNodes'][:,1]
+        BlSwpAC = Bld['BldAeroNodes'][:,2]
+        chord = Bld['BldAeroNodes'][:,5]
+        s_aero = BlSpn/BlSpn[-1]
+        ac_x = np.interp(r_bar, s_aero, BlCrvAC)
+        ac_y = np.interp(r_bar, s_aero, BlSwpAC)
+        le2ac = np.interp(r_bar, s_aero, le2ac_raw) # Leading edge to aerodynamic center (in chord)
+
+        # Get x and y coordinates of c2 axis
+        ac2c2 = (0.5 - le2ac) * chord
+        c2_x = ac_x + ac2c2 * np.sin(twist)
+        c2_y = ac_y + ac2c2 * np.cos(twist)
+        # Get offsets from BD axis to c2 axis along the twisted frame of reference
+        c2BD_y = np.sqrt( (c2_y - kp_y)**2 + (c2_x - kp_x)**2 )
+        c2BD_x = np.zeros_like(c2BD_y) # no x translation, we should be translating along the twisted chord
+
+        # Translate matrices from BD to c2 axis (translate along chord, x and twist are 0)
+        transform = TransformCrossSectionMatrix()
+        for iSpan in np.arange(len(K[0,0])):
+            K_bd_temp = np.zeros((6,6))
+            M_bd_temp = np.zeros((6,6))
+            for i in np.arange(6):
+                for j in np.arange(6):
+                    K_bd_temp[i,j] = K[i,j][iSpan]
+                    M_bd_temp[i,j] = M[i,j][iSpan]
+            K_c2_temp = transform.CrossSectionRotoTranslationMatrix(K_bd_temp, 0., c2BD_y[iSpan], 0.)
+            M_c2_temp = transform.CrossSectionRotoTranslationMatrix(M_bd_temp, 0., c2BD_y[iSpan], 0.)
+            for i in np.arange(6):
+                for j in np.arange(6):
+                    K[i,j][iSpan]=K_c2_temp[i,j]
+                    M[i,j][iSpan]=M_c2_temp[i,j]
+
+        # Update BeamDyn axis to c2 axis
+        kp_x = c2_x
+        kp_y = c2_y
 
     # Map 6x6 data to "beam" data
     # NOTE: theta_* are in [rad]
@@ -141,17 +189,19 @@ def beamDynToHawc2(BD_mainfile, BD_bladefile, H2_htcfile=None, H2_stfile=None, b
             pass
         if verbose: 
             print('Writing:   ',H2_stfile)
-        with open(H2_stfile, 'w') as f:
-            f.write('%i ; number of sets, Nset\n' % 1)
-            f.write('-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------\n')
-            f.write('#%i ; set number\n' % 1)
-            if FPM:
-                cols=['r_[m]','m_[kg/m]','x_cg_[m]','y_cg_[m]','ri_x_[m]','ri_y_[m]','pitch_[deg]','x_e_[m]','y_e_[m]','K11','K12','K13','K14','K15','K16','K22','K23','K24','K25','K26','K33','K34','K35','K36','K44','K45','K46','K55','K56','K66']
-            else:
-                cols=['r_[m]','m_[kg/m]','x_cg_[m]','y_cg_[m]','ri_x_[m]','ri_y_[m]', 'x_sh_[m]','y_sh_[m]','E_[N/m^2]','G_[N/m^2]','I_x_[m^4]','I_y_[m^4]','I_p_[m^4]','k_x_[-]','k_y_[-]','A_[m^2]','pitch_[deg]','x_e_[m]','y_e_[m]']
-            f.write('\t'.join(['{:20s}'.format(s) for s in cols])+'\n')
-            f.write('$%i %i\n' % (1, dfStructure.shape[0]))
-            f.write('\n'.join('\t'.join('%19.13e' %x for x in y) for y in dfStructure.values))
+
+        dfstructure2stfile(dfStructure, H2_stfile)
+        #with open(H2_stfile, 'w') as f:
+        #    f.write('%i ; number of sets, Nset\n' % 1)
+        #    f.write('-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------\n')
+        #    f.write('#%i ; set number\n' % 1)
+        #    if FPM:
+        #        cols=['r_[m]','m_[kg/m]','x_cg_[m]','y_cg_[m]','ri_x_[m]','ri_y_[m]','pitch_[deg]','x_e_[m]','y_e_[m]','K11','K12','K13','K14','K15','K16','K22','K23','K24','K25','K26','K33','K34','K35','K36','K44','K45','K46','K55','K56','K66']
+        #    else:
+        #        cols=['r_[m]','m_[kg/m]','x_cg_[m]','y_cg_[m]','ri_x_[m]','ri_y_[m]', 'x_sh_[m]','y_sh_[m]','E_[N/m^2]','G_[N/m^2]','I_x_[m^4]','I_y_[m^4]','I_p_[m^4]','k_x_[-]','k_y_[-]','A_[m^2]','pitch_[deg]','x_e_[m]','y_e_[m]']
+        #    f.write('\t'.join(['{:20s}'.format(s) for s in cols])+'\n')
+        #    f.write('$%i %i\n' % (1, dfStructure.shape[0]))
+        #    f.write('\n'.join('\t'.join('%19.13e' %x for x in y) for y in dfStructure.values))
 
     # --- Rewrite htc file
     if H2_htcfile is not None:

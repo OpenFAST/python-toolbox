@@ -192,12 +192,15 @@ def AE_PC_C2_toAD(ae_filename, pc_filename, blade_c2def, r_AD=None, ADbldFilenam
         P = Polar(Re=Re, alpha=vAlpha, cl=M[:,1], cd=M[:,2], cm=M[:,3], radians=False)
         # Apply 3D correction
         if r>0 and correction3D:
-            P = P.correction3D(
-                r_over_R     = r/r_max,
-                chord_over_r = c/r,
-                tsr=tsr, 
-                lift_method="DuSelig", drag_method="None", blending_method="linear_25_45",
-                max_cl_corr=0.25)
+            try:
+                P = P.correction3D(
+                    r_over_R     = r/r_max,
+                    chord_over_r = c/r,
+                    tsr=tsr, 
+                    lift_method="DuSelig", drag_method="None", blending_method="linear_25_45",
+                    max_cl_corr=0.25)
+            except:
+                print('3D correction not applied at station ', ir)
 
         # Store polars
         M = np.column_stack((P.alpha, P.cl, P.cd, P.cm))

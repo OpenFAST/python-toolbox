@@ -43,7 +43,9 @@ def campbell(templateFstFile, operatingPointsFile, workDir, toolboxDir, fastExe,
              nPerPeriod=36, baseDict=None, tStart=5400, trim=True, viz=False,
              trimGainPitch = 0.001, trimGainGenTorque = 300,
              maxTrq= None, 
-             generateInputs=True, runFast=True, runMBC=True, prefix='',sortedSuffix=None, ylim=None, removeTwrAzimuth=False):
+             generateInputs=True, runFast=True, runMBC=True, prefix='',sortedSuffix=None, ylim=None, 
+             removeTwrAzimuth=False, starSub=None, removeStatesPattern=None # Options for A matrices
+             ):
     """ 
     Wrapper function to perform a Campbell diagram study
        see: writeLinearizationFiles, postproLinearization and postproMBC for more description of inputs.
@@ -60,6 +62,14 @@ def campbell(templateFstFile, operatingPointsFile, workDir, toolboxDir, fastExe,
       - prefix:     strings such that the output files will looked like: [folder prefix ]
       - sortedSuffix use a separate file where IDs have been sorted
       - runFast      Logical to specify whether to run the simulations or not
+      - removeTwrAzimuth: if False do nothing
+                 otherwise discard lin files where azimuth in [60, 180, 300]+/-4deg (close to tower). 
+      - starSub: if None, raise an error if `****` are present
+                 otherwise replace *** with `starSub` (e.g. 0)
+                 see FASTLinearizationFile. 
+      - removeStatesPattern: remove states matching a giving description pattern.
+                e.g:  'tower|Drivetrain'  or '^AD'
+                see FASTLinearizationFile. 
     """
     Cases=pd.read_csv(caseFile); Cases.rename(columns=lambda x: x.strip(), inplace=True)
 
@@ -80,7 +90,7 @@ def campbell(templateFstFile, operatingPointsFile, workDir, toolboxDir, fastExe,
 
     # --- Postprocess linearization outputs (MBC + modes ID)
     if runMBC:
-        OP, Freq, Damp, _, _, modeID_file = postproCampbell(FSTfilenames, removeTwrAzimuth=removeTwrAzimuth, suffix=suffix)
+        OP, Freq, Damp, _, _, modeID_file = postproCampbell(FSTfilenames, removeTwrAzimuth=removeTwrAzimuth, starSub=starSub, removeStatesPattern=removeStatesPattern, suffix=suffix)
 
     # ---  Plot Campbell
     fig, axes = plotCampbell(OP, Freq, Damp, sx='WS_[m/s]', UnMapped=UnMapped, ylim=ylim)

@@ -42,7 +42,8 @@ class Polar(object):
     """
 
     def __init__(self, filename=None, alpha=None, cl=None, cd=None, cm=None, Re=None, 
-            compute_params=False, radians=None, fformat='auto', verbose=False):
+            compute_params=False, radians=None, cl_lin_method='max',
+            fformat='auto', verbose=False):
         """Constructor
 
         Parameters
@@ -118,9 +119,9 @@ class Polar(object):
 
         # NOTE: method needs to be in harmony for linear_slope and the one used in cl_fully_separated
         if compute_params:
-            self._linear_slope, self._alpha0 = self.cl_linear_slope(method="max")
+            self._linear_slope, self._alpha0 = self.cl_linear_slope(method=cl_lin_method)
             if not self._cl_fs_lock:
-                self.cl_fully_separated()
+                self.cl_fully_separated(method=cl_lin_method)
             if not self._cl_inv_lock:
                 self.cl_inv = self._linear_slope * (self.alpha - self._alpha0)
 
@@ -136,6 +137,9 @@ class Polar(object):
         s+=' - _alpha0:            {} [{}]\n'.format(self._alpha0, sunit)
         s+=' - _linear_slope:      {} [1/{}]\n'.format(self._linear_slope, sunit)
         s+='Derived parameters:\n'
+        s+=' * cl_inv             : array of size {} \n'.format(len(self.alpha))
+        s+=' * cl_fs              : array of size {} \n'.format(len(self.alpha))
+        s+=' * fs                 : array of size {} \n'.format(len(self.alpha))
         s+=' * cl_lin (UNSURE)    : array of size {} \n'.format(len(self.alpha))
         s+='Functional parameters:\n'
         s+=' * alpha0 :            {} [{}]\n'.format(self.alpha0(),sunit)
@@ -280,10 +284,6 @@ class Polar(object):
         #    self._linear_slope,self._alpha0=self.cl_linear_slope()
         #return self._linear_slope*(self.alpha-self._alpha0)
 
-
-
-
-
     @classmethod
     def fromfile(cls, filename, fformat='auto', compute_params=False, to_radians=False):
         """Constructor based on a filename
@@ -394,8 +394,11 @@ class Polar(object):
                     / cl_slope
                     * (1.6 * chord_over_r / 0.1267 * (a - chord_over_r ** expon) / (b + chord_over_r ** expon) - 1)
                 )
+                # Force fcl to stay non-negative
+                if fcl < 0.:
+                    fcl = 0.
             else:
-                fcl=1.0
+                fcl=0.0
         elif lift_method == "Snel":
             # Snel correction
             fcl = 3.0 * chord_over_r ** 2.0
@@ -536,6 +539,8 @@ class Polar(object):
         # -90 <-> -alpha_high
         alpha5 = np.linspace(-np.pi / 2, alpha5max, nalpha)
         alpha5 = alpha5[1:]
+        if alpha_low == -alpha_high:
+            alpha5 = alpha5[:-1]
         cl5, cd5 = self.__Viterna(-alpha5, -cl_adj)
 
         # -180+alpha_high <-> -90
@@ -730,7 +735,7 @@ class Polar(object):
         else:
             window = [-20, 20]
         try:
-            alpha0cn = _find_alpha0(alpha, cn, window, direction='up')
+            alpha0cn = _find_alpha0(alpha, cn, window, direction='up', value_if_constant = 0.)
         except NoCrossingException:
             print("[WARN] Polar: Cn unsteady, cannot find zero crossing with up direction, trying down direction")
             alpha0cn = _find_alpha0(alpha, cn, window, direction='down')
@@ -1058,6 +1063,7 @@ class Polar(object):
         if not self._fs_lock:
             fs = (self.cl - cl_fs) / (cl_inv - cl_fs + 1e-10)
             fs[np.where(fs < 1e-15)] = 0
+            fs[np.where(fs > 1)] = 1
             # Storing
             self.fs = fs
         self.cl_fs = cl_fs
@@ -1264,17 +1270,17 @@ def _alpha_window_in_bounds(alpha, window):
     return window
 
 
-def _find_alpha0(alpha, coeff, window, direction='up'):
+def _find_alpha0(alpha, coeff, window, direction='up', value_if_constant = np.nan):
     """Finds the point where coeff(alpha)==0 using interpolation.
     The search is narrowed to a window that can be specified by the user. The default window is yet enough for cases that make physical sense.
     The angle alpha0 is found by looking at a zero up crossing in this window, and interpolation is used to find the exact location.
     """
     # Constant case or only one value
-    if np.all(coeff == coeff[0]) or len(coeff) == 1:
+    if np.all(abs((coeff - coeff[0])<1e-8)) or len(coeff) == 1:
         if coeff[0] == 0:
             return 0
         else:
-            return np.nan
+            return value_if_constant
     # Ensuring window is within our alpha values
     window = _alpha_window_in_bounds(alpha, window)
 
@@ -1534,6 +1540,7 @@ def cl_linear_slope(alpha, cl, window=None, method="max", nInterp=721, inputInRa
       - alpha: angle of attack in radians
       - Cl   : lift coefficient
       - window: [alpha_min, alpha_max]: region when linear slope is sought
+      - method: 'max', 'optim', 'leastsquare', 'leastsquare_constraint'
       
     OUTPUTS:
       - Cl_alpha, alpha0: lift slope (1/rad) and angle of attack (rad) of zero lift

@@ -49,7 +49,7 @@ vizFiles = lin.writeVizFiles(fstFiles, verbose=True, **vizDict)
 # --- Step 5b: Run FAST with VIZ files to generate VTKs
 import pyFAST.case_generation.runner as runner
 simDir = os.path.dirname(fstFiles[0])
-fastExe = '../../../data/openfast3.3_x64s.exe'
+fastExe = os.path.join(scriptDir, '../../../data/openfast.exe')
 ### Option 1 write a batch file and run it
 # batchfile = runner.writeBatch(os.path.join(simDir,'_RUNViz.bat'), vizFiles, fastExe=fastExe, flags='-VTKLin')
 # runner.runBatch(batchfile)

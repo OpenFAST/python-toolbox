@@ -10,6 +10,8 @@ from pyFAST.input_output.fast_input_file import FASTInputFile
 from pyFAST.input_output.fast_input_deck import FASTInputDeck
 
 import pyFAST.converters.beamdyn as bd
+import pyFAST.converters.elastodyn as ed
+import pyFAST.converters.hawc2 as h2
 
 
 def FAST2Hawc2(fstIn, htcTemplate, htcOut, OPfile=None, TwrFAFreq=0.1, TwrSSFreq=0.1, SftTorFreq=4, FPM = False, Bld_E=None, Bld_G=None, Bld_A=None, Bld_theta_p=None):
@@ -27,6 +29,7 @@ def FAST2Hawc2(fstIn, htcTemplate, htcOut, OPfile=None, TwrFAFreq=0.1, TwrSSFreq
     twrOF = fst.fst_vt['ElastoDynTower']
     BD    = fst.fst_vt['BeamDyn']
     BDbld = fst.fst_vt['BeamDynBlade']
+    EDbld = fst.fst_vt['ElastoDynBlade']
 
     # print(fst.ED.keys())
     # print(fst.ED['TwrFile'])
@@ -135,52 +138,87 @@ def FAST2Hawc2(fstIn, htcTemplate, htcOut, OPfile=None, TwrFAFreq=0.1, TwrSSFreq
     # --------------------------------------------------------------------------------}
     # --- Blade 
     # --------------------------------------------------------------------------------{
-    bdy = htc.bodyByName('blade1')
     # Mean line
     # val[:,3] = np.linspace(0, ED['HubRad'], val.shape[0])
 
+    st_filefull = os.path.join(outDataDir, 'blade_st.st') # Full path of blade st file
+    st_file     = os.path.relpath(st_filefull, outDir)    # Relative to output dir
+    dfStructure = None
+    dfMeanLine  = None
+    damp=[0, 0, 0]
     if BD is not None:
+        # --- Convert from BeamDyn to HAWC2 c2def and st data
+        # also writes st file
         # TODO A, E, G, theta_p
-        st_filefull  = os.path.join(outDataDir, 'blade_st.st')
         dfMeanLine, dfStructure = bd.beamDynToHawc2(BD, BDbld, H2_stfile=st_filefull, A=Bld_A, E=Bld_E, G=Bld_G, theta_p_in = Bld_theta_p, FPM=FPM, verbose=True)
-        st_file = os.path.relpath(st_filefull, outDir)
 
-        bdy.nbodies = dfMeanLine.shape[0]-1 # One body per station -1
-        bdy.timoschenko_input.ts_filename = st_file
-        bdy.timoschenko_input.set.values = [1,1]
-
-        if FPM:
-            bdy.timoschenko_input.fpm = 1
-            # Damping
-            #bdy['damping_aniso'] = bdy.damping_posdef.copy()
-            bdy.damping_posdef.name_='damping_aniso'
-            bdy.damping_posdef.name_='damping_aniso'
-            bdy.damping_posdef.values[0]=0 # no mass proportioanl damping
-            bdy.damping_posdef.values[1]=0 # no mass proportioanl damping
-            bdy.damping_posdef.values[2]=0 # no mass proportioanl damping
-            bdy.damping_posdef.values[3] = BDbld['DampingCoeffs'][0,1] # TODO  Check order
-            bdy.damping_posdef.values[4] = BDbld['DampingCoeffs'][0,0] # TODO 
-            bdy.damping_posdef.values[5] = BDbld['DampingCoeffs'][0,2] # TODO 
-            #raise NotImplementedError('Damping for FPM')
-            print('>>>> TODO TODO TODO DAMPING ')
-        else:
-            bdy.timoschenko_input.fpm = 0
-            # Damping
-            bdy.damping_posdef.values[3] = BDbld['DampingCoeffs'][0,1]
-            bdy.damping_posdef.values[4] = BDbld['DampingCoeffs'][0,0]
-            bdy.damping_posdef.values[5] = BDbld['DampingCoeffs'][0,2]
-
-        # Meanline
-        c2_def = htc.bodyC2(bdy)
-        c2_def = np.column_stack((np.arange(1,len(dfMeanLine)+1), dfMeanLine.values))
-        c2_def = np.around(c2_def, 5)
-        htc.setBodyC2(bdy, c2_def)
+        # --- Damping
+        damp[0] = BDbld['DampingCoeffs'][0,1] # TODO  Check order
+        damp[1] = BDbld['DampingCoeffs'][0,0] # TODO 
+        damp[2] = BDbld['DampingCoeffs'][0,2] # TODO 
             
-    else:
-        # ElastoDyn
-        raise NotImplementedError('Blade with ElastoDyn')
+    elif EDbld is not None:
+        print('[WARN] Blade with ElastoDyn is not fully implemented')
+        if FPM:
+            print('[WARN] Cannot do FPM with ElastoDyn for now')
+            FPM = False # Cannot do FPM with ElastoDyn
 
-    # print(bdy)
+        # --- ElastoDyn blade properties
+        M = EDbld['BldProp']
+        dfBld = EDbld.toDataFrame() # r/R, PitchAxis(unused), StructuralTwist, m, EIflap, EIdge
+        R           = ED['TipRad'] - ED['HubRad']
+
+        # --- Convert from ElastoDyn to HAWC2 c2def and st data
+        dfMeanLine, dfStructure = ed.elastodynBlade2Hawc2_raw(dfBld, R)
+        # Write st file
+        h2.dfstructure2stfile(dfStructure, st_filefull)
+
+        # --- 
+        # TODO TODO TODO Damping is completely wrong here
+        print('[WARN] Damping values for blades are wrong when using ElastoDyn blade')
+        damp[0] = EDbld['BldFlDmp(1)']/100 # 
+        damp[1] = EDbld['BldFlDmp(2)']/100
+        damp[2] = EDbld['BldEdDmp(1)']/100
+
+
+    else:
+        raise Exception('No BeamDyn or ElastoDyn blade present')
+        # or throw a warning and skip the section below..
+
+    # --- Setup HAWC2 "body" data
+    bdy = htc.bodyByName('blade1')
+    bdy.nbodies = dfMeanLine.shape[0]-1 # One body per station -1
+    bdy.timoschenko_input.ts_filename = st_file
+    bdy.timoschenko_input.set.values = [1,1]
+
+    if FPM:
+        bdy.timoschenko_input.fpm = 1
+        # Damping
+        #bdy['damping_aniso'] = bdy.damping_posdef.copy()
+        bdy.damping_posdef.name_='damping_aniso'
+        bdy.damping_posdef.name_='damping_aniso'
+        bdy.damping_posdef.values[0]=0 # no mass proportional damping
+        bdy.damping_posdef.values[1]=0 # no mass proportional damping
+        bdy.damping_posdef.values[2]=0 # no mass proportional damping
+        bdy.damping_posdef.values[3] = damp[0]
+        bdy.damping_posdef.values[4] = damp[1]
+        bdy.damping_posdef.values[5] = damp[2]
+        #raise NotImplementedError('Damping for FPM')
+        print('>>>> TODO TODO TODO DAMPING ')
+    else:
+        bdy.timoschenko_input.fpm = 0
+        # Damping
+        bdy.damping_posdef.values[3] = damp[0]
+        bdy.damping_posdef.values[4] = damp[1]
+        bdy.damping_posdef.values[5] = damp[2]
+
+    # Meanline
+    c2_def = htc.bodyC2(bdy)
+    c2_def = np.column_stack((np.arange(1,len(dfMeanLine)+1), dfMeanLine.values))
+    c2_def = np.around(c2_def, 5)
+    htc.setBodyC2(bdy, c2_def)
+
+    #print(bdy)
 
 
     # --- Orientation
@@ -199,7 +237,9 @@ def FAST2Hawc2(fstIn, htcTemplate, htcOut, OPfile=None, TwrFAFreq=0.1, TwrSSFreq
     # sec.relative__8.body2_eulerang.values[2] = - np.around(ED['BlPitch(3)'],4) # TODO sign
     #print(sec)
 
+    # --------------------------------------------------------------------------------}
     # --- Wind
+    # --------------------------------------------------------------------------------{
     sec = htc.data.wind
     sec.density                = AD['AirDens']
     sec.wsp                    = IW['HWindSpeed']

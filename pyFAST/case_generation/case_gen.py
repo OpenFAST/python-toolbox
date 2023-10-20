@@ -11,10 +11,7 @@ import re
 import pyFAST.input_output.fast_input_file as fi
 import pyFAST.case_generation.runner as runner
 import pyFAST.input_output.postpro as postpro
-from pyFAST.input_output.fast_wind_file import FASTWndFile
-from pyFAST.input_output.rosco_performance_file import ROSCOPerformanceFile
-from pyFAST.input_output.csv_file import CSVFile
-
+from pyFAST.input_output.fast_wind_file import FASTWndFilefrom pyFAST.input_output.rosco_performance_file import ROSCOPerformanceFilefrom pyFAST.input_output.csv_file import CSVFile
 # --------------------------------------------------------------------------------}
 # --- Template replace 
 # --------------------------------------------------------------------------------{
@@ -150,11 +147,7 @@ def templateReplaceGeneral(PARAMS, templateDir=None, outputDir=None, main_file=N
                 ext = os.path.splitext(templatefilename)[-1]
                 newfilename_full = os.path.join(wd,strID+ext)
                 newfilename      = strID+ext
-                if dryRun:
-                    newfilename = os.path.join(workDir, newfilename)
-                    obj=type('DummyClass', (object,), {'filename':newfilename})
-                    return newfilename, {'Root':obj}
-            else:
+                if dryRun:                    newfilename = os.path.join(workDir, newfilename)                    obj=type('DummyClass', (object,), {'filename':newfilename})                    return newfilename, {'Root':obj}            else:
                 newfilename, newfilename_full = rebaseFileName(templatefilename, workDir, strID)
             #print('--------------------------------------------------------------')
             #print('TemplateFile    :', templatefilename)
@@ -172,8 +165,12 @@ def templateReplaceGeneral(PARAMS, templateDir=None, outputDir=None, main_file=N
             Key    = NewFileKey_or_Key
             #print('Setting', FileKey, '|',Key, 'to',ParamValue)
             if Key=='OutList':
-                OutList=f[Key]
-                f[Key] = addToOutlist(OutList, ParamValue)
+                if len(ParamValue)>0:
+                    if len(ParamValue[0])==0:
+                        f[Key] = ParamValue # We replace
+                    else:
+                        OutList=f[Key]
+                        f[Key] = addToOutlist(OutList, ParamValue) # we insert
             else:
                 f[Key] = ParamValue
         else:
@@ -229,14 +226,21 @@ def templateReplaceGeneral(PARAMS, templateDir=None, outputDir=None, main_file=N
             removeFASTOuputs(wd)
         if os.path.exists(wd) and removeAllowed:
             shutil.rmtree(wd, ignore_errors=False, onerror=handleRemoveReadonlyWin)
-        copyTree(templateDir, wd)
-        if removeAllowed:
-            removeFASTOuputs(wd)
+        templateDir = os.path.normpath(templateDir)
+        wd          = os.path.normpath(wd)
+        # NOTE: need some special handling if path are the sames
+        if templateDir!=wd:
+            copyTree(templateDir, wd)
+            if removeAllowed:
+                removeFASTOuputs(wd)
 
 
     TemplateFiles=[]
     files=[]
+    nTot=len(PARAMS)
     for ip,(wd,p) in enumerate(zip(workDirS,PARAMS)):
+        if np.mod(ip+1,1000)==0:
+            print('File {:d}/{:d}'.format(ip,nTot))
         if '__index__' not in p.keys():
             p['__index__']=ip
 
@@ -248,16 +252,12 @@ def templateReplaceGeneral(PARAMS, templateDir=None, outputDir=None, main_file=N
             if k =='__index__' or k=='__name__':
                 continue
             new_mainFile, Files = replaceRecurse(main_file_base, '', k, v, Files, strID, wd, TemplateFiles)
-            if dryRun:
-                break
-
+            if dryRun:                break
         # --- Writting files
         for k,f in Files.items():
             if k=='Root':
                 files.append(f.filename)
-            if not dryRun:
-                f.write()
-
+            if not dryRun:                f.write()
     # --- Remove extra files at the end
     if removeRefSubFiles:
         TemplateFiles, nCounts = np.unique(TemplateFiles, return_counts=True)

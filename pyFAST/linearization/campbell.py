@@ -28,10 +28,11 @@ from pyFAST.linearization.campbell_data import campbell_diagram_data_oneOP, camp
 from pyFAST.linearization.campbell_data import IdentifyModes
 
 
-def postproCampbell(fstFiles, BladeLen=None, TowerLen=None, verbose=True, nFreqOut=15, 
-        WS_legacy=None, removeTwrAzimuth=False,
-        writeModes=None,
-        **kwargs
+def postproCampbell(fstFiles, BladeLen=None, TowerLen=None, verbose=True, 
+        WS_legacy=None, 
+        nFreqOut=500, freqRange=None, posDampRange=None,  # Options for TXT output
+        removeTwrAzimuth=False, starSub=None, removeStatesPattern=None, # Options for A matrix selection
+        writeModes=None, **kwargs  # Options for .viz files
         ):
     """ 
     Postprocess linearization files to extract Campbell diagram (linearization at different Operating points)
@@ -42,6 +43,23 @@ def postproCampbell(fstFiles, BladeLen=None, TowerLen=None, verbose=True, nFreqO
 
     INPUTS:
      - fstFiles: list of fst files
+
+    INPUTS (related to A matrices):
+     - removeTwrAzimuth: if False do nothing
+                 otherwise discard lin files where azimuth in [60, 180, 300]+/-4deg (close to tower). 
+     - starSub: if None, raise an error if `****` are present
+                 otherwise replace *** with `starSub` (e.g. 0)
+                 see FASTLinearizationFile. 
+     - removeStatesPattern: remove states matching a giving description pattern.
+                e.g:  'tower|Drivetrain'  or '^AD'
+                see FASTLinearizationFile. 
+
+    INPUTS (related to Campbell_Summary.txt output):
+     - nFreqOut: maximum number of frequencies to write to Campbell_Summary.txt file
+     - freqRange:    range in which frequencies are "accepted",  if None: [-np.inf, np.inf]
+     - posDampRange: range in which damping are "accepted'    ,  if None: [1e-5, 0.96]
+
+    INPUTS (related to .viz files):
      - writeModes: if True, a binary file and a .viz file is written to disk for OpenFAST VTK visualization.
                    if None, the binary file is written only if a checkpoint file is present.
                           For instance, if the main file is     : 'main.fst', 
@@ -50,6 +68,13 @@ def postproCampbell(fstFiles, BladeLen=None, TowerLen=None, verbose=True, nFreqO
                           the checkpoint file is expected to be : 'main.ModeShapeVTK.chkp'
      - **kwargs: list of key/values to be passed to writeVizFile (see function below)
            VTKLinModes=15, VTKLinScale=10, VTKLinTim=1, VTKLinTimes1=True, VTKLinPhase=0, VTKModes=None
+
+    OUTPUTS:
+     - OP: dataframe of operating points
+     - Freq: dataframe of frequencies for each OP and identified mode
+     - Damp: dataframe of dampings    for each OP and identified mode
+     - UnMapped: 
+     - ModeData: all mode data all mode data 
     """ 
     if len(fstFiles)==0:
         raise Exception('postproCampbell requires a list of at least one .fst')
@@ -60,7 +85,8 @@ def postproCampbell(fstFiles, BladeLen=None, TowerLen=None, verbose=True, nFreqO
         CD = pickle.load(open(fstFiles[0],'rb'))
     else:
         # --- Attemps to extract Blade Length and TowerLen from first file...
-        CD, MBC = getCampbellDataOPs(fstFiles, writeModes=writeModes, BladeLen=BladeLen, TowerLen=TowerLen, removeTwrAzimuth=removeTwrAzimuth, verbose=verbose, **kwargs)
+        CD, MBC = getCampbellDataOPs(fstFiles, writeModes=writeModes, BladeLen=BladeLen, TowerLen=TowerLen, 
+                removeTwrAzimuth=removeTwrAzimuth, starSub=starSub, removeStatesPattern=removeStatesPattern, verbose=verbose, **kwargs)
 
     # --- Identify modes
     modeID_table,modesDesc=IdentifyModes(CD)
@@ -71,7 +97,7 @@ def postproCampbell(fstFiles, BladeLen=None, TowerLen=None, verbose=True, nFreqO
     modeID_file = campbellData2CSV(baseName, CD, modeID_table, modesDesc)
     # Write summary txt file to help manual identification step..
     txtFileName = baseName+'_Summary.txt'
-    campbellData2TXT(CD, nFreqOut=nFreqOut, txtFileName=txtFileName)
+    campbellData2TXT(CD, txtFileName=txtFileName, nFreqOut=nFreqOut, freqRange=freqRange, posDampRange=posDampRange)
 
     # --- Return nice dataframes (assuming the identification is correct)
     # TODO, for now we reread the files...
@@ -167,7 +193,7 @@ def postproMBC(xlsFile=None, csvModesIDFile=None, xlssheet=None, verbose=True, W
         for i,v in enumerate(WS):
             OPFile = csvBase+'Campbell_Point{:02d}{:}.csv'.format(i+1,suffix)
             #print(OPFile, WS[i], RPM[i])
-            Points[i] = pd.read_csv(OPFile, sep = ',', header=None)
+            Points[i] = pd.read_csv(OPFile, sep = ',', header=None, dtype='object')
     else:
         raise Exception('Provide either an Excel file or a csv (ModesID) file')
     # --- Mode Identification
@@ -258,7 +284,7 @@ def postproMBC(xlsFile=None, csvModesIDFile=None, xlssheet=None, verbose=True, W
             UnMapped_RPM  = np.concatenate((UnMapped_RPM, rpm))
         else:
             if all(ModeIndices==-1):
-                print('Skipping mode number ',iMode)
+                print('Mode not IDd: {}, name: {}.'.format(iMode, ModeName))
             else:
                 f=[]
                 d=[]

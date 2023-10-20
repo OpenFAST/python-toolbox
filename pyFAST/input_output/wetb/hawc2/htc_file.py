@@ -157,8 +157,8 @@ class HTCFile(HTCContents, HTCDefaults, HTCExtensions):
             relpath = "../" * np.argmax(found)
             return abspath(pjoin(os.path.dirname(self.filename), relpath))
         else:
-            raise ValueError(
-                "Modelpath cannot be autodetected for '%s'.\nInput files not found near htc file" % self.filename)
+            print("Modelpath cannot be autodetected for '%s'.\nInput files not found near htc file" % self.filename)
+            return 'unknown'
 
     def load(self):
         self.contents = OrderedDict()
@@ -591,7 +591,6 @@ class SSH_HTCFile(HTCFile):
 if "__main__" == __name__:
     f = HTCFile(r"C:/Work/BAR-Local/Hawc2ToBeamDyn/sim.htc", ".")
     print(f.input_files())
-    import pdb; pdb.set_trace()
 #     f.save(r"C:\mmpe\HAWC2\models\DTU10MWRef6.0\htc\DTU_10MW_RWT_power_curve.htc")
 #
 #     f = HTCFile(r"C:\mmpe\HAWC2\models\DTU10MWRef6.0\htc\DTU_10MW_RWT.htc", "../")
