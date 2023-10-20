@@ -343,7 +343,7 @@ def WriteTSFile(fileIn, fileOut, params, NewFile=True, tpath=None, tmax=50, turb
             f.write(f'"0.0"\tCohExp\t\t- Coherence exponent for general model [-] (or "default")\n')
             f.write(f'\n')
             f.write(f'--------Coherent Turbulence Scaling Parameters-------------------\n')
-            f.write(f'".\EventData"\tCTEventPath\t\t- Name of the path where event data files are located\n')
+            f.write(f'".\\EventData"\tCTEventPath\t\t- Name of the path where event data files are located\n')
             f.write(f'"random"\tCTEventFile\t\t- Type of event files ("LES", "DNS", or "RANDOM")\n')
             f.write(f'true\tRandomize\t\t- Randomize the disturbance scale and locations? (true/false)\n')
             f.write(f'1\tDistScl\t\t- Disturbance scale [-] (ratio of event dataset height to rotor disk). (Ignored when Randomize = true.)\n')
