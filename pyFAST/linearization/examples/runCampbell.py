@@ -40,18 +40,18 @@ def campbell_example(writeFSTfiles=True, runFAST=True, postproLin=True):
 
     # --- Step 1: Write OpenFAST inputs files for each operating points 
     baseDict = {'DT':0.01} # Example of how inputs can be overriden (see case_gen.py templateReplace)
-    FSTfilenames = lin.writeLinearizationFiles(templateFstFile, simulationFolder, operatingPointsFile, nPerPeriod=nPerPeriod, baseDict=baseDict)
+    fstFiles = lin.writeLinearizationFiles(templateFstFile, simulationFolder, operatingPointsFile, nPerPeriod=nPerPeriod, baseDict=baseDict)
 
     # Create a batch script (optional)
-    runner.writeBatch(os.path.join(simulationFolder,'_RUN_ALL.bat'), FSTfilenames, fastExe=fastExe)
+    runner.writeBatch(os.path.join(simulationFolder,'_RUN_ALL.bat'), fstFiles, fastExe=fastExe)
 
     # --- Step 2: run OpenFAST 
     if runFAST:
-        runner.run_fastfiles(FSTfilenames, fastExe=fastExe, parallel=True, showOutputs=True, nCores=4)
+        runner.run_fastfiles(fstFiles, fastExe=fastExe, parallel=True, showOutputs=True, nCores=4)
 
     # --- Step 3: Run MBC, identify Modes, generate CSV files, and binary modes
     if postproLin:
-        OP, Freq, Damp, _, _, modeID_file = lin.postproCampbell(FSTfilenames, writeModes=True, verbose=True)
+        OP, Freq, Damp, _, _, modeID_file = lin.postproCampbell(fstFiles, writeModes=True, verbose=True)
         # Edit the modeID file manually to identify the modes
         print('[TODO] Edit this file manually: ',modeID_file)
 
@@ -70,7 +70,6 @@ def campbell_example(writeFSTfiles=True, runFAST=True, postproLin=True):
 
         # --- Step 5b: Run FAST with VIZ files to generate VTKs
         simDir = os.path.dirname(fstFiles[0])
-        fastExe = '../../../data/openfast3.3_x64s.exe'
         ### Option 1 write a batch file and run it
         # batchfile = runner.writeBatch(os.path.join(simDir,'_RUNViz.bat'), vizFiles, fastExe=fastExe, flags='-VTKLin')
         # runner.runBatch(batchfile)

@@ -13,4 +13,3 @@ Examples using higher-level functions:
 
 - `runCampbell.py`: Generates a Campbell diagram; write OpenFAST input files, run openfast, postprocess the linearization files, and generate the Campbell diagram plot. Requires an openfast executable.
 
-- `runLinTurbine.py`: (advanced) Example to run a set of OpenFAST simulations with linearizations. Requires an OpenFAST exe.
