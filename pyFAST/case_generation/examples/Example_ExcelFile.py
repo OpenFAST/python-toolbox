@@ -23,9 +23,9 @@ def main(run=True):
 
     # --- Reading Excel file, converting it to a list of dictionaries, and generate input files
     dfs    = io.excel_file.ExcelFile(parametricFile).toDataFrame()
-    try:
+    if isinstance(dfs, dict):
         df = dfs[list(dfs.keys())[0]]
-    except:
+    else:
         df = dfs
     PARAMS = df.to_dict('records')
     fastFiles=case_gen.templateReplace(PARAMS, ref_dir, outputDir=work_dir, removeRefSubFiles=True, removeAllowed=False, main_file=main_file)
