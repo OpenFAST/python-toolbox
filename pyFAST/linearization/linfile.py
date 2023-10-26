@@ -286,16 +286,20 @@ def ReadFASTLinear(filename, starSub=None, removeStatesPattern=None):
         data['x_desc']       = f['x_info']['Description']
         data['xdot_desc']    = f['xdot_info']['Description']
         data['n_x2'] = np.sum(data['x_DerivOrder']== 2)
+        data['x_op'] = f['x']
     else:
         data['n_x2'] = 0;
     if data['n_z']>0:
         data['z_desc']     = f['z_info']['Description']
+        data['z_op']       = f['z']
     if data['n_u']>0:
         data['u_rotFrame'] = f['u_info']['RotatingFrame']
         data['u_desc']     = f['u_info']['Description']
+        data['u_op']       = f['u']
     if data['n_y']>0:
         data['y_rotFrame'] = f['y_info']['RotatingFrame']
         data['y_desc']     = f['y_info']['Description']
+        data['y_op']       = f['y']
     for k in ['A','B','C','D']:
         if k in f.keys():
             data[k] = f[k]
