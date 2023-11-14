@@ -1,0 +1,2 @@
+"""Initializes the package"""
+print('>>>>')
