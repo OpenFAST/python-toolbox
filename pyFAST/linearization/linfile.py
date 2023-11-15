@@ -7,7 +7,7 @@
 #############################################################
 #!/usr/bin/env python
 
-import os, distutils
+import os
 import collections
 from itertools import islice
 import numpy as np
