@@ -11,13 +11,47 @@ on:
 # strategy:
 #   matrix:
 #     os: [macOS-10.14, ubuntu-18.04]
+#     runs-on: ubuntu-latest
+#     strategy:
+#       matrix:
+#         python-version: [3.7, 3.8, 3.9, 3.11, 3.12]  # 
 
 jobs:
   build-and-test:
-    runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.7, 3.8, 3.9, 3.11, 3.12]  # 
+        include:
+          - os: ubuntu-latest
+            python-version: 3.7
+            python: xvfb-run python3
+            pip_arg: ""
+          - os: ubuntu-latest
+            python-version: 3.8
+            python: xvfb-run python3
+            pip_arg: ""
+          - os: ubuntu-latest
+            python-version: 3.9
+            python: xvfb-run python3
+            pip_arg: ""
+          - os: ubuntu-latest
+            python-version: 3.11
+            python: xvfb-run python3
+            pip_arg: ""
+          - os: ubuntu-latest
+            python-version: 3.12
+            python: xvfb-run python3
+            pip_arg: ""
+          - os: macos-11
+            python-version: 3.11
+            python: python3
+            pip_arg: ""
+          - os: windows-2019
+            python-version: 3.11
+            python: python
+            pip_arg: --user
+    runs-on: ${{ matrix.os }}
+
+
     steps:
       - name: Checkout
         uses: actions/checkout@main
@@ -30,9 +64,6 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          pip install pytest
-          pip install pytest-cov
           pip install -e .
       - name: Tests
         run: |
