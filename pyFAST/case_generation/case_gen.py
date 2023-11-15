@@ -1,5 +1,9 @@
 import os
-import collections
+try:
+    import collections.abc as collections
+except:
+    import collections
+
 import glob
 import pandas as pd
 import numpy as np
@@ -11,7 +15,9 @@ import re
 import pyFAST.input_output.fast_input_file as fi
 import pyFAST.case_generation.runner as runner
 import pyFAST.input_output.postpro as postpro
-from pyFAST.input_output.fast_wind_file import FASTWndFilefrom pyFAST.input_output.rosco_performance_file import ROSCOPerformanceFilefrom pyFAST.input_output.csv_file import CSVFile
+from pyFAST.input_output.fast_wind_file import FASTWndFile
+from pyFAST.input_output.rosco_performance_file import ROSCOPerformanceFile
+from pyFAST.input_output.csv_file import CSVFile
 # --------------------------------------------------------------------------------}
 # --- Template replace 
 # --------------------------------------------------------------------------------{
