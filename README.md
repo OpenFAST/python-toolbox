@@ -22,7 +22,7 @@ pytest
 
 The repository contains a set of small packages:
 
-- input\_output: read/write OpenFAST/FAST.Farm/OLAF input and output files (see [README](openfast_toolbox/input_output)) 
+- input\_output: read/write OpenFAST/FAST.Farm/OLAF input and output files (see [README](openfast_toolbox/io)) 
 - postpro: postprocess OpenFAST outputs (extract radial data, compute fatigue loads) (see [examples](openfast_toolbox/postpro/examples))
 - linearization: tools to deal with OpenFAST linearization, e.g. generate a Campbell diagram (see [examples](openfast_toolbox/linearization/examples/))
 - aeroacoustics: tools for aeroacoustics (generate BL files and plot outputs)
@@ -32,11 +32,11 @@ The repository contains a set of small packages:
 ## QuickStart and main usage
 
 ### Read and write files
-Find examples scripts in this [folder](openfast_toolbox/input_output/examples) and the different fileformats [here](openfast_toolbox/input_output). 
+Find examples scripts in this [folder](openfast_toolbox/io/examples) and the different fileformats [here](openfast_toolbox/io). 
 
 Read an AeroDyn file (or any OpenFAST input file), modifies some values and write the modified file:
 ```python
-from openfast_toolbox.input_output import FASTInputFile
+from openfast_toolbox.io import FASTInputFile
 filename = 'AeroDyn.dat'
 f = FASTInputFile(filename)
 f['TwrAero'] = True
@@ -46,7 +46,7 @@ f.write('AeroDyn_Changed.dat')
 
 Read an OpenFAST binary output file and convert it to a pandas DataFrame
 ```python
-from openfast_toolbox.input_output import FASTOutputFile
+from openfast_toolbox.io import FASTOutputFile
 df = FASTOutputFile('5MW.outb').toDataFrame()
 time  = df['Time_[s]']
 Omega = df['RotSpeed_[rpm]']
@@ -54,7 +54,7 @@ Omega = df['RotSpeed_[rpm]']
 
 Read a TurbSim binary file, modify it and write it back
 ```python 
-from openfast_toolbox.input_output import TurbSimFile
+from openfast_toolbox.io import TurbSimFile
 ts = TurbSimFile('Turb.bts')
 print(ts.keys())
 print(ts['u'].shape)  
