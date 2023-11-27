@@ -1,4 +1,4 @@
-# pyfast
+# openfast_toolbox
 
 [![Build status](https://github.com/openfast/python-toolbox/workflows/Development%20Pipeline/badge.svg)](https://github.com/OpenFAST/python-toolbox/actions?query=workflow%3A%22Development+Pipeline%22)
 [![Python: 3.6+](https://img.shields.io/badge/python-3.6%2B-informational)](https://www.python.org/)
