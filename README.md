@@ -1,7 +1,14 @@
-# pyfast
-
+# [DEPRECATED] pyfast
 [![Build status](https://github.com/openfast/python-toolbox/workflows/Development%20Pipeline/badge.svg)](https://github.com/OpenFAST/python-toolbox/actions?query=workflow%3A%22Development+Pipeline%22)
 [![Python: 3.6+](https://img.shields.io/badge/python-3.6%2B-informational)](https://www.python.org/)
+
+
+NOTE: pyFAST has been renamed to `openfast_toolbox` and migrated to the following repository: 
+ [openfast_toolbox](https://github.com/OpenFAST/openfast_toolbox). 
+
+Sorry for the inconvenience. 
+
+
 
 Python package to work with NREL-supported [OpenFAST](https://github.com/OpenFAST/openfast) tool.
 This repository intends to provide simple scripts to help OpenFAST users setup models, run simulations and postprocess the results. 
