@@ -15,8 +15,8 @@ with open(os.path.join(ROOT, "VERSION")) as version_file:
 
 
 setup(
-    name="pyFAST",
-    description="pyFAST",
+    name="openfast_toolbox",
+    description="openfast_toolbox",
     long_description=LONG_DESCRIPTION,
     version=VERSION,
     url="https://github.com/openfast/python-toolbox/",
@@ -28,7 +28,7 @@ setup(
         "Programming Language :: Python :: 3.7",
         "Topic :: Software Development :: Version Control :: Git",
     ],
-    packages=["pyFAST"],
+    packages=["openfast_toolbox"],
     python_requires=">=3.6",
     install_requires=[
         "matplotlib",
@@ -43,5 +43,5 @@ setup(
     ],
     test_suite="pytest",
     tests_require=["pytest"],
-    entry_points={"console_scripts": ["pyFAST = pyFAST.__main__:main"]},
+    entry_points={"console_scripts": ["openfast_toolbox = openfast_toolbox.__main__:main"]},
 )

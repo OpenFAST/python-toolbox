@@ -1,4 +1,4 @@
-# pyfast
+# openfast_toolbox
 
 [![Build status](https://github.com/openfast/python-toolbox/workflows/Development%20Pipeline/badge.svg)](https://github.com/OpenFAST/python-toolbox/actions?query=workflow%3A%22Development+Pipeline%22)
 [![Python: 3.6+](https://img.shields.io/badge/python-3.6%2B-informational)](https://www.python.org/)
@@ -22,21 +22,21 @@ pytest
 
 The repository contains a set of small packages:
 
-- input\_output: read/write OpenFAST/FAST.Farm/OLAF input and output files (see [README](pyFAST/input_output)) 
-- postpro: postprocess OpenFAST outputs (extract radial data, compute fatigue loads) (see [examples](pyFAST/postpro/examples))
-- linearization: tools to deal with OpenFAST linearization, e.g. generate a Campbell diagram (see [examples](pyFAST/linearization/examples/))
+- input\_output: read/write OpenFAST/FAST.Farm/OLAF input and output files (see [README](openfast_toolbox/io)) 
+- postpro: postprocess OpenFAST outputs (extract radial data, compute fatigue loads) (see [examples](openfast_toolbox/postpro/examples))
+- linearization: tools to deal with OpenFAST linearization, e.g. generate a Campbell diagram (see [examples](openfast_toolbox/linearization/examples/))
 - aeroacoustics: tools for aeroacoustics (generate BL files and plot outputs)
-- case\_generation: tools to generate and run a set of input of OpenFAST input files (see [examples](pyFAST/case_generation/examples))
+- case\_generation: tools to generate and run a set of input of OpenFAST input files (see [examples](openfast_toolbox/case_generation/examples))
 
 
 ## QuickStart and main usage
 
 ### Read and write files
-Find examples scripts in this [folder](pyFAST/input_output/examples) and the different fileformats [here](pyFAST/input_output). 
+Find examples scripts in this [folder](openfast_toolbox/io/examples) and the different fileformats [here](openfast_toolbox/io). 
 
 Read an AeroDyn file (or any OpenFAST input file), modifies some values and write the modified file:
 ```python
-from pyFAST.input_output import FASTInputFile
+from openfast_toolbox.io import FASTInputFile
 filename = 'AeroDyn.dat'
 f = FASTInputFile(filename)
 f['TwrAero'] = True
@@ -46,7 +46,7 @@ f.write('AeroDyn_Changed.dat')
 
 Read an OpenFAST binary output file and convert it to a pandas DataFrame
 ```python
-from pyFAST.input_output import FASTOutputFile
+from openfast_toolbox.io import FASTOutputFile
 df = FASTOutputFile('5MW.outb').toDataFrame()
 time  = df['Time_[s]']
 Omega = df['RotSpeed_[rpm]']
@@ -54,7 +54,7 @@ Omega = df['RotSpeed_[rpm]']
 
 Read a TurbSim binary file, modify it and write it back
 ```python 
-from pyFAST.input_output import TurbSimFile
+from openfast_toolbox.io import TurbSimFile
 ts = TurbSimFile('Turb.bts')
 print(ts.keys())
 print(ts['u'].shape)  
@@ -63,27 +63,27 @@ tw.write('NewTurbulenceBox.bts')
 ```
 
 ### Polar/airfoil manipulation
-Find examples scripts in this [folder](pyFAST/polar/examples).
+Find examples scripts in this [folder](openfast_toolbox/polar/examples).
 
 
 Read a CSV file with `alpha, Cl, Cd, Cm`, and write it to AeroDyn format (also computes unsteady coefficients)
 ```python 
-from pyFAST.airfoils.Polar import Polar
-polar = Polar('pyFAST/airfoils/data/DU21_A17.csv', fformat='delimited')
+from openfast_toolbox.airfoils.Polar import Polar
+polar = Polar('openfast_toolbox/airfoils/data/DU21_A17.csv', fformat='delimited')
 ADpol = polar.toAeroDyn('AeroDyn_Polar_DU21_A17.dat')
 ```
 
 ### Write a set of OpenFAST input file for multiple simulations
-Find examples scripts in this [folder](pyFAST/case_generation/examples).
+Find examples scripts in this [folder](openfast_toolbox/case_generation/examples).
 
 ### Postprocessing
 
 Below are different scripts to manipulate OpenFAST outputs:
 
-- [Extract average radial data](pyFAST/postpro/examples/Example_RadialPostPro.py).
-- [Interpolate data at different radial positions](pyFAST/postpro/examples/Example_RadialInterp.py).
-- [Compute damage equivalent loads](pyFAST/postpro/examples/Example_EquivalentLoad.py).
-- [Change column names and units](pyFAST/postpro/examples/Example_Remap.py).
+- [Extract average radial data](openfast_toolbox/postpro/examples/Example_RadialPostPro.py).
+- [Interpolate data at different radial positions](openfast_toolbox/postpro/examples/Example_RadialInterp.py).
+- [Compute damage equivalent loads](openfast_toolbox/postpro/examples/Example_EquivalentLoad.py).
+- [Change column names and units](openfast_toolbox/postpro/examples/Example_Remap.py).
 
 
 ## Future work and friend projects
