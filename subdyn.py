@@ -14,8 +14,8 @@ import matplotlib.pyplot as plt
 import copy
 import re
 # Local 
-from pyFAST.input_output.fast_input_file import FASTInputFile
-from pyFAST.tools.tictoc import Timer
+from openfast_toolbox.io.fast_input_file import FASTInputFile
+from openfast_toolbox.tools.tictoc import Timer
 
 idGuyanDamp_None     = 0
 idGuyanDamp_Rayleigh = 1
